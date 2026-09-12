@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A192F" />
+      <stop offset="50%" stop-color="#071324" />
+      <stop offset="100%" stop-color="#020813" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCEBA4" />
+      <stop offset="40%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#997A1E" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D4AF37" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="104" fill="url(#bgGrad)" />
+  <circle cx="256" cy="256" r="230" fill="url(#glow)" />
+  
+  <!-- Outer Gold Concentric Rings -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.8" />
+  <circle cx="256" cy="256" r="198" fill="none" stroke="url(#goldGrad)" stroke-width="1.5" stroke-dasharray="6 4" stroke-opacity="0.6" />
+  
+  <!-- Central Shield -->
+  <path d="M256 90 L360 140 V255 C360 330 256 395 256 395 C256 395 152 330 152 255 V140 Z" fill="#0A192F" stroke="url(#goldGrad)" stroke-width="6" />
+  
+  <!-- Aviation Wings -->
+  <!-- Left Wing -->
+  <path d="M250 220 C210 180 130 170 80 190 C120 215 180 230 240 245 Z" fill="url(#goldGrad)" />
+  <path d="M250 240 C200 215 140 210 100 230 C140 245 190 260 245 268 Z" fill="url(#goldGrad)" opacity="0.85" />
+  <path d="M250 260 C210 245 160 245 125 265 C160 275 205 285 248 290 Z" fill="url(#goldGrad)" opacity="0.7" />
+  
+  <!-- Right Wing -->
+  <path d="M262 220 C302 180 382 170 432 190 C392 215 332 230 272 245 Z" fill="url(#goldGrad)" />
+  <path d="M262 240 C312 215 372 210 412 230 C372 245 322 260 267 268 Z" fill="url(#goldGrad)" opacity="0.85" />
+  <path d="M262 260 C302 245 352 245 387 265 C352 275 307 285 264 290 Z" fill="url(#goldGrad)" opacity="0.7" />
+
+  <!-- Jet Aircraft Silhouette in Center -->
+  <path d="M256 125 L263 195 L320 240 L320 255 L263 245 L263 325 L285 345 L285 358 L256 350 L227 358 L227 345 L249 325 L249 245 L192 255 L192 240 L249 195 Z" fill="url(#goldGrad)" />
+  
+  <!-- Summit Text / Year -->
+  <text x="256" y="445" font-family="'Cinzel', serif, Arial" font-size="28" font-weight="700" fill="#FCEBA4" text-anchor="middle" letter-spacing="4">AVIATION SAFETY</text>
+  <text x="256" y="475" font-family="'Plus Jakarta Sans', sans-serif, Arial" font-size="16" font-weight="600" fill="#D4AF37" text-anchor="middle" letter-spacing="6">SUMMIT 2026</text>
+</svg>

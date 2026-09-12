@@ -1,0 +1,8 @@
+{
+  "name": "Aviation Safety Summit 2026",
+  "description": "Aviation Safety Summit 2026 — 17 November 2026 at Marriott Hotel, Ikeja, Lagos, Nigeria. Bringing aviation professionals, industry, government, technology, investors and stakeholders together around aviation safety.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
