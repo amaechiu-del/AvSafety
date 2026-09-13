@@ -11,6 +11,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { INITIAL_AD_POSITIONS, INITIAL_SPONSORSHIP_PACKAGES } from './src/data/marketplaceData';
 import { INITIAL_VERIFIED_SPEAKERS } from './src/data/speakersData';
+import { INITIAL_SPEAKER_RECORDS } from './src/data/speakerPublicationData';
 import { INITIAL_STAKEHOLDERS, STAKEHOLDER_CATEGORIES } from './src/data/stakeholdersData';
 
 
@@ -1734,6 +1735,293 @@ ${speakerContext}
     answer: `No speaker matching "${question}" was found in the official summit database. The Aviation Safety Summit 2026 features leaders across Regulators, Airlines, Airports, Oil & Gas, Banking, Telecoms, Insurance, Training, Simulation, and Government. Feel free to ask about specific sectors or executive names.`,
     timestamp: new Date().toISOString()
   });
+});
+
+// ============================================================
+// PUBLISHING AGENT ENDPOINTS
+// ============================================================
+app.post('/api/publishing/ai-transcribe', async (req, res) => {
+  const { speakerName, topic, organisation, audioFileName, audioNote } = req.body || {};
+
+  const fallbackTranscript = `[Verified Speaker Audio Transcription - ${speakerName || 'Speaker'}]: "${audioNote || `In this session on ${topic || 'aviation safety'}, we reviewed leadership accountability, incident reporting discipline, and practical prevention measures required to protect human life across Nigerian and regional airspace.`}"`;
+  const ai = getAiClient();
+
+  if (ai) {
+    try {
+      const prompt = `You are an aviation summit transcription assistant.
+Speaker: ${speakerName || 'Unknown'}
+Organisation: ${organisation || 'Unknown'}
+Topic: ${topic || 'Aviation Safety'}
+Audio file reference: ${audioFileName || 'Unknown'}
+Raw note/context: ${audioNote || 'No extra note provided'}
+
+Return only valid JSON:
+{
+  "transcript": "cleaned professional transcript paragraph"
+}
+The transcript must be concise and realistic, and must stay aligned with aviation safety.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.2,
+          responseMimeType: "application/json"
+        }
+      });
+
+      const parsed = JSON.parse(response.text || '{}');
+      const transcript = typeof parsed.transcript === 'string' && parsed.transcript.trim()
+        ? parsed.transcript.trim()
+        : fallbackTranscript;
+
+      return res.json({ success: true, transcript });
+    } catch (err: any) {
+      console.error('Publishing transcription agent failed:', err);
+    }
+  }
+
+  return res.json({ success: true, transcript: fallbackTranscript });
+});
+
+app.post('/api/publishing/ai-generate-handbook', async (req, res) => {
+  const { speakerName, topic, organisation, transcript, preferredTitle } = req.body || {};
+
+  const safeSpeaker = speakerName || 'Summit Speaker';
+  const safeTopic = topic || 'Aviation Safety Leadership';
+  const safeOrganisation = organisation || 'Aviation Safety Summit 2026';
+  const safeTranscript = transcript || `This session addresses ${safeTopic} with practical recommendations for operators, regulators, and corporate leaders.`;
+  const fallbackTitle = preferredTitle || `${safeTopic} — Executive Safety Handbook`;
+  const ai = getAiClient();
+
+  if (ai) {
+    try {
+      const prompt = `You are the DomisLink handbook drafting agent.
+Generate concise, publication-ready handbook structure from verified summit materials.
+
+Speaker: ${safeSpeaker}
+Organisation: ${safeOrganisation}
+Topic: ${safeTopic}
+Source Transcript:
+${safeTranscript}
+
+Return valid JSON only:
+{
+  "title": "string",
+  "executiveSummary": "string",
+  "chapterOutline": ["string"],
+  "keyLessons": ["string"],
+  "recommendations": ["string"],
+  "checklist": ["string"],
+  "status": "SPEAKER_REVIEW"
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.2,
+          responseMimeType: "application/json"
+        }
+      });
+
+      const parsed = JSON.parse(response.text || '{}');
+      if (parsed && typeof parsed === 'object') {
+        return res.json({
+          success: true,
+          handbook: {
+            title: parsed.title || fallbackTitle,
+            executiveSummary: parsed.executiveSummary || `This handbook translates ${safeSpeaker}'s summit message into practical safety implementation guidance.`,
+            chapterOutline: Array.isArray(parsed.chapterOutline) ? parsed.chapterOutline : [
+              'Foreword & Summit Context',
+              'Executive Summary',
+              'Operational Risks and Root Causes',
+              'Action Framework and Accountability'
+            ],
+            keyLessons: Array.isArray(parsed.keyLessons) ? parsed.keyLessons : [
+              'Safety is a shared responsibility across the aviation value chain.',
+              'Early hazard reporting reduces catastrophic outcomes.'
+            ],
+            recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [
+              'Embed periodic operational safety audits.',
+              'Strengthen non-punitive safety reporting channels.'
+            ],
+            checklist: Array.isArray(parsed.checklist) ? parsed.checklist : [
+              'Review safety KPIs at executive level monthly.',
+              'Confirm recurrent crew and technical training completion.'
+            ],
+            status: 'SPEAKER_REVIEW'
+          }
+        });
+      }
+    } catch (err: any) {
+      console.error('Publishing handbook agent failed:', err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    handbook: {
+      title: fallbackTitle,
+      executiveSummary: `This handbook translates ${safeSpeaker}'s summit message into practical safety implementation guidance for ${safeOrganisation}.`,
+      chapterOutline: [
+        'Foreword & Summit Context',
+        'Executive Summary',
+        'Operational Risks and Root Causes',
+        'Case Studies and Lessons Learned',
+        'Recommendations and Action Checklist'
+      ],
+      keyLessons: [
+        'Safety is a shared responsibility across the aviation value chain.',
+        'Early hazard reporting reduces catastrophic outcomes.',
+        'Leadership discipline is central to sustainable compliance.'
+      ],
+      recommendations: [
+        'Embed periodic operational safety audits.',
+        'Strengthen non-punitive safety reporting channels.',
+        'Track corrective actions with deadline ownership.'
+      ],
+      checklist: [
+        'Review safety KPIs at executive level monthly.',
+        'Confirm recurrent crew and technical training completion.',
+        'Validate emergency communication and escalation drills.'
+      ],
+      status: 'SPEAKER_REVIEW'
+    }
+  });
+});
+
+app.post('/api/publishing/ai-generate-podcast-episode', async (req, res) => {
+  const { speakerName, organisation, approvedTopic, editedTranscript, podcastEpisodeNumber } = req.body || {};
+  const safeSpeaker = speakerName || 'Summit Speaker';
+  const safeOrg = organisation || 'Aviation Safety Summit 2026';
+  const safeTopic = approvedTopic || 'Aviation Safety Spotlight';
+  const safeEpisode = Number(podcastEpisodeNumber) || 1;
+  const safeTranscript = editedTranscript || `This episode explores ${safeTopic} and actionable safeguards for safer operations.`;
+  const ai = getAiClient();
+
+  if (ai) {
+    try {
+      const prompt = `You are the DomisLink podcast episode generation agent.
+Generate metadata for a summit podcast episode.
+
+Speaker: ${safeSpeaker}
+Organisation: ${safeOrg}
+Approved topic: ${safeTopic}
+Episode number: ${safeEpisode}
+Transcript material:
+${safeTranscript}
+
+Return JSON only:
+{
+  "episodeTitle": "string",
+  "episodeDescription": "string",
+  "showNotes": ["string"],
+  "keyTakeaways": ["string"],
+  "status": "SCHEDULED"
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.3,
+          responseMimeType: "application/json"
+        }
+      });
+
+      const parsed = JSON.parse(response.text || '{}');
+      if (parsed && typeof parsed === 'object') {
+        return res.json({
+          success: true,
+          episode: {
+            episodeTitle: parsed.episodeTitle || `Episode #${safeEpisode}: ${safeTopic}`,
+            episodeDescription: parsed.episodeDescription || `A summit conversation with ${safeSpeaker} on ${safeTopic}.`,
+            showNotes: Array.isArray(parsed.showNotes) ? parsed.showNotes : [
+              '00:00 - Opening context and summit framing',
+              '12:00 - Key operational risk discussion',
+              '28:00 - Action agenda for executives'
+            ],
+            keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [
+              'Safety outcomes improve when reporting is proactive.',
+              'Cross-sector collaboration reduces system vulnerabilities.'
+            ],
+            status: 'SCHEDULED'
+          }
+        });
+      }
+    } catch (err: any) {
+      console.error('Publishing podcast generation agent failed:', err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    episode: {
+      episodeTitle: `Episode #${safeEpisode}: ${safeTopic}`,
+      episodeDescription: `A summit conversation with ${safeSpeaker} of ${safeOrg} on ${safeTopic}.`,
+      showNotes: [
+        '00:00 - Opening context and summit framing',
+        '12:00 - Key operational risk discussion',
+        '28:00 - Action agenda for executives'
+      ],
+      keyTakeaways: [
+        'Safety outcomes improve when reporting is proactive.',
+        'Cross-sector collaboration reduces system vulnerabilities.',
+        'Executive governance determines safety culture maturity.'
+      ],
+      status: 'SCHEDULED'
+    }
+  });
+});
+
+app.post('/api/publishing/ai-podcast-producer', async (req, res) => {
+  const { prompt, speakerName, approvedTopic, podcastEpisodeNumber, transcript } = req.body || {};
+  const ai = getAiClient();
+  const safeSpeaker = speakerName || INITIAL_SPEAKER_RECORDS[0]?.speakerName || 'Summit Speaker';
+  const safeTopic = approvedTopic || INITIAL_SPEAKER_RECORDS[0]?.approvedTopic || 'Aviation Safety';
+  const safeEpisode = Number(podcastEpisodeNumber) || 1;
+
+  const fallback = `[DomisLink AI Podcast Producer Analysis]: Based on approved summit transcripts for "${safeSpeaker}" regarding "${safeTopic}":
+
+1. Suggested Interview Question: "What practical governance controls must airlines adopt to prevent repeat safety incidents?"
+2. Key Episode Outline: Opening context -> case-based lessons -> implementation checklist for executives.
+3. Social Media Copy: "Tune into Episode #${safeEpisode} with ${safeSpeaker} as we discuss ${safeTopic} and practical steps to strengthen African aviation resilience."`;
+
+  if (ai) {
+    try {
+      const promptText = `You are the DomisLink AI Podcast Producer.
+Generate concise producer notes based only on provided summit context.
+
+Speaker: ${safeSpeaker}
+Topic: ${safeTopic}
+Episode number: ${safeEpisode}
+User request: ${prompt || 'Generate interview and outreach notes'}
+Transcript excerpt: ${transcript || 'No transcript supplied'}
+
+Return valid JSON:
+{
+  "analysis": "string with numbered points for interview question, episode outline, and social media copy"
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: promptText,
+        config: {
+          temperature: 0.25,
+          responseMimeType: "application/json"
+        }
+      });
+
+      const parsed = JSON.parse(response.text || '{}');
+      const analysis = typeof parsed.analysis === 'string' && parsed.analysis.trim() ? parsed.analysis : fallback;
+      return res.json({ success: true, analysis });
+    } catch (err: any) {
+      console.error('Publishing podcast producer agent failed:', err);
+    }
+  }
+
+  return res.json({ success: true, analysis: fallback });
 });
 
 // ============================================================

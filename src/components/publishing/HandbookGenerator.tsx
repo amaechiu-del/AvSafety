@@ -28,14 +28,36 @@ export default function HandbookGenerator() {
     { num: 9, title: 'CONCLUSION & ABOUT DOMISLINK', content: `Conclusion: Safety in civil aviation is a shared regulatory burden connecting every stakeholder.\n\nAbout DomisLink: Building permanent aviation safety knowledge libraries across Africa and beyond.` }
   ];
 
-  const handleGenerateHandbook = (e: React.FormEvent) => {
+  const handleGenerateHandbook = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
-      setSuccessMsg(`Successfully generated complete tangible handbook for "${currentRecord.speakerName}"! Record updated to APPROVED status.`);
+
+    try {
+      const res = await fetch('/api/publishing/ai-generate-handbook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          speakerName: currentRecord.speakerName,
+          organisation: currentRecord.organisation,
+          topic: currentRecord.approvedTopic,
+          transcript: currentRecord.editedTranscript,
+          preferredTitle: currentRecord.handbookTitle
+        })
+      });
+
+      const data = await res.json();
+      if (data?.success && data?.handbook) {
+        setSuccessMsg(`Successfully generated complete tangible handbook draft for "${currentRecord.speakerName}".`);
+      } else {
+        setSuccessMsg('Handbook generation service returned an incomplete response.');
+      }
       setTimeout(() => setSuccessMsg(null), 4000);
-    }, 1200);
+    } catch (error) {
+      console.error('Handbook generation failed:', error);
+      setSuccessMsg('Unable to generate handbook right now. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
