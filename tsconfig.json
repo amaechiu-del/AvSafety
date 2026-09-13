@@ -17,9 +17,7 @@
     "jsx": "react-jsx",
     "types": [
       "vite/client",
-      "vite-plugin-pwa/client",
-      "node",
-      "jest"
+      "vite-plugin-pwa/client"
     ],
     "paths": {
       "@/*": [
@@ -28,5 +26,10 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "tests",
+    "coverage",
+    "dist"
+  ]
 }
