@@ -44,15 +44,37 @@ export default function PodcastEngineHub() {
     return matchesCat && matchesSearch;
   });
 
-  const handleAskAiProducer = (e: React.FormEvent) => {
+  const handleAskAiProducer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiPrompt.trim()) return;
 
     setIsGeneratingAi(true);
-    setTimeout(() => {
+
+    try {
+      const res = await fetch('/api/publishing/ai-podcast-producer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          speakerName: activeEpisode?.speakerName,
+          approvedTopic: activeEpisode?.approvedTopic,
+          podcastEpisodeNumber: activeEpisode?.podcastEpisodeNumber,
+          transcript: activeEpisode?.editedTranscript || activeEpisode?.transcript
+        })
+      });
+
+      const data = await res.json();
+      if (data?.success && data?.analysis) {
+        setAiResponse(data.analysis);
+      } else {
+        setAiResponse('Unable to generate producer notes right now. Please try again shortly.');
+      }
+    } catch (error) {
+      console.error('Podcast producer request failed:', error);
+      setAiResponse('Unable to generate producer notes right now. Please try again shortly.');
+    } finally {
       setIsGeneratingAi(false);
-      setAiResponse(`[DomisLink AI Podcast Producer Analysis]: Based on approved summit transcripts for "${activeEpisode?.speakerName}" regarding "${activeEpisode?.approvedTopic}":\n\n1. Suggested Interview Question: "How can regional carriers in Africa implement proactive safety reporting without fear of regulatory reprisal?"\n2. Key Episode Outline: Introduction to shared safety burden -> Real-world incident case study -> Actionable recommendations for airline executives.\n3. Social Media Copy: "Tune into Episode #${activeEpisode?.podcastEpisodeNumber} of the DomisLink Aviation Safety Podcast with ${activeEpisode?.speakerName} as we explore the future of African airspace resilience. Listen now and read the accompanying handbook!"`);
-    }, 1000);
+    }
   };
 
   return (

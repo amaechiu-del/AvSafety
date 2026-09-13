@@ -47,14 +47,34 @@ export default function SpeakerHandbookEngine() {
     }, 1500);
   };
 
-  const handleGenerateHandbook = () => {
+  const handleGenerateHandbook = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/publishing/ai-generate-handbook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          speakerName: selectedSpeaker.name,
+          organisation: selectedSpeaker.organisation,
+          topic: selectedSpeaker.topic,
+          transcript,
+          preferredTitle: constructedTitle
+        })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setHandbookGenerated(true);
+        setHandbookStatus('SPEAKER_REVIEW');
+        setSuccessMsg('Speaker handbook successfully structured and generated according to DomisLink publishing standards!');
+      } else {
+        setSuccessMsg('Handbook generation service returned an unexpected response.');
+      }
+    } catch (error) {
+      console.error('Speaker handbook generation failed:', error);
+      setSuccessMsg('Unable to generate handbook draft right now. Please try again.');
+    } finally {
       setIsGenerating(false);
-      setHandbookGenerated(true);
-      setHandbookStatus('SPEAKER_REVIEW');
-      setSuccessMsg('Speaker handbook successfully structured and generated according to DomisLink publishing standards!');
-    }, 2000);
+    }
   };
 
   const handleApproveAndPublish = () => {

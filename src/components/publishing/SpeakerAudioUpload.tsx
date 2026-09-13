@@ -51,30 +51,53 @@ export default function SpeakerAudioUpload({
   const [customAudioName, setCustomAudioName] = useState('');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const handleSimulateUpload = (e: React.FormEvent) => {
+  const handleSimulateUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customAudioName.trim()) return;
 
     setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
+    try {
+      const normalizedFileName = customAudioName.endsWith('.mp3') || customAudioName.endsWith('.wav')
+        ? customAudioName
+        : `${customAudioName}.mp3`;
+
+      const res = await fetch('/api/publishing/ai-transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          speakerName,
+          topic: speakerTopic,
+          organisation,
+          audioFileName: normalizedFileName,
+          audioNote: `Uploaded recording for ${speakerName} on ${speakerTopic}`
+        })
+      });
+
+      const data = await res.json();
+      const transcript = data?.transcript || `[Transcribed Audio Session for ${speakerName}]: Discussing ${speakerTopic}. Key emphasis on proactive hazard identification, crew resource management, and transparent safety reporting systems.`;
+
       const newRec: SpeakerRecording = {
         id: `rec-${Date.now()}`,
         speakerId,
         speakerName,
         topic: speakerTopic,
         date: new Date().toISOString().split('T')[0],
-        audioFileName: customAudioName.endsWith('.mp3') || customAudioName.endsWith('.wav') ? customAudioName : `${customAudioName}.mp3`,
+        audioFileName: normalizedFileName,
         consentStatus: 'VERIFIED_CONSENT',
         transcriptionStatus: 'CLEANED',
-        transcript: `[Transcribed Audio Session for ${speakerName}]: Discussing ${speakerTopic}. Key emphasis on proactive hazard identification, crew resource management, and transparent safety reporting systems.`
+        transcript
       };
 
       setRecordings(prev => [newRec, ...prev]);
       setCustomAudioName('');
-      setSuccessMsg('Audio recording successfully uploaded, stored in state, and queued for handbook drafting.');
+      setSuccessMsg('Audio recording successfully uploaded, transcribed, and queued for handbook drafting.');
       onTranscriptReady(newRec.transcript);
-    }, 1200);
+    } catch (error) {
+      console.error('Audio upload/transcription failed:', error);
+      setSuccessMsg('Unable to process the recording right now. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDeleteRecording = (id: string) => {

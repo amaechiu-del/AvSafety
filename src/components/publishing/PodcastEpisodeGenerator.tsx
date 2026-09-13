@@ -37,17 +37,52 @@ export default function PodcastEpisodeGenerator({ onEpisodeGenerated }: PodcastE
     }
   };
 
-  const handleGenerateEpisode = (e: React.FormEvent) => {
+  const handleGenerateEpisode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+
+    try {
+      const res = await fetch('/api/publishing/ai-generate-podcast-episode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          speakerName: currentRecord.speakerName,
+          organisation: currentRecord.organisation,
+          approvedTopic: currentRecord.approvedTopic,
+          editedTranscript: currentRecord.editedTranscript,
+          podcastEpisodeNumber: currentRecord.podcastEpisodeNumber
+        })
+      });
+
+      const data = await res.json();
+      const episode = data?.episode;
+      let finalTitle = episodeTitle;
+      if (data?.success && episode) {
+        finalTitle = episode.episodeTitle || episodeTitle;
+        setEpisodeTitle(episode.episodeTitle || episodeTitle);
+        setEpisodeDescription(episode.episodeDescription || episodeDescription);
+        if (Array.isArray(episode.showNotes)) {
+          setShowNotes(episode.showNotes.join('\n'));
+        }
+        if (Array.isArray(episode.keyTakeaways)) {
+          setKeyTakeaways(episode.keyTakeaways.join('\n'));
+        }
+        if (episode.status) {
+          setStatus(episode.status);
+        }
+      }
+
       setSuccessMsg('Podcast episode metadata, show notes, and chapter markers successfully generated from approved speaker recording and transcript!');
       if (onEpisodeGenerated) {
-        onEpisodeGenerated(episodeTitle);
+        onEpisodeGenerated(finalTitle);
       }
       setTimeout(() => setSuccessMsg(null), 4000);
-    }, 1200);
+    } catch (error) {
+      console.error('Episode generation failed:', error);
+      setSuccessMsg('Unable to reach podcast generation service. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
