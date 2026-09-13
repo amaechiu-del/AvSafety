@@ -233,8 +233,8 @@ export default function MarketplaceHub({ onBackToMain }: MarketplaceHubProps) {
         })
       });
       const data = await res.json();
-      if (data.success && data.request) {
-        setCreativeResult(data.request);
+      if (data.success) {
+        setCreativeResult(data.data?.request || data.request || null);
       }
     } catch (err) {
       console.error('Creative request failed:', err);

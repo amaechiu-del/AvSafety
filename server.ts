@@ -12,6 +12,17 @@ import { GoogleGenAI } from '@google/genai';
 import { INITIAL_AD_POSITIONS, INITIAL_SPONSORSHIP_PACKAGES } from './src/data/marketplaceData';
 import { INITIAL_VERIFIED_SPEAKERS } from './src/data/speakersData';
 import { INITIAL_STAKEHOLDERS, STAKEHOLDER_CATEGORIES } from './src/data/stakeholdersData';
+import type {
+  AdPosition,
+  CreativeServiceRequest,
+  InvitationLetter,
+  Session,
+  Speaker,
+  SponsorshipPackage,
+  StakeholderCategory,
+  StakeholderEventRole,
+  StakeholderInvitee
+} from './src/types';
 
 
 
@@ -585,6 +596,278 @@ function writeDb(data: any) {
   }
 }
 
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const AI_UNVERIFIED_DISCLAIMER = 'AI-GENERATED — NOT YET VERIFIED';
+const SUMMIT_INFO = 'Aviation Safety Summit 2026 on 17 November 2026 at Lagos Marriott Hotel, Ikeja, Lagos, Nigeria.';
+const SUMMIT_THEME = 'EVERYBODY IS INVOLVED IN AVIATION SAFETY';
+
+type SupportedCurrency = 'NGN' | 'USD';
+
+interface StandardAiResponse<T> {
+  success: boolean;
+  aiGenerated: boolean;
+  data: T;
+  timestamp: string;
+  disclaimer?: string;
+}
+
+interface MarketplaceAssistantRequest {
+  message?: string;
+  organisation?: string;
+  promotionGoal?: string;
+  targetAudience?: string;
+  estimatedBudget?: string | number;
+  visibilityTypes?: string[];
+  currency?: SupportedCurrency;
+}
+
+interface MarketplaceRecommendation {
+  id: string;
+  name: string;
+  category: string;
+  priceNGN: number;
+  priceUSD: number;
+  reason: string;
+  expectedImpact: string;
+  safetyCompliance: string;
+  sourceType: 'POSITION' | 'PACKAGE';
+  inventoryStatus: string;
+  availableUnits: number;
+}
+
+interface MarketplaceAssistantData {
+  advisorGreeting: string;
+  recommendedPackages: MarketplaceRecommendation[];
+  strategicAdvice: string;
+  nextSteps: string;
+}
+
+interface StakeholderBrainstormSuggestion {
+  name: string;
+  position: string;
+  organisation: string;
+  category: StakeholderCategory;
+  whyRelevant: string;
+  proposedTopic: string;
+  proposedRole: StakeholderEventRole;
+  verificationStatus: string;
+  suggestedSponsorship: string;
+}
+
+interface StakeholderBrainstormData {
+  representationBySector: Record<string, number>;
+  underRepresentedCategories: StakeholderCategory[];
+  suggestions: StakeholderBrainstormSuggestion[];
+}
+
+interface SpeakerTopicsData {
+  topics: string[];
+  speakerContext: {
+    name: string;
+    organisation: string;
+    industry: string;
+    role: string;
+  };
+}
+
+interface SpeakerAssistantMatch {
+  id: string;
+  name: string;
+  organisation: string;
+  status: string;
+  verificationStatus: string;
+  topic: string;
+  session: string;
+}
+
+interface SpeakerAssistantData {
+  answer: string;
+  matchedSpeakers: SpeakerAssistantMatch[];
+}
+
+interface CreativeConcept {
+  title: 'Concept A' | 'Concept B';
+  headline: string;
+  bodyCopy: string;
+  visualNotes: string;
+  callToAction: string;
+}
+
+type StoredCreativeRequest = CreativeServiceRequest & {
+  concepts?: CreativeConcept[];
+  uploadTracking?: {
+    logoProvided: boolean;
+    uploadedAssetCount: number;
+    uploadedAssets: string[];
+  };
+};
+
+interface CreativeRequestData {
+  request: StoredCreativeRequest;
+  concepts: CreativeConcept[];
+}
+
+type GeneratedInvitationLetter = InvitationLetter & {
+  gmailDraftUrl: string;
+  mailtoUrl: string;
+};
+
+interface SponsorshipTierRecommendation {
+  id: string;
+  tier: SponsorshipPackage['tier'];
+  name: string;
+  rationale: string;
+  feeNGN: string;
+  feeUSD: string;
+  benefits: string[];
+  status: SponsorshipPackage['status'];
+}
+
+interface SponsorshipProposalData {
+  headline: string;
+  whySectorMatters: string;
+  howParticipationSupportsSafety: string;
+  recommendedTiers: SponsorshipTierRecommendation[];
+  callToAction: string;
+}
+
+function createTimestamp() {
+  return new Date().toISOString();
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function sanitizeText(value: unknown, maxLength = 2000) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function sanitizeStringArray(value: unknown, maxItems = 10) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => sanitizeText(item, 120))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function normalizeCurrency(value: unknown): SupportedCurrency {
+  return value === 'USD' ? 'USD' : 'NGN';
+}
+
+function sendAiSuccess<T>(res: express.Response, aiGenerated: boolean, data: T, disclaimer?: string) {
+  const payload: StandardAiResponse<T> = {
+    success: true,
+    aiGenerated,
+    data,
+    timestamp: createTimestamp()
+  };
+
+  if (disclaimer) {
+    payload.disclaimer = disclaimer;
+  }
+
+  return res.json(payload);
+}
+
+function sendValidationError(res: express.Response, message: string) {
+  return res.status(400).json({
+    success: false,
+    aiGenerated: false,
+    error: message,
+    timestamp: createTimestamp()
+  });
+}
+
+function safeJsonParse<T>(raw: string | undefined | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const trimmed = raw.trim();
+    const jsonStart = trimmed.indexOf('{');
+    const jsonArrayStart = trimmed.indexOf('[');
+    const start = jsonArrayStart === -1 ? jsonStart : jsonStart === -1 ? jsonArrayStart : Math.min(jsonStart, jsonArrayStart);
+    const end = Math.max(trimmed.lastIndexOf('}'), trimmed.lastIndexOf(']'));
+
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1)) as T;
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  }
+}
+
+function formatMoney(amount: number, currency: SupportedCurrency) {
+  if (currency === 'USD') {
+    return `$${amount.toLocaleString()}`;
+  }
+
+  return `₦${amount.toLocaleString()}`;
+}
+
+function findStakeholderCategoryMeta(category: StakeholderCategory | string | undefined) {
+  return STAKEHOLDER_CATEGORIES.find((item) => item.id === category) || STAKEHOLDER_CATEGORIES.find((item) => item.id === 'OTHER');
+}
+
+function buildMarketplaceRecommendation(
+  item: AdPosition | SponsorshipPackage,
+  reason: string,
+  expectedImpact: string
+): MarketplaceRecommendation {
+  const sourceType = 'tier' in item ? 'PACKAGE' : 'POSITION';
+  const category = 'tier' in item ? item.tier : item.category;
+  const inventoryStatus = item.status;
+  const availableUnits = 'slotsAvailable' in item ? item.slotsAvailable : item.availableInventory;
+  const needsApproval = 'requiresRegulatoryApproval' in item && item.requiresRegulatoryApproval;
+
+  return {
+    id: item.id,
+    name: item.name,
+    category,
+    priceNGN: item.priceNGN,
+    priceUSD: item.priceUSD,
+    reason,
+    expectedImpact,
+    safetyCompliance: needsApproval
+      ? `Subject to statutory approval. ${item.regulatoryNote || 'FAAN/LASAA or venue authorization must be confirmed before deployment.'}`
+      : 'Within approved summit inventory and subject to standard creative/material review.',
+    sourceType,
+    inventoryStatus,
+    availableUnits
+  };
+}
+
+function dedupeById<T extends { id: string }>(items: T[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function renderCreativeConceptSummary(concepts: CreativeConcept[]) {
+  return concepts.map((concept) => (
+    `${concept.title}\nHeadline: ${concept.headline}\nBody Copy: ${concept.bodyCopy}\nVisual Notes: ${concept.visualNotes}\nCTA: ${concept.callToAction}`
+  )).join('\n\n');
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Middleware
 app.use(express.json());
 
@@ -724,187 +1007,304 @@ app.post('/api/marketplace/inventory/update', (req, res) => {
 
 // 3. AI Summit Advertising Assistant
 app.post('/api/marketplace/ai-assistant', async (req, res) => {
+  const {
+    message,
+    organisation,
+    promotionGoal,
+    targetAudience,
+    estimatedBudget,
+    visibilityTypes,
+    currency
+  } = (req.body || {}) as MarketplaceAssistantRequest;
+
+  const normalizedOrganisation = sanitizeText(organisation, 160);
+  const normalizedMessage = sanitizeText(message, 1200);
+  const normalizedGoal = sanitizeText(promotionGoal, 240);
+  const normalizedAudience = sanitizeText(targetAudience, 240);
+  const normalizedBudget = typeof estimatedBudget === 'number' ? String(estimatedBudget) : sanitizeText(estimatedBudget, 120);
+  const normalizedVisibilityTypes = sanitizeStringArray(visibilityTypes);
+  const normalizedCurrency = normalizeCurrency(currency);
+
+  if (!normalizedOrganisation && !normalizedMessage && !normalizedGoal) {
+    return sendValidationError(res, 'Provide at least an organisation, promotion goal, or message for tailored advertising recommendations.');
+  }
+
   try {
-    const { 
-      message, 
-      organisation, 
-      promotionGoal, 
-      targetAudience, 
-      estimatedBudget, 
-      visibilityTypes, 
-      currency = 'NGN' 
-    } = req.body;
-
     const currentDb = readDb();
-    const positions = currentDb.ad_positions || INITIAL_AD_POSITIONS;
-    const packages = currentDb.sponsorship_packages || INITIAL_SPONSORSHIP_PACKAGES;
+    const positions = (currentDb.ad_positions || INITIAL_AD_POSITIONS) as AdPosition[];
+    const packages = (currentDb.sponsorship_packages || INITIAL_SPONSORSHIP_PACKAGES) as SponsorshipPackage[];
+    const catalogue = new Map<string, AdPosition | SponsorshipPackage>([
+      ...positions.map((item) => [item.id, item] as const),
+      ...packages.map((item) => [item.id, item] as const)
+    ]);
+    const availablePositions = positions.filter((item) => item.availableInventory > 0 && item.status !== 'REQUESTED');
+    const availablePackages = packages.filter((item) => item.status !== 'SOLD_OUT');
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const searchText = [
+      normalizedOrganisation,
+      normalizedMessage,
+      normalizedGoal,
+      normalizedAudience,
+      normalizedBudget,
+      normalizedVisibilityTypes.join(' ')
+    ].join(' ').toLowerCase();
 
-    // Structured catalogue summary for grounding
-    const catalogueSummary = positions.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      category: p.category,
-      priceNGN: p.priceNGN,
-      priceUSD: p.priceUSD,
-      status: p.status,
-      available: p.availableInventory,
-      badge: p.badge,
-      description: p.description
-    }));
+    const scoredRecommendations = new Map<string, {
+      item: AdPosition | SponsorshipPackage;
+      score: number;
+      reasons: Set<string>;
+      impacts: Set<string>;
+    }>();
 
-    const packageSummary = packages.map((pkg: any) => ({
-      id: pkg.id,
-      tier: pkg.tier,
-      name: pkg.name,
-      priceNGN: pkg.priceNGN,
-      priceUSD: pkg.priceUSD,
-      status: pkg.status,
-      tagline: pkg.tagline
-    }));
+    const addRecommendationSignal = (itemId: string, score: number, reason: string, impact: string) => {
+      const item = catalogue.get(itemId);
+      if (!item) return;
+      const availableUnits = 'slotsAvailable' in item ? item.slotsAvailable : item.availableInventory;
+      if (availableUnits <= 0 || item.status === 'SOLD_OUT' || item.status === 'REQUESTED') return;
 
-    if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        
-        const systemPrompt = `You are the AI Summit Advertising & Sponsorship Advisor for the AVIATION SAFETY SUMMIT 2026 (17 November 2026, Marriott Hotel, Ikeja, Lagos, Nigeria, organised by Domislink International Services Ltd / The Digital Empire).
-Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY".
+      const existing = scoredRecommendations.get(itemId);
+      if (existing) {
+        existing.score += score;
+        existing.reasons.add(reason);
+        existing.impacts.add(impact);
+        return;
+      }
 
-RULES & CONSTRAINTS:
-1. Ground your recommendations STRICTLY on the real configured administrator catalogue below.
-2. AI MAY RECOMMEND. AI MUST NOT AUTHORISE.
-3. AI MUST NOT PROMISE INVENTED PRICES, INVENTED ATTENDANCE, INVENTED LOCATIONS, OR INVENTED BENEFITS.
-4. If a location is marked PENDING_APPROVAL or REQUESTED (like Airport or Motorway), explicitly state that it is subject to statutory FAAN or LASAA regulatory safety authorization.
-5. Provide helpful, consultative, high-level business strategy advice for aviation executives, banks, airlines, energy firms, and vendors.
+      scoredRecommendations.set(itemId, {
+        item,
+        score,
+        reasons: new Set([reason]),
+        impacts: new Set([impact])
+      });
+    };
 
-REAL CATALOGUE:
-Ad Positions: ${JSON.stringify(catalogueSummary)}
-Sponsorship Packages: ${JSON.stringify(packageSummary)}
+    [
+      {
+        keywords: ['water', 'drink', 'hydrate', 'bottle'],
+        itemIds: ['ad-water-branded'],
+        reason: 'Matches an attendee hydration objective already configured in the approved summit catalogue.',
+        impact: 'Places your brand in a guaranteed attendee touchpoint throughout the event day.'
+      },
+      {
+        keywords: ['coffee', 'food', 'lunch', 'catering', 'refreshment'],
+        itemIds: ['ad-food-lunch', 'ad-food-coffee'],
+        reason: 'Aligns with hospitality-led visibility that keeps your brand present during networking moments.',
+        impact: 'Captures repeated brand exposure during breaks and meal sessions.'
+      },
+      {
+        keywords: ['booth', 'exhibit', 'showcase', 'demo', 'display'],
+        itemIds: ['ad-exhibit-standard', 'ad-exhibit-island', 'pkg-gold', 'pkg-platinum'],
+        reason: 'Supports product demonstrations and face-to-face executive engagement through approved exhibition inventory.',
+        impact: 'Creates in-person B2B conversations with delegates, regulators, and decision-makers.'
+      },
+      {
+        keywords: ['simulator', 'simulation', 'training', 'pilot'],
+        itemIds: ['pkg-simulation-partner', 'ad-exhibit-island'],
+        reason: 'Fits a flight training or simulator-led activation using real summit simulation assets.',
+        impact: 'Positions your brand inside the summit’s technical and training conversation.'
+      },
+      {
+        keywords: ['online', 'digital', 'website', 'portal', 'logo'],
+        itemIds: ['ad-online-logo-bar', 'ad-online-hero', 'ad-online-partner-spotlight'],
+        reason: 'Supports digital-first brand discovery across the official summit portal and programme surfaces.',
+        impact: 'Keeps your brand visible before, during, and after the summit through online placements.'
+      },
+      {
+        keywords: ['stage', 'screen', 'video', 'keynote', 'thought leadership'],
+        itemIds: ['ad-venue-screen-loop', 'ad-online-programme', 'pkg-title', 'pkg-platinum'],
+        reason: 'Targets executive visibility and programme alignment using approved plenary-facing assets.',
+        impact: 'Improves brand recall during the most visible summit sessions and broadcasts.'
+      },
+      {
+        keywords: ['lanyard', 'badge', 'delegate', 'credential'],
+        itemIds: ['ad-venue-lanyards', 'ad-online-reg-confirm', 'pkg-platinum'],
+        reason: 'Targets mandatory delegate touchpoints with inventory that every attendee will see or use.',
+        impact: 'Creates broad reach across delegate registration, credentials, and identity materials.'
+      },
+      {
+        keywords: ['airport', 'shuttle', 'route', 'transit', 'arrival'],
+        itemIds: ['ad-route-shuttle', 'ad-route-airport-desk'],
+        reason: 'Matches airport-to-venue transport branding opportunities already defined in the catalogue.',
+        impact: 'Extends brand exposure beyond the venue into arrival and VIP movement corridors.'
+      },
+      {
+        keywords: ['title', 'sovereign', 'platinum', 'gold', 'sponsor'],
+        itemIds: ['pkg-title', 'pkg-platinum', 'pkg-gold'],
+        reason: 'Matches a premium sponsorship posture with approved tiers and verified benefits.',
+        impact: 'Combines executive authority, speaking visibility, and broad brand placement.'
+      }
+    ].forEach((signal) => {
+      const matches = signal.keywords.filter((keyword) => searchText.includes(keyword));
+      if (matches.length > 0) {
+        signal.itemIds.forEach((itemId) => addRecommendationSignal(itemId, matches.length * 2, signal.reason, signal.impact));
+      }
+    });
 
-Return your response in structured JSON with the following keys:
+    const parsedBudget = Number((normalizedBudget.match(/\d[\d,]*/)?.[0] || '').replace(/,/g, ''));
+    if (parsedBudget) {
+      availablePositions
+        .filter((item) => item.priceNGN <= parsedBudget * 1.2)
+        .slice(0, 3)
+        .forEach((item) => addRecommendationSignal(
+          item.id,
+          1,
+          'Fits the indicative budget range while staying within approved summit inventory.',
+          'Provides cost-controlled visibility without inventing custom pricing.'
+        ));
+
+      availablePackages
+        .filter((item) => item.priceNGN > 0 && item.priceNGN <= parsedBudget * 1.3)
+        .slice(0, 2)
+        .forEach((item) => addRecommendationSignal(
+          item.id,
+          1,
+          'Matches the indicative sponsorship budget with real tier pricing.',
+          'Adds structured sponsor recognition using approved package benefits only.'
+        ));
+    }
+
+    if (scoredRecommendations.size === 0) {
+      ['ad-online-logo-bar', 'ad-exhibit-standard', 'ad-venue-lanyards', 'pkg-gold'].forEach((itemId) => addRecommendationSignal(
+        itemId,
+        1,
+        'A balanced starter recommendation anchored on official summit inventory.',
+        'Combines online visibility, on-site presence, and delegate-facing exposure.'
+      ));
+    }
+
+    const fallbackRecommendations = dedupeById(
+      Array.from(scoredRecommendations.values())
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 4)
+        .map(({ item, reasons, impacts }) => buildMarketplaceRecommendation(
+          item,
+          Array.from(reasons).join(' '),
+          Array.from(impacts).join(' ')
+        ))
+    );
+
+    const fallbackData: MarketplaceAssistantData = {
+      advisorGreeting: `Welcome ${normalizedOrganisation || 'esteemed aviation partner'} to the Aviation Safety Summit 2026 commercial advisory desk.`,
+      recommendedPackages: fallbackRecommendations,
+      strategicAdvice: 'For the strongest commercial outcome, combine one broad digital placement, one compulsory attendee touchpoint, and one executive-visibility asset or sponsorship tier that fits your approved budget range.',
+      nextSteps: '1. Review the matched inventory. 2. Add approved items to your booking cart or request a formal quote. 3. Complete payment or quotation review. 4. Upload artwork for secretariat validation and deployment scheduling.'
+    };
+
+    const ai = getAiClient();
+    if (!ai) {
+      return sendAiSuccess(res, false, fallbackData);
+    }
+
+    try {
+      const catalogueSummary = [
+        ...availablePositions.map((item) => ({
+          id: item.id,
+          type: 'POSITION',
+          name: item.name,
+          category: item.category,
+          priceNGN: item.priceNGN,
+          priceUSD: item.priceUSD,
+          inventoryStatus: item.status,
+          availableUnits: item.availableInventory,
+          description: item.description,
+          requiresRegulatoryApproval: item.requiresRegulatoryApproval
+        })),
+        ...availablePackages.map((item) => ({
+          id: item.id,
+          type: 'PACKAGE',
+          name: item.name,
+          category: item.tier,
+          priceNGN: item.priceNGN,
+          priceUSD: item.priceUSD,
+          inventoryStatus: item.status,
+          availableUnits: item.slotsAvailable,
+          description: item.tagline,
+          requiresRegulatoryApproval: false
+        }))
+      ];
+
+      const aiPayload = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: `You are the Aviation Safety Summit 2026 commercial advisor.
+
+Only recommend items from the verified catalogue below. Never invent prices, benefits, or approvals. If an item needs regulatory approval, mention that explicitly.
+
+Verified catalogue:
+${JSON.stringify(catalogueSummary)}
+
+Client brief:
+${JSON.stringify({
+  organisation: normalizedOrganisation || 'Not specified',
+  promotionGoal: normalizedGoal || 'General summit visibility',
+  targetAudience: normalizedAudience || 'Aviation delegates, regulators, and executives',
+  estimatedBudget: normalizedBudget || 'Flexible',
+  visibilityTypes: normalizedVisibilityTypes,
+  message: normalizedMessage || 'Recommend the best approved options',
+  currency: normalizedCurrency
+})}
+
+Return strict JSON in this schema:
 {
-  "advisorGreeting": "string (polite, executive greeting addressing the company)",
+  "advisorGreeting": "string",
   "recommendedPackages": [
     {
-      "id": "matching catalogue item id or package id",
-      "name": "matching name",
-      "category": "category",
-      "priceNGN": number,
-      "priceUSD": number,
-      "reason": "specific reason why this matches their objective and audience",
-      "expectedImpact": "measurable visibility context",
-      "safetyCompliance": "statement on safety compliance and approval requirement"
+      "id": "existing catalogue id only",
+      "reason": "string",
+      "expectedImpact": "string"
     }
   ],
-  "strategicAdvice": "paragraph explaining tactical synergy (e.g. combining digital logo strip + physical booth + delegate water)",
-  "nextSteps": "1. Select packages in portal -> 2. Instant Paystack Checkout or Request Custom Formal Quote -> 3. Upload Artwork for Secretariat Review"
-}`;
+  "strategicAdvice": "string",
+  "nextSteps": "string"
+}`,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2
+        }
+      });
 
-        const userPrompt = `Client Details:
-Organisation: ${organisation || 'Not specified'}
-Promoting: ${promotionGoal || 'Corporate Aviation Brand / Services'}
-Target Audience: ${targetAudience || 'Aviation CEOs, Regulators, and Delegates'}
-Estimated Budget: ${estimatedBudget || 'Flexible'}
-Visibility Interests: ${(visibilityTypes || []).join(', ') || 'Online, Venue, Branding'}
-Customer Specific Request / Question: "${message || 'Recommend the most effective packages for our brand'}"
-Currency: ${currency}`;
+      const parsed = safeJsonParse<{
+        advisorGreeting?: string;
+        recommendedPackages?: Array<{ id?: string; reason?: string; expectedImpact?: string }>;
+        strategicAdvice?: string;
+        nextSteps?: string;
+      }>(aiPayload.text);
 
-        const result = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: `${systemPrompt}\n\n${userPrompt}`,
-          config: {
-            responseMimeType: 'application/json'
-          }
-        });
+      const validatedRecommendations = dedupeById(
+        (parsed?.recommendedPackages || [])
+          .map((entry) => {
+            if (!entry?.id) return null;
+            const item = catalogue.get(entry.id);
+            if (!item) return null;
+            return buildMarketplaceRecommendation(
+              item,
+              sanitizeText(entry.reason, 400) || 'Matches the stated brand objective using approved summit inventory.',
+              sanitizeText(entry.expectedImpact, 240) || 'Provides summit visibility based on approved placement reach.'
+            );
+          })
+          .filter((item): item is MarketplaceRecommendation => Boolean(item))
+      ).slice(0, 4);
 
-        const parsed = JSON.parse(result.text || '{}');
-        return res.json({ success: true, aiGenerated: true, ...parsed });
-      } catch (geminiErr) {
-        console.warn('Gemini API call failed, using catalogue rule engine:', geminiErr);
+      if (validatedRecommendations.length > 0) {
+        return sendAiSuccess(res, true, {
+          advisorGreeting: sanitizeText(parsed?.advisorGreeting, 240) || fallbackData.advisorGreeting,
+          recommendedPackages: validatedRecommendations,
+          strategicAdvice: sanitizeText(parsed?.strategicAdvice, 800) || fallbackData.strategicAdvice,
+          nextSteps: sanitizeText(parsed?.nextSteps, 400) || fallbackData.nextSteps
+        }, `${AI_UNVERIFIED_DISCLAIMER}. Recommendations are grounded in the approved summit catalogue and still require administrative confirmation.`);
       }
+    } catch (geminiError) {
+      console.error('Marketplace AI assistant Gemini error:', geminiError);
     }
 
-    // Smart Fallback Rule Engine (Zero hallucination, fully grounded)
-    const lowerQuery = (message || '' + ' ' + promotionGoal || '' + ' ' + (visibilityTypes || []).join(' ')).toLowerCase();
-    
-    const matchedPositions: any[] = [];
-    
-    // Check keyword matches
-    if (lowerQuery.includes('water') || lowerQuery.includes('drink') || lowerQuery.includes('hydrate')) {
-      const pos = positions.find((p: any) => p.id === 'ad-water-branded');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('lunch') || lowerQuery.includes('food') || lowerQuery.includes('catering') || lowerQuery.includes('coffee')) {
-      const pos = positions.find((p: any) => p.id === 'ad-food-lunch') || positions.find((p: any) => p.id === 'ad-food-coffee');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('booth') || lowerQuery.includes('exhibit') || lowerQuery.includes('stand') || lowerQuery.includes('display')) {
-      const pos = positions.find((p: any) => p.id === 'ad-exhibit-standard');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('simulat') || lowerQuery.includes('training') || lowerQuery.includes('pilot')) {
-      const pkg = packages.find((p: any) => p.tier === 'SIMULATION') || positions.find((p: any) => p.id === 'ad-exhibit-island');
-      if (pkg) matchedPositions.push(pkg);
-    }
-    if (lowerQuery.includes('entrance') || lowerQuery.includes('arch') || lowerQuery.includes('foyer')) {
-      const pos = positions.find((p: any) => p.id === 'ad-venue-entrance');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('logo') || lowerQuery.includes('website') || lowerQuery.includes('online')) {
-      const pos = positions.find((p: any) => p.id === 'ad-online-logo-bar');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('screen') || lowerQuery.includes('video') || lowerQuery.includes('stage')) {
-      const pos = positions.find((p: any) => p.id === 'ad-venue-screen-loop');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('lanyard') || lowerQuery.includes('badge') || lowerQuery.includes('attendee')) {
-      const pos = positions.find((p: any) => p.id === 'ad-venue-lanyards');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('airport') || lowerQuery.includes('shuttle') || lowerQuery.includes('transit')) {
-      const pos = positions.find((p: any) => p.id === 'ad-route-shuttle');
-      if (pos) matchedPositions.push(pos);
-    }
-    if (lowerQuery.includes('title') || lowerQuery.includes('headline') || lowerQuery.includes('sovereign') || lowerQuery.includes('platinum')) {
-      const pkg = packages.find((p: any) => p.tier === 'TITLE') || packages.find((p: any) => p.tier === 'PLATINUM');
-      if (pkg) matchedPositions.push(pkg);
-    }
-
-    // Default top recommendations if none matched specifically
-    if (matchedPositions.length === 0) {
-      matchedPositions.push(
-        positions.find((p: any) => p.id === 'ad-online-logo-bar'),
-        positions.find((p: any) => p.id === 'ad-exhibit-standard'),
-        positions.find((p: any) => p.id === 'ad-venue-rollup')
-      );
-    }
-
-    const recommended = matchedPositions.filter(Boolean).slice(0, 4).map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      category: item.category || 'SPONSORSHIPS',
-      priceNGN: item.priceNGN,
-      priceUSD: item.priceUSD,
-      reason: `Directly aligns with your target audience at the Marriott Hotel venue and online summit portal.`,
-      expectedImpact: `Guaranteed reach across attending aviation directors, regulatory delegates, and online portal viewers.`,
-      safetyCompliance: item.requiresRegulatoryApproval 
-        ? `Note: ${item.regulatoryNote || 'Subject to statutory aviation/venue safety approval.'}` 
-        : `Complies with Marriott Hotel and Summit safety regulations.`
-    }));
-
-    res.json({
-      success: true,
+    return sendAiSuccess(res, false, fallbackData);
+  } catch (error) {
+    console.error('Marketplace AI assistant error:', error);
+    return res.status(500).json({
+      success: false,
       aiGenerated: false,
-      advisorGreeting: `Welcome ${organisation ? organisation : 'esteemed aviation partner'} to the Aviation Safety Summit 2026 Commercial Portal.`,
-      recommendedPackages: recommended,
-      strategicAdvice: `For maximum return on investment, we recommend combining continuous digital visibility on the official summit portal with a tactile physical touchpoint (such as delegate water or an exhibition stand) to engage all 500+ attendees throughout the 17 November summit.`,
-      nextSteps: `1. Review the tailored catalogue items below -> 2. Select any add-ons -> 3. Proceed to instant Paystack checkout or generate a formal invoice -> 4. Submit artwork to the Domislink Secretariat.`
+      error: 'Unable to generate marketplace recommendations at this time.',
+      timestamp: createTimestamp()
     });
-  } catch (err: any) {
-    console.error('Error in AI Assistant endpoint:', err);
-    res.status(500).json({ error: 'AI Assistant temporarily unavailable', details: err.message });
   }
 });
 
@@ -1386,62 +1786,159 @@ app.post('/api/marketplace/quotes', (req, res) => {
 
 // 11. Creative Design Service Request & AI Concept Drafting
 app.post('/api/marketplace/creative-request', async (req, res) => {
+  const {
+    companyName,
+    contactPerson,
+    email,
+    phone,
+    message,
+    targetAudience,
+    preferredSizeFormat,
+    deadline,
+    logoUrl,
+    referenceImages
+  } = req.body || {};
+
+  const normalizedCompanyName = sanitizeText(companyName, 160);
+  const normalizedContactPerson = sanitizeText(contactPerson, 160);
+  const normalizedEmail = sanitizeText(email, 160);
+  const normalizedPhone = sanitizeText(phone, 80);
+  const normalizedMessage = sanitizeText(message, 1200);
+  const normalizedAudience = sanitizeText(targetAudience, 240) || 'Aviation decision-makers, regulators, and summit delegates';
+  const normalizedFormat = sanitizeText(preferredSizeFormat, 180) || 'Digital and print-safe summit advertising format';
+  const normalizedDeadline = sanitizeText(deadline, 80) || createTimestamp().split('T')[0];
+  const normalizedLogoUrl = sanitizeText(logoUrl, 500);
+  const normalizedReferenceImages = sanitizeStringArray(referenceImages, 8);
+
+  if (!normalizedCompanyName || !normalizedContactPerson || !normalizedEmail || !normalizedMessage) {
+    return sendValidationError(res, 'Company name, contact person, email, and campaign message are required.');
+  }
+
+  const fallbackConcepts: CreativeConcept[] = [
+    {
+      title: 'Concept A',
+      headline: `${normalizedCompanyName}: Safety Leadership That Travels With Every Flight`,
+      bodyCopy: `${normalizedCompanyName} presents a disciplined message of operational confidence, highlighting how its solutions support safer flights, stronger compliance, and dependable passenger outcomes across Nigeria and West Africa.`,
+      visualNotes: `Use a deep navy aviation backdrop, the ${normalizedCompanyName} logo, aircraft or control-room imagery, and summit gold accent lines to emphasize trust and executive authority.`,
+      callToAction: 'Meet our team at Aviation Safety Summit 2026 to explore approved safety-focused partnership opportunities.'
+    },
+    {
+      title: 'Concept B',
+      headline: `Innovation for Safer Skies with ${normalizedCompanyName}`,
+      bodyCopy: `Position ${normalizedCompanyName} as a forward-looking contributor to aviation safety through resilient technology, disciplined operations, and practical support for regulators, airlines, and airport stakeholders.`,
+      visualNotes: 'Showcase product detail, digital dashboards, radar or aircraft systems imagery, and a clean executive layout built for both exhibition and digital deployment.',
+      callToAction: 'Request a summit commercial consultation and creative review with the Domislink secretariat.'
+    }
+  ];
+
   try {
-    const { companyName, contactPerson, email, phone, message, targetAudience, preferredSizeFormat, deadline, logoUrl } = req.body;
     const currentDb = readDb();
+    let concepts = fallbackConcepts;
+    let aiGenerated = false;
+    const ai = getAiClient();
 
-    let aiConcept = `PROPOSED AD CONCEPT FOR ${companyName.toUpperCase()}:
-Headline: "Championing Safety Leadership in West African Skies"
-Visual Layout: High-contrast deep navy backdrop with gold crown crest framing ${companyName} logo.
-Call to Action: "Explore Safety Solutions at Aviation Safety Summit 2026 — Marriott Hotel Ikeja"`;
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
+    if (ai) {
       try {
-        const ai = new GoogleGenAI({ apiKey });
-        const result = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: `Create 2 distinct high-impact advertising concepts for an aviation company attending Aviation Safety Summit 2026 (Marriott Hotel, Ikeja, Lagos, Nigeria).
-Company Name: ${companyName}
-Target Audience: ${targetAudience}
-Message/Goal: ${message}
-Size/Format: ${preferredSizeFormat}
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: `Create exactly two distinct summit advertising concepts for ${normalizedCompanyName}.
 
-Provide:
-1. Concept A (Direct & Authoritative) with Headline, Body copy, Visual composition notes, and CTA.
-2. Concept B (Innovative & Technology-focused) with Headline, Body copy, Visual composition notes, and CTA.
-Ensure all copy respects aviation safety standards and requires final customer approval.`
+Summit context: ${SUMMIT_INFO}
+Theme: ${SUMMIT_THEME}
+Target audience: ${normalizedAudience}
+Campaign objective: ${normalizedMessage}
+Preferred format: ${normalizedFormat}
+
+Return strict JSON in this schema:
+{
+  "concepts": [
+    {
+      "title": "Concept A",
+      "headline": "string",
+      "bodyCopy": "string",
+      "visualNotes": "string",
+      "callToAction": "string"
+    },
+    {
+      "title": "Concept B",
+      "headline": "string",
+      "bodyCopy": "string",
+      "visualNotes": "string",
+      "callToAction": "string"
+    }
+  ]
+}
+
+Rules:
+- Keep both concepts aviation-safety relevant and professional.
+- Do not invent event metrics, approvals, or unapproved promises.
+- Mention only ideas that still require customer approval and production review.`,
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.35
+          }
         });
-        aiConcept = result.text || aiConcept;
-      } catch (e) {
-        console.warn('Creative AI generation failed, using standard template:', e);
+
+        const parsed = safeJsonParse<{ concepts?: Array<Partial<CreativeConcept>> }>(response.text);
+        const parsedConcepts = (parsed?.concepts || [])
+          .map((concept, index) => ({
+            title: (index === 0 ? 'Concept A' : 'Concept B') as CreativeConcept['title'],
+            headline: sanitizeText(concept.headline, 160),
+            bodyCopy: sanitizeText(concept.bodyCopy, 500),
+            visualNotes: sanitizeText(concept.visualNotes, 400),
+            callToAction: sanitizeText(concept.callToAction, 220)
+          }))
+          .filter((concept) => concept.headline && concept.bodyCopy && concept.visualNotes && concept.callToAction);
+
+        if (parsedConcepts.length === 2) {
+          concepts = parsedConcepts;
+          aiGenerated = true;
+        }
+      } catch (geminiError) {
+        console.error('Creative request Gemini error:', geminiError);
       }
     }
 
-    const creativeReq = {
-      id: 'cr-' + Date.now(),
-      companyName,
-      contactPerson,
-      email,
-      phone,
-      message,
-      targetAudience,
-      preferredSizeFormat,
-      deadline,
-      logoProvided: !!logoUrl,
-      logoUrl: logoUrl || '',
-      aiDraftConcept: aiConcept,
+    const creativeReq: StoredCreativeRequest = {
+      id: `cr-${Date.now()}`,
+      companyName: normalizedCompanyName,
+      contactPerson: normalizedContactPerson,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      message: normalizedMessage,
+      targetAudience: normalizedAudience,
+      preferredSizeFormat: normalizedFormat,
+      deadline: normalizedDeadline,
+      logoProvided: Boolean(normalizedLogoUrl),
+      logoUrl: normalizedLogoUrl || '',
+      referenceImages: normalizedReferenceImages,
+      concepts,
+      uploadTracking: {
+        logoProvided: Boolean(normalizedLogoUrl),
+        uploadedAssetCount: [normalizedLogoUrl, ...normalizedReferenceImages].filter(Boolean).length,
+        uploadedAssets: [normalizedLogoUrl, ...normalizedReferenceImages].filter(Boolean)
+      },
+      aiDraftConcept: renderCreativeConceptSummary(concepts),
       status: 'CONCEPT_DRAFTED',
-      createdAt: new Date().toISOString()
+      createdAt: createTimestamp()
     };
 
     currentDb.creative_requests = currentDb.creative_requests || [];
     currentDb.creative_requests.unshift(creativeReq);
     writeDb(currentDb);
 
-    res.json({ success: true, request: creativeReq });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Creative request failed', details: err.message });
+    return sendAiSuccess(res, aiGenerated, {
+      request: creativeReq,
+      concepts
+    }, aiGenerated ? `${AI_UNVERIFIED_DISCLAIMER}. Creative concepts are draft copy only and require customer approval plus secretariat review.` : undefined);
+  } catch (error) {
+    console.error('Creative request error:', error);
+    return res.status(500).json({
+      success: false,
+      aiGenerated: false,
+      error: 'Creative request processing failed.',
+      timestamp: createTimestamp()
+    });
   }
 });
 
@@ -1533,44 +2030,111 @@ app.get('/api/marketplace/revenue-metrics', (req, res) => {
 // GEMINI AI ASSISTANT API
 // ============================================================
 app.post('/api/gemini/chat', async (req, res) => {
-  const ai = getAiClient();
-  if (!ai) {
-    return res.status(500).json({ error: 'Gemini API not configured' });
+  const message = sanitizeText(req.body?.message, 1200);
+  if (!message) {
+    return sendValidationError(res, 'A message is required.');
   }
 
   try {
-    const { message, context } = req.body;
     const currentDb = readDb();
-    
-    // Build context string from DB
-    const speakersData = currentDb.speakers?.map((s: any) => `${s.name} (${s.position}, ${s.organisation}) - Topic: ${s.topic}`).join('\n') || '';
-    const sessionsData = currentDb.sessions?.map((s: any) => `${s.time} [${s.type}] ${s.title} - Speaker: ${s.speaker} in ${s.room}`).join('\n') || '';
-    
-    const systemInstruction = `You are the official AI Assistant for the Aviation Safety Summit 2026.
-Respond to attendee questions using ONLY the official programme and speaker data provided below. 
-Do not invent information. If an answer is not in the data, politely say "That information is not currently available in the official programme."
-Keep responses concise, professional, and helpful.
+    const speakers = ((currentDb.speakers || []) as Speaker[]).filter((speaker) => speaker.published !== false);
+    const sessions = (currentDb.sessions || []) as Session[];
+    const normalizedQuestion = message.toLowerCase();
+    const questionTokens = normalizedQuestion
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((token) => token.length > 2);
 
-OFFICIAL SPEAKERS:
-${speakersData}
+    const matchingSpeakers = speakers.filter((speaker) => questionTokens.some((token) => (
+      `${speaker.name} ${speaker.organisation} ${speaker.position} ${speaker.topic} ${speaker.industry} ${speaker.session}`.toLowerCase().includes(token)
+    ))).slice(0, 3);
 
-OFFICIAL SESSIONS:
-${sessionsData}
-`;
+    const matchingSessions = sessions.filter((session) => questionTokens.some((token) => (
+      `${session.title} ${session.speaker} ${session.room} ${session.type} ${session.time}`.toLowerCase().includes(token)
+    ))).slice(0, 3);
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: message,
-      config: {
-        systemInstruction,
-        temperature: 0.2,
+    const fallbackText = (() => {
+      if (normalizedQuestion.includes('date') || normalizedQuestion.includes('when')) {
+        return 'The Aviation Safety Summit 2026 is scheduled for Tuesday, 17 November 2026.';
       }
-    });
 
-    res.json({ text: response.text });
-  } catch (error: any) {
-    console.error('Gemini API Error:', error);
-    res.status(500).json({ error: error.message || 'Error communicating with AI assistant' });
+      if (normalizedQuestion.includes('venue') || normalizedQuestion.includes('where') || normalizedQuestion.includes('location')) {
+        return 'The summit venue is the Lagos Marriott Hotel, Ikeja, Lagos, Nigeria.';
+      }
+
+      if (normalizedQuestion.includes('theme')) {
+        return `The official theme is "${SUMMIT_THEME}".`;
+      }
+
+      if (matchingSpeakers.length > 0) {
+        return matchingSpeakers.map((speaker) => (
+          `${speaker.name} (${speaker.position}, ${speaker.organisation}) is listed with status ${speaker.status}. Topic: ${speaker.topic || 'Topic to be confirmed'}. Session: ${speaker.session || 'To be announced'}.`
+        )).join(' ');
+      }
+
+      if (matchingSessions.length > 0) {
+        return matchingSessions.map((session) => (
+          `${session.title} is scheduled for ${session.time || 'TBD'} in ${session.room || 'the designated venue'}${session.speaker ? ` and currently lists ${session.speaker} as speaker` : ''}.`
+        )).join(' ');
+      }
+
+      return 'That information is not currently available in the official summit programme. Please ask about a listed speaker, session, the venue, the date, or the summit theme.';
+    })();
+
+    const ai = getAiClient();
+    if (!ai) {
+      return sendAiSuccess(res, false, { text: fallbackText, matchedSpeakers: matchingSpeakers.map((speaker) => speaker.name), matchedSessions: matchingSessions.map((session) => session.title) });
+    }
+
+    try {
+      const speakerContext = speakers
+        .slice(0, 20)
+        .map((speaker) => `${speaker.name} | ${speaker.position} | ${speaker.organisation} | Status: ${speaker.status} | Topic: ${speaker.topic || 'TBC'} | Session: ${speaker.session || 'TBA'}`)
+        .join('\n');
+      const sessionContext = sessions
+        .slice(0, 20)
+        .map((session) => `${session.title} | ${session.time || 'TBD'} | ${session.room || 'Venue TBA'} | Speaker: ${session.speaker || 'TBA'} | Status: ${session.status || 'CONFIRMED'}`)
+        .join('\n');
+
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: message,
+        config: {
+          systemInstruction: `You are the official Aviation Safety Summit 2026 assistant.
+
+Use only the official speaker and session context below. Never invent attendees, dates, rooms, benefits, or agenda items. If the answer is unknown, reply exactly: "That information is not currently available in the official summit programme."
+
+Summit facts:
+- ${SUMMIT_INFO}
+- Theme: ${SUMMIT_THEME}
+
+Official speakers:
+${speakerContext}
+
+Official sessions:
+${sessionContext}`,
+          temperature: 0.15
+        }
+      });
+
+      return sendAiSuccess(res, true, {
+        text: sanitizeText(response.text, 1200) || fallbackText,
+        matchedSpeakers: matchingSpeakers.map((speaker) => speaker.name),
+        matchedSessions: matchingSessions.map((session) => session.title)
+      }, 'AI-generated answer using official summit records only. Please rely on listed statuses for final confirmation.');
+    } catch (geminiError) {
+      console.error('Gemini chat error:', geminiError);
+    }
+
+    return sendAiSuccess(res, false, { text: fallbackText, matchedSpeakers: matchingSpeakers.map((speaker) => speaker.name), matchedSessions: matchingSessions.map((session) => session.title) });
+  } catch (error) {
+    console.error('Gemini chat endpoint error:', error);
+    return res.status(500).json({
+      success: false,
+      aiGenerated: false,
+      error: 'Unable to process the summit assistant request.',
+      timestamp: createTimestamp()
+    });
   }
 });
 
@@ -1578,161 +2142,170 @@ ${sessionsData}
 // SPEAKERS: AI TOPIC SUGGESTER (GEMINI POWERED)
 // ============================================================
 app.post('/api/speakers/ai-suggest-topics', async (req, res) => {
-  const { name, position, organisation, industry, role } = req.body;
+  const name = sanitizeText(req.body?.name, 160);
+  const position = sanitizeText(req.body?.position, 160) || 'Executive Leader';
+  const organisation = sanitizeText(req.body?.organisation, 160);
+  const industry = sanitizeText(req.body?.industry, 120) || 'Aviation & Allied Sectors';
+  const role = sanitizeText(req.body?.role, 120) || 'Keynote / Industry Leader';
+
   if (!name || !organisation) {
-    return res.status(400).json({ error: 'Name and organisation are required' });
+    return sendValidationError(res, 'Name and organisation are required.');
   }
+
+  const currentDb = readDb();
+  const relevantSpeakers = ((currentDb.speakers || []) as Speaker[])
+    .filter((speaker) => speaker.organisation !== organisation && (speaker.industry === industry || speaker.category === role))
+    .slice(0, 3)
+    .map((speaker) => `${speaker.name} — ${speaker.topic}`);
+
+  const fallbackTopics = [
+    `Building a Safer Aviation Culture Through Leadership at ${organisation}`,
+    `${industry} and Aviation Safety: Risk Control, Reliability, and Shared Accountability`,
+    `Executive Priorities for Safer Skies: Governance, Human Factors, and Operational Discipline`
+  ];
 
   const ai = getAiClient();
   if (ai) {
     try {
-      const prompt = `You are a senior aviation safety consultant advising the Aviation Safety Summit 2026 (Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY").
-Executive: ${name}
-Current Position: ${position || 'Executive Leader'}
-Organisation: ${organisation}
-Industry Sector: ${industry || 'Aviation & Allied Sectors'}
-Role at Summit: ${role || 'Keynote / Industry Leader'}
-
-Suggest THREE (3) highly realistic, impactful, and industry-relevant summit safety topics for this executive based on their specific industry, statutory mandate, and role.
-Each topic must be professional, authoritative, and strictly pertinent to aviation safety (e.g. operational discipline, regulation, financial sustainability, telecommunications reliability, insurance risk mitigation, engineering standards, or human factors).
-
-Return a JSON array of 3 strings containing only the topic titles, for example:
-["Topic 1", "Topic 2", "Topic 3"]`;
-
       const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
+        model: GEMINI_MODEL,
+        contents: `You are a senior aviation safety summit programme advisor.
+
+Executive: ${name}
+Position: ${position}
+Organisation: ${organisation}
+Industry Sector: ${industry}
+Summit Role: ${role}
+Relevant examples from current summit speakers: ${relevantSpeakers.join(' | ') || 'None'}
+
+Generate exactly three distinct, professional topic titles focused on aviation safety. Topics must stay relevant to the executive's industry and must not claim the executive has already accepted any topic.
+
+Return strict JSON in either of these shapes:
+["Topic 1", "Topic 2", "Topic 3"]
+or
+{"topics":["Topic 1","Topic 2","Topic 3"]}`,
         config: {
-          responseMimeType: "application/json",
-          temperature: 0.3,
+          responseMimeType: 'application/json',
+          temperature: 0.25
         }
       });
 
-      let topics: string[] = [];
-      try {
-        topics = JSON.parse(response.text || '[]');
-      } catch (e) {
-        topics = [
-          `Enhancing Operational Safety & Compliance Across ${organisation}`,
-          `Industry Leadership and Risk Mitigation in the ${industry} Sector`,
-          `Collaborative Safety Protocols for Sustainable Airspace Protection`
-        ];
-      }
+      const parsed = safeJsonParse<string[] | { topics?: string[] }>(response.text);
+      const aiTopics = Array.isArray(parsed) ? parsed : parsed?.topics || [];
+      const normalizedTopics = Array.from(new Set(
+        aiTopics
+          .map((topic) => sanitizeText(topic, 180))
+          .filter((topic) => topic.length > 10)
+      )).slice(0, 3);
 
-      return res.json({
-        success: true,
-        topics: Array.isArray(topics) ? topics.slice(0, 3) : [],
-        disclaimer: 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL'
-      });
-    } catch (err: any) {
-      console.error('Error generating AI topics:', err);
+      if (normalizedTopics.length === 3) {
+        return sendAiSuccess<SpeakerTopicsData>(res, true, {
+          topics: normalizedTopics,
+          speakerContext: { name, organisation, industry, role }
+        }, `${AI_UNVERIFIED_DISCLAIMER}. Topic suggestions are draft ideas only and require speaker approval.`);
+      }
+    } catch (error) {
+      console.error('AI speaker topic suggestion error:', error);
     }
   }
 
-  // Deterministic fallback if Gemini is offline
-  res.json({
-    success: true,
-    topics: [
-      `Building a Sustainable Safety Culture in ${organisation}: Leadership, Discipline and Risk Prevention`,
-      `${industry} and Aviation Safety: Cross-Sector Collaboration for Zero Mishaps`,
-      `Modernising Operational Standards and Safety Accountability Across Nigerian Airspace`
-    ],
-    disclaimer: 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL'
-  });
+  return sendAiSuccess<SpeakerTopicsData>(res, false, {
+    topics: fallbackTopics,
+    speakerContext: { name, organisation, industry, role }
+  }, 'Draft topic suggestions generated from fallback rules and not yet verified.');
 });
 
 // ============================================================
 // SPEAKERS: "ASK ABOUT THE SPEAKERS" AI GROUNDED ASSISTANT
 // ============================================================
 app.post('/api/speakers/ai-assistant', async (req, res) => {
-  const { question } = req.body;
-  if (!question || typeof question !== 'string') {
-    return res.status(400).json({ error: 'Valid question is required' });
+  const question = sanitizeText(req.body?.question, 1200);
+  if (!question) {
+    return sendValidationError(res, 'A valid speaker question is required.');
   }
 
   const currentDb = readDb();
-  const publishedSpeakers = (currentDb.speakers || []).filter((s: any) => s.published !== false);
+  const publishedSpeakers = ((currentDb.speakers || []) as Speaker[]).filter((speaker) => speaker.published !== false);
+  const stopWords = new Set([
+    'who', 'what', 'when', 'where', 'why', 'how', 'is', 'are', 'about', 'speaking', 'speaker', 'talk',
+    'the', 'and', 'for', 'from', 'with', 'does', 'anyone', 'tell', 'show', 'me', 'please', 'summit',
+    'there', 'their', 'them', 'this', 'that', 'have', 'has', 'will'
+  ]);
+  const tokens = question.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((token) => token.length > 2 && !stopWords.has(token));
 
-  const speakerContext = publishedSpeakers.map((s: any, idx: number) => {
-    return `[SPEAKER ${idx + 1}]
-Name: ${s.name}
-Position: ${s.position}
-Organisation: ${s.organisation}
-Industry Sector: ${s.industry}
-Summit Role: ${s.category}
-Participation Status: ${s.status}
-Workflow Stage: ${s.workflowStage || 'VERIFIED'}
-Topic: "${s.topic || 'TOPIC TO BE CONFIRMED'}" (${s.isTopicOfficial ? 'OFFICIAL APPROVED TOPIC' : 'PROPOSED TOPIC'})
-Session: ${s.session || 'To Be Announced'} (Time: ${s.time || 'TBD'})
-Why Topic Matters: ${s.whyTopicMatters || 'Foundational to cross-sector aviation safety.'}
-Safety Perspective: ${s.safetyPerspective || 'Safety is everyone\'s responsibility.'}
-Verified By: ${s.verifiedBy || 'Summit Secretariat'} (${s.verificationDate || '2026'})`;
-  }).join('\n\n');
+  const matches = publishedSpeakers
+    .map((speaker) => {
+      const textBlob = `${speaker.name} ${speaker.position} ${speaker.organisation} ${speaker.industry} ${speaker.topic} ${speaker.category} ${speaker.whyTopicMatters} ${speaker.session}`.toLowerCase();
+      const score = tokens.reduce((total, token) => total + (textBlob.includes(token) ? 1 : 0), 0);
+      return { speaker, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5);
+
+  const matchedSpeakers: SpeakerAssistantMatch[] = matches.map(({ speaker }) => ({
+    id: speaker.id,
+    name: speaker.name,
+    organisation: speaker.organisation,
+    status: speaker.status,
+    verificationStatus: `${speaker.workflowStage || 'VERIFIED'}${speaker.verificationDate ? ` • ${speaker.verificationDate}` : ''}`,
+    topic: speaker.topic || 'Topic to be confirmed',
+    session: speaker.session || 'To be announced'
+  }));
+
+  const fallbackAnswer = matchedSpeakers.length > 0
+    ? `Here are the matching speakers from the official summit database:\n\n${matchedSpeakers.map((speaker) => `• ${speaker.name} (${speaker.organisation}) — Status: ${speaker.status}; Verification: ${speaker.verificationStatus}; Topic: ${speaker.topic}; Session: ${speaker.session}.`).join('\n')}`
+    : 'That information is not currently in the official summit speaker database.';
 
   const ai = getAiClient();
   if (ai) {
     try {
-      const systemInstruction = `You are the official "Ask About the Speakers" AI Assistant for the Aviation Safety Summit 2026.
-Event Date: 17 November 2026
-Venue: Marriott Hotel, Ikeja, Lagos, Nigeria
-Host: Domislink International Services Ltd
-Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY — An accident does not select a tribe, profession, company or class."
-
-STRICT GUARD-RAILS:
-1. Answer the user's question using ONLY the verified speaker records provided below.
-2. Under NO circumstances fabricate or invent people, positions, organizations, topics, or attendance status.
-3. If the user asks about a speaker, topic, or sector not found in the database, state clearly and politely:
-   "That information is not currently in the official summit speaker database."
-4. Always note the official participation status (e.g. "CONFIRMED GUEST", "INVITED", "PROPOSED", or "TO BE CONFIRMED") so delegates know the exact verification status.
-5. If asked about Capt. Chris Najomo or Capt. Alex Badeh Jnr., note that their participation status is "TO BE CONFIRMED" pending formal secretariat protocol.
-6. Provide helpful, professional, structured answers highlighting relevant sessions and topics.
-
-VERIFIED SUMMIT SPEAKER DATABASE:
-${speakerContext}
-`;
+      const speakerContext = publishedSpeakers.map((speaker, index) => `[SPEAKER ${index + 1}]
+Name: ${speaker.name}
+Position: ${speaker.position}
+Organisation: ${speaker.organisation}
+Industry: ${speaker.industry}
+Summit Role: ${speaker.category}
+Participation Status: ${speaker.status}
+Workflow Stage: ${speaker.workflowStage || 'VERIFIED'}
+Verification Date: ${speaker.verificationDate || 'Not stated'}
+Topic: ${speaker.topic || 'TOPIC TO BE CONFIRMED'}
+Topic Status: ${speaker.isTopicOfficial ? 'OFFICIAL APPROVED TOPIC' : 'PROPOSED TOPIC'}
+Session: ${speaker.session || 'To Be Announced'}
+Time: ${speaker.time || 'TBD'}
+Why Topic Matters: ${speaker.whyTopicMatters || 'Foundational to cross-sector aviation safety.'}`).join('\n\n');
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: GEMINI_MODEL,
         contents: question,
         config: {
-          systemInstruction,
-          temperature: 0.2,
+          systemInstruction: `You are the official "Ask About the Speakers" assistant for Aviation Safety Summit 2026.
+
+Rules:
+1. Use only the verified speaker records below.
+2. Never invent people, positions, organisations, sessions, or attendance status.
+3. If the answer is not in the database, reply exactly: "That information is not currently in the official summit speaker database."
+4. Always include each relevant speaker's participation status and verification context.
+5. Capt. Chris Najomo and Capt. Alex Badeh Jnr. must be described as "TO BE CONFIRMED" unless the database says otherwise.
+
+Verified speaker database:
+${speakerContext}`,
+          temperature: 0.15
         }
       });
 
-      return res.json({
-        success: true,
-        answer: response.text,
-        timestamp: new Date().toISOString()
-      });
-    } catch (err: any) {
-      console.error('Gemini Speaker Assistant Error:', err);
+      return sendAiSuccess<SpeakerAssistantData>(res, true, {
+        answer: sanitizeText(response.text, 1600) || fallbackAnswer,
+        matchedSpeakers
+      }, 'AI-generated answer grounded in the official speaker database. Verify participation status before public use.');
+    } catch (error) {
+      console.error('Speaker assistant Gemini error:', error);
     }
   }
 
-  // Fallback search match if Gemini unavailable
-  const stopWords = new Set(['who', 'what', 'when', 'where', 'why', 'how', 'is', 'are', 'about', 'speaking', 'speaker', 'talk', 'the', 'and', 'for', 'from', 'with', 'does', 'anyone', 'tell', 'show', 'me']);
-  const tokens = question.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(t => t.length > 2 && !stopWords.has(t));
-  
-  const matches = publishedSpeakers.filter((s: any) => {
-    const textBlob = `${s.name} ${s.position} ${s.organisation} ${s.industry} ${s.topic} ${s.category} ${s.whyTopicMatters}`.toLowerCase();
-    if (tokens.length === 0) return false;
-    return tokens.some(t => textBlob.includes(t));
-  });
-
-  if (matches.length > 0) {
-    const list = matches.slice(0, 5).map((m: any) => `• **${m.name}** (${m.position}, ${m.organisation})\n  — Sector: ${m.industry} | Status: **${m.status}**\n  — Topic: "${m.topic}"`).join('\n\n');
-    return res.json({
-      success: true,
-      answer: `Here are the leaders matching your inquiry from our verified summit directory:\n\n${list}\n\n*Participation status is verified by the Summit Secretariat under the theme: EVERYBODY IS INVOLVED IN AVIATION SAFETY.*`,
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  return res.json({
-    success: true,
-    answer: `No speaker matching "${question}" was found in the official summit database. The Aviation Safety Summit 2026 features leaders across Regulators, Airlines, Airports, Oil & Gas, Banking, Telecoms, Insurance, Training, Simulation, and Government. Feel free to ask about specific sectors or executive names.`,
-    timestamp: new Date().toISOString()
+  return sendAiSuccess<SpeakerAssistantData>(res, false, {
+    answer: fallbackAnswer,
+    matchedSpeakers
   });
 });
 
@@ -1981,195 +2554,302 @@ app.delete('/api/stakeholders/:id', (req, res) => {
 
 // 5. POST /api/stakeholders/ai-brainstorm ("Ask AI: Who else should we invite?")
 app.post('/api/stakeholders/ai-brainstorm', async (req, res) => {
-  const data = readDb();
-  const currentStakeholders = data.stakeholders || [];
-  
-  // Extract summary of current representation
-  const sectorCounts: Record<string, number> = {};
-  for (const s of currentStakeholders) {
-    sectorCounts[s.category] = (sectorCounts[s.category] || 0) + 1;
-  }
+  try {
+    const data = readDb();
+    const currentStakeholders = (data.stakeholders || []) as StakeholderInvitee[];
+    const validCategories = new Set<StakeholderCategory>(STAKEHOLDER_CATEGORIES.map((item) => item.id as StakeholderCategory));
+    const sectorCounts = STAKEHOLDER_CATEGORIES.reduce<Record<string, number>>((accumulator, category) => {
+      accumulator[category.id] = 0;
+      return accumulator;
+    }, {});
 
-  const ai = getAiClient();
-  if (ai) {
+    currentStakeholders.forEach((stakeholder) => {
+      sectorCounts[stakeholder.category] = (sectorCounts[stakeholder.category] || 0) + 1;
+    });
+
+    let underRepresentedCategories = STAKEHOLDER_CATEGORIES
+      .filter((category) => (sectorCounts[category.id] || 0) <= 1)
+      .map((category) => category.id as StakeholderCategory);
+
+    if (underRepresentedCategories.length === 0) {
+      underRepresentedCategories = [...STAKEHOLDER_CATEGORIES]
+        .sort((left, right) => (sectorCounts[left.id] || 0) - (sectorCounts[right.id] || 0))
+        .slice(0, 6)
+        .map((category) => category.id as StakeholderCategory);
+    }
+
+    const curatedSuggestions: StakeholderBrainstormSuggestion[] = [
+      {
+        name: 'Managing Director',
+        position: 'Country Managing Director',
+        organisation: 'DHL Express Nigeria',
+        category: 'LOGISTICS',
+        whyRelevant: 'Air cargo hold security, dangerous goods handling compliance, and intermodal transport safety across West Africa.',
+        proposedTopic: 'Cold Chain Logistics, Aviation Cargo Safety Standards and Rapid Intermodal Clearance',
+        proposedRole: 'PANELIST',
+        verificationStatus: 'AI-GENERATED CANDIDATE — NOT YET VERIFIED',
+        suggestedSponsorship: 'SILVER'
+      },
+      {
+        name: 'Dr. Pamela Ajayi',
+        position: 'President',
+        organisation: 'Healthcare Federation of Nigeria (HFN)',
+        category: 'HEALTHCARE',
+        whyRelevant: 'Aviation medicine, medical fitness of commercial pilots, aeromedical evacuation, and in-flight medical emergency readiness.',
+        proposedTopic: 'Cardiovascular and Mental Health Standards in Airline Cockpits and In-Flight Medical Emergency Protocols',
+        proposedRole: 'PANELIST',
+        verificationStatus: 'AI-GENERATED CANDIDATE — NOT YET VERIFIED',
+        suggestedSponsorship: 'EXHIBITION'
+      },
+      {
+        name: 'Minister of Education or delegated aviation-education lead',
+        position: 'Honourable Minister / Designated Delegate',
+        organisation: 'Federal Ministry of Education',
+        category: 'ACADEMIA',
+        whyRelevant: 'Aerospace engineering education, pilot training sponsorships, and research capacity directly shape future aviation safety talent.',
+        proposedTopic: 'Sustaining the Indigenous Aerospace Engineering Pipeline and Safety Culture in Higher Institutions',
+        proposedRole: 'SPECIAL GUEST',
+        verificationStatus: 'AI-GENERATED CANDIDATE — NOT YET VERIFIED',
+        suggestedSponsorship: 'NONE'
+      },
+      {
+        name: 'Tony O. Elumelu CFR',
+        position: 'Group Chairman',
+        organisation: 'Heirs Holdings / Transcorp Group',
+        category: 'INVESTORS',
+        whyRelevant: 'Infrastructure capital, airport hospitality, stable power, and long-term private investment all influence operational safety resilience.',
+        proposedTopic: 'Catalysing Private Capital for Airport Power Reliability and Aviation Safety Infrastructure',
+        proposedRole: 'GUEST OF HONOUR',
+        verificationStatus: 'AI-GENERATED CANDIDATE — NOT YET VERIFIED',
+        suggestedSponsorship: 'PLATINUM'
+      },
+      {
+        name: 'Engr. Mansur Ahmed',
+        position: 'Former President / Council Member',
+        organisation: 'Manufacturers Association of Nigeria (MAN)',
+        category: 'MANUFACTURING',
+        whyRelevant: 'Engineering reliability, precision manufacturing, supply-chain quality assurance, and standards compliance all connect directly to safe aircraft operations.',
+        proposedTopic: 'High-Reliability Manufacturing Principles Applied to Aviation Component Sourcing and Maintenance',
+        proposedRole: 'PANELIST',
+        verificationStatus: 'AI-GENERATED CANDIDATE — NOT YET VERIFIED',
+        suggestedSponsorship: 'SILVER'
+      },
+      {
+        name: 'Editor-in-Chief or Aviation Desk Lead',
+        position: 'Editorial Lead',
+        organisation: 'Aviation media house or national broadcast newsroom',
+        category: 'MEDIA',
+        whyRelevant: 'Accurate reporting and informed public communication shape passenger confidence and accountability after incidents or disruptions.',
+        proposedTopic: 'Responsible Aviation Safety Journalism, Crisis Communication, and Public Trust',
+        proposedRole: 'PANELIST',
+        verificationStatus: 'AI-GENERATED CANDIDATE — NOT YET VERIFIED',
+        suggestedSponsorship: 'NONE'
+      }
+    ];
+
+    const fallbackSuggestions = curatedSuggestions
+      .filter((suggestion) => underRepresentedCategories.includes(suggestion.category))
+      .slice(0, 5);
+    const safeFallbackSuggestions = fallbackSuggestions.length > 0 ? fallbackSuggestions : curatedSuggestions.slice(0, 5);
+
+    const responseData = (suggestions: StakeholderBrainstormSuggestion[]) => sendAiSuccess<StakeholderBrainstormData>(
+      res,
+      false,
+      {
+        representationBySector: sectorCounts,
+        underRepresentedCategories,
+        suggestions
+      },
+      'AI-GENERATED CANDIDATES — NOT YET VERIFIED. Every candidate must be manually audited before official invitation.'
+    );
+
+    const ai = getAiClient();
+    if (!ai) {
+      return responseData(safeFallbackSuggestions);
+    }
+
     try {
-      const prompt = `You are the Executive Stakeholder Research Intelligence for the Aviation Safety Summit 2026.
-Event Date: 17 November 2026 at Lagos Marriott Hotel, Ikeja, Lagos, Nigeria.
-Convener: Domislink International Services Ltd.
-Central Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY — An accident does not select a tribe, profession, company or class."
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: `You are the Aviation Safety Summit 2026 stakeholder research assistant.
 
-The summit demonstrates that aviation safety directly affects:
-Passengers, Families, Businesses, Airlines, Airports, Government, Oil & Gas, Banks, Telecoms, Technology, Insurance, Manufacturing, Logistics, Healthcare, Education, Faith Communities, Media, Investors, State Governments, Security, Emergency Services, and The General Public.
+Summit context:
+- ${SUMMIT_INFO}
+- Theme: ${SUMMIT_THEME}
 
-Current database representation by sector:
+Current representation by sector:
 ${JSON.stringify(sectorCounts, null, 2)}
 
-TASK:
-Analyze gaps in under-represented sectors (e.g. Manufacturing, Logistics, Insurance, Healthcare, Academia, Media, Investors, State Infrastructure, Regional Air Travel, Technology).
-Propose 5 high-impact, authentic, real candidates (current verifiable Nigerian or West African corporate/civic leaders or organizations).
+Under-represented categories to prioritise:
+${JSON.stringify(underRepresentedCategories)}
 
-STRICT ANTI-FABRICATION RULES:
-1. ONLY suggest real people holding real, verifiable offices or major organizations in Nigeria.
-2. If you are not 100% sure of an individual executive's exact name, propose the organization and the appropriate executive office (e.g. "Country Manager, Microsoft Nigeria" or "Head of Safety, Seplat Energy").
-3. NEVER invent fake names or fake companies.
-4. Mark every suggestion with verificationStatus: "AI-GENERATED CANDIDATE — NOT YET VERIFIED".
+Existing organisations already in the database:
+${JSON.stringify(currentStakeholders.slice(0, 80).map((stakeholder) => stakeholder.organisation))}
 
-Respond ONLY with valid JSON array in this exact schema:
+Return strict JSON with exactly 5 suggestions using this schema:
 [
   {
-    "name": "string (Real person or Verified Executive Role)",
-    "position": "string (e.g. Managing Director & CEO)",
-    "organisation": "string (e.g. Nigerian Breweries Plc / Guinness Nigeria)",
-    "category": "string (one of: AVIATION, GOVERNMENT, STATE_GOVERNMENT, AIRLINES, AIRPORTS, AIR_NAVIGATION, OIL_AND_GAS, BANKING_AND_FINANCE, TELECOMMUNICATIONS, TECHNOLOGY, MANUFACTURING, INSURANCE, LOGISTICS, HEALTHCARE, ACADEMIA, FAITH_AND_COMMUNITY, MEDIA, INVESTORS, TRAVEL_AND_TOURISM, EMERGENCY_AND_RESCUE, SECURITY, TRANSPORT, PASSENGERS_AND_ADVOCACY, OTHER)",
-    "whyRelevant": "string (Why aviation safety affects this sector)",
-    "proposedTopic": "string (Draft proposed discussion area)",
-    "proposedRole": "string (one of: SPECIAL GUEST, GUEST OF HONOUR, KEYNOTE SPEAKER, PANELIST, GUEST, SPONSOR, EXHIBITOR, PARTNER)",
+    "name": "real person or clearly labelled executive office",
+    "position": "string",
+    "organisation": "string",
+    "category": "one of ${Array.from(validCategories).join(', ')}",
+    "whyRelevant": "string",
+    "proposedTopic": "string",
+    "proposedRole": "SPECIAL GUEST | GUEST OF HONOUR | KEYNOTE SPEAKER | PANELIST | GUEST | SPONSOR | EXHIBITOR | PARTNER",
     "verificationStatus": "AI-GENERATED CANDIDATE — NOT YET VERIFIED",
-    "suggestedSponsorship": "string (e.g. GOLD, SILVER, EXHIBITION, NONE)"
+    "suggestedSponsorship": "PLATINUM | GOLD | SILVER | EXHIBITION | NONE"
   }
-]`;
+]
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
+Strict anti-fabrication rules:
+- Use only real organisations or clearly labelled executive offices.
+- If unsure of a specific person, name the office rather than inventing a person.
+- Prioritise Nigeria or West Africa.
+- Do not repeat organisations already in the database.`,
         config: {
-          temperature: 0.3,
-          responseMimeType: "application/json"
+          responseMimeType: 'application/json',
+          temperature: 0.25
         }
       });
 
-      const parsed = JSON.parse(response.text || '[]');
-      return res.json({
-        success: true,
-        suggestions: parsed,
-        disclaimer: 'AI-GENERATED CANDIDATES — NOT YET VERIFIED. MUST BE AUDITED BEFORE OFFICIAL INVITATION.'
-      });
-    } catch (err: any) {
-      console.error('Gemini Brainstorm Error:', err);
+      const parsed = safeJsonParse<Array<Partial<StakeholderBrainstormSuggestion>>>(response.text) || [];
+      const existingKeys = new Set(currentStakeholders.map((stakeholder) => `${stakeholder.name.toLowerCase()}::${stakeholder.organisation.toLowerCase()}`));
+      const validatedSuggestions = parsed
+        .map((suggestion) => {
+          const category = sanitizeText(suggestion.category, 80) as StakeholderCategory;
+          const name = sanitizeText(suggestion.name, 160);
+          const organisation = sanitizeText(suggestion.organisation, 160);
+          const position = sanitizeText(suggestion.position, 160);
+          const proposedTopic = sanitizeText(suggestion.proposedTopic, 220);
+          const whyRelevant = sanitizeText(suggestion.whyRelevant, 320);
+          const proposedRole = sanitizeText(suggestion.proposedRole, 40) as StakeholderEventRole;
+          const suggestedSponsorship = sanitizeText(suggestion.suggestedSponsorship, 40) || 'NONE';
+
+          if (!name || !organisation || !position || !proposedTopic || !whyRelevant || !validCategories.has(category)) {
+            return null;
+          }
+
+          const dedupeKey = `${name.toLowerCase()}::${organisation.toLowerCase()}`;
+          if (existingKeys.has(dedupeKey)) {
+            return null;
+          }
+
+          return {
+            name,
+            position,
+            organisation,
+            category,
+            whyRelevant,
+            proposedTopic,
+            proposedRole: (
+              ['SPECIAL GUEST', 'GUEST OF HONOUR', 'KEYNOTE SPEAKER', 'PANELIST', 'GUEST', 'SPONSOR', 'EXHIBITOR', 'PARTNER']
+                .includes(proposedRole) ? proposedRole : 'GUEST'
+            ) as StakeholderEventRole,
+            verificationStatus: 'AI-GENERATED CANDIDATE — NOT YET VERIFIED',
+            suggestedSponsorship
+          } satisfies StakeholderBrainstormSuggestion;
+        })
+        .filter((suggestion): suggestion is StakeholderBrainstormSuggestion => Boolean(suggestion))
+        .slice(0, 5);
+
+      if (validatedSuggestions.length > 0) {
+        return sendAiSuccess<StakeholderBrainstormData>(
+          res,
+          true,
+          {
+            representationBySector: sectorCounts,
+            underRepresentedCategories,
+            suggestions: validatedSuggestions
+          },
+          'AI-GENERATED CANDIDATES — NOT YET VERIFIED. Every candidate must be manually audited before official invitation.'
+        );
+      }
+    } catch (error) {
+      console.error('Stakeholder brainstorm Gemini error:', error);
     }
+
+    return responseData(safeFallbackSuggestions);
+  } catch (error) {
+    console.error('Stakeholder brainstorm endpoint error:', error);
+    return res.status(500).json({
+      success: false,
+      aiGenerated: false,
+      error: 'Unable to generate stakeholder suggestions at this time.',
+      timestamp: createTimestamp()
+    });
   }
-
-  // Curated fallback suggestions across under-represented sectors
-  const fallbackSuggestions = [
-    {
-      name: "Hansessa / Managing Director",
-      position: "Country Managing Director",
-      organisation: "DHL Express Nigeria",
-      category: "LOGISTICS",
-      whyRelevant: "Air cargo hold security, dangerous goods handling compliance, and intermodal transport safety across West Africa.",
-      proposedTopic: "Cold Chain Logistics, Aviation Cargo Safety Standards and Rapid Intermodal Clearance",
-      proposedRole: "PANELIST",
-      verificationStatus: "AI-GENERATED CANDIDATE — NOT YET VERIFIED",
-      suggestedSponsorship: "SILVER"
-    },
-    {
-      name: "Dr. Pamela Ajayi",
-      position: "President",
-      organisation: "Healthcare Federation of Nigeria (HFN)",
-      category: "HEALTHCARE",
-      whyRelevant: "Aviation medicine, medical fitness of commercial pilots, aeromedical evacuation and in-flight medical emergencies.",
-      proposedTopic: "Cardiovascular & Mental Health Standards in Airline Cockpits and In-Flight Medical Emergency Protocols",
-      proposedRole: "PANELIST",
-      verificationStatus: "AI-GENERATED CANDIDATE — NOT YET VERIFIED",
-      suggestedSponsorship: "EXHIBITION"
-    },
-    {
-      name: "Prof. Tahir Mamman SAN",
-      position: "Honourable Minister",
-      organisation: "Federal Ministry of Education",
-      category: "ACADEMIA",
-      whyRelevant: "Aerospace engineering education, pilot training sponsorships, and research institutional capacity in universities.",
-      proposedTopic: "Sustaining the Indigenous Aerospace Engineering Pipeline and Safety Culture in Higher Institutions",
-      proposedRole: "SPECIAL GUEST",
-      verificationStatus: "AI-GENERATED CANDIDATE — NOT YET VERIFIED",
-      suggestedSponsorship: "NONE"
-    },
-    {
-      name: "Tony O. Elumelu CFR",
-      position: "Group Chairman",
-      organisation: "Heirs Holdings / Transcorp Group",
-      category: "INVESTORS",
-      whyRelevant: "Infrastructure capital, hospitality near airports (Transcorp Hilton), power supply to radar sites, and African economic integration.",
-      proposedTopic: "Catalysing Private Capital for Airport Power Reliability and Aviation Safety Infrastructure",
-      proposedRole: "GUEST OF HONOUR",
-      verificationStatus: "AI-GENERATED CANDIDATE — NOT YET VERIFIED",
-      suggestedSponsorship: "PLATINUM"
-    },
-    {
-      name: "Engr. Mansur Ahmed",
-      position: "Former President / Council Member",
-      organisation: "Manufacturers Association of Nigeria (MAN)",
-      category: "MANUFACTURING",
-      whyRelevant: "Engineering reliability, precision manufacturing, supply-chain safety, and testing standards.",
-      proposedTopic: "High-Reliability Manufacturing Principles Applied to Aviation Component Sourcing & Maintenance",
-      proposedRole: "PANELIST",
-      verificationStatus: "AI-GENERATED CANDIDATE — NOT YET VERIFIED",
-      suggestedSponsorship: "SILVER"
-    }
-  ];
-
-  res.json({
-    success: true,
-    suggestions: fallbackSuggestions,
-    disclaimer: 'AI-GENERATED CANDIDATES — NOT YET VERIFIED. MUST BE AUDITED BEFORE OFFICIAL INVITATION.'
-  });
 });
 
 // 6. POST /api/stakeholders/ai-letter (Domislink Mail AI: Invitation Letter Generator)
 app.post('/api/stakeholders/ai-letter', async (req, res) => {
-  const {
-    recipientName,
-    recipientPosition,
-    recipientOrg,
-    recipientEmail,
-    category,
-    proposedTopic,
-    eventRole,
-    sponsorshipOption,
-    specialMessage
-  } = req.body;
+  const recipientName = sanitizeText(req.body?.recipientName, 160);
+  const recipientPosition = sanitizeText(req.body?.recipientPosition, 160) || 'Executive Leader';
+  const recipientOrg = sanitizeText(req.body?.recipientOrg, 160);
+  const recipientEmail = sanitizeText(req.body?.recipientEmail, 160);
+  const category = (sanitizeText(req.body?.category, 80) || 'OTHER') as StakeholderCategory;
+  const proposedTopic = sanitizeText(req.body?.proposedTopic, 220) || 'Corporate Leadership and Shared Safety Accountability';
+  const eventRole = (sanitizeText(req.body?.eventRole, 60) || 'GUEST') as StakeholderEventRole;
+  const sponsorshipOption = sanitizeText(req.body?.sponsorshipOption, 80);
+  const specialMessage = sanitizeText(req.body?.specialMessage, 400);
 
   if (!recipientName || !recipientOrg) {
-    return res.status(400).json({ error: 'Recipient name and organisation are required' });
+    return sendValidationError(res, 'Recipient name and organisation are required.');
   }
 
-  const ai = getAiClient();
+  const categoryMeta = findStakeholderCategoryMeta(category);
   let subject = `OFFICIAL INVITATION: Aviation Safety Summit 2026 — 17 November 2026, Marriott Hotel Ikeja, Lagos`;
   let formalSalutation = `Dear ${recipientName},`;
-  let formalInvitationText = `On behalf of the Advisory Board and Secretariat of the Aviation Safety Summit 2026, convened by Domislink International Services Ltd, we have the distinct honour to formally invite you as a distinguished ${eventRole || 'Special Guest'} to the landmark Aviation Safety Summit 2026.`;
-  let eventDetailsText = `The Summit is scheduled to hold on Tuesday, 17 November 2026, at the Grand Ballroom, Lagos Marriott Hotel, GRA, Ikeja, Lagos, Nigeria, commencing promptly at 08:30 AM (WAT).`;
-  let sectorRelevanceText = `The theme of this summit is "EVERYBODY IS INVOLVED IN AVIATION SAFETY — An accident does not select a tribe, profession, company or class." As a foremost leader in ${recipientOrg}, your sector directly intersects with aviation safety, risk prevention, operational continuity, and public protection.`;
-  let proposedRoleText = `We would be deeply privileged to have you participate as a ${eventRole || 'Special Guest'}${proposedTopic ? `, and propose your intervention around the topic: "${proposedTopic}"` : ''}. (Please note that all proposed topics remain subject to your formal convenience and approval).`;
-  let callToActionText = `We kindly request that you confirm your esteemed acceptance or nominate an official representative at your earliest convenience to enable our Protocol Desk finalize your summit credentials and VIP seating.`;
-  let signatureBlock = `Yours in the Service of Air Safety and Human Life,\n\nSummit Secretariat & Organizing Board\nDomislink International Services Ltd\nLagos Marriott Hotel, Ikeja, Lagos, Nigeria\nEmail: domislinkint@gmail.com | Web: https://theaviationsecuritysummit.com`;
+  let formalInvitationText = `On behalf of the Advisory Board and Secretariat of the Aviation Safety Summit 2026, convened by Domislink International Services Ltd, we respectfully invite you to participate as a distinguished ${eventRole} at this national safety forum.`;
+  let eventDetailsText = `The summit will hold on Tuesday, 17 November 2026, at the Lagos Marriott Hotel, Ikeja, Lagos, Nigeria, with protocol activities commencing from 08:30 AM WAT.`;
+  let sectorRelevanceText = `The summit theme is "${SUMMIT_THEME}." ${recipientOrg} belongs in this conversation because ${categoryMeta?.whyCorporateBelongs?.toLowerCase() || 'its sector directly shapes public safety, operational resilience, and responsible leadership.'}`;
+  let proposedRoleText = `We would be honoured to host you as a ${eventRole}. We propose the discussion area "${proposedTopic}", subject entirely to your review, convenience, and formal acceptance.`;
+  let callToActionText = sponsorshipOption
+    ? `Should your office wish, the secretariat can also discuss the approved ${sponsorshipOption} sponsorship pathway in a manner aligned with your protocol preferences. Kindly confirm acceptance or nominate a representative at your earliest convenience.`
+    : 'Kindly confirm acceptance, propose amendments, or nominate a representative at your earliest convenience so that protocol, seating, and programme planning can be concluded properly.';
+  let signatureBlock = `Yours faithfully,\n\nSummit Secretariat & Organizing Board\nDomislink International Services Ltd\nLagos, Nigeria\nEmail: domislinkint@gmail.com | Web: https://summit.domislink.com`;
+
+  const buildFullHtmlContent = () => [
+    `<p>${escapeHtml(formalSalutation)}</p>`,
+    `<p>${escapeHtml(formalInvitationText)}</p>`,
+    `<p>${escapeHtml(eventDetailsText)}</p>`,
+    `<p>${escapeHtml(sectorRelevanceText)}</p>`,
+    `<p>${escapeHtml(proposedRoleText)}</p>`,
+    `<p>${escapeHtml(callToActionText)}</p>`,
+    `<p>${escapeHtml(signatureBlock).replace(/\n/g, '<br />')}</p>`
+  ].join('');
+
+  let fullHtmlContent = buildFullHtmlContent();
+  let aiGenerated = false;
+  const ai = getAiClient();
 
   if (ai) {
     try {
-      const prompt = `You are the Chief Diplomatic Protocol Officer for DOMISLINK MAIL AI at Domislink International Services Ltd.
-Generate an official, dignified, and highly polished formal summit invitation letter.
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: `You are the Chief Diplomatic Protocol Officer for Domislink.
 
-DETAILS:
-- Summit: Aviation Safety Summit 2026
-- Convener: Domislink International Services Ltd ("The Digital Empire")
-- Date: Tuesday, 17 November 2026
-- Venue: Grand Ballroom, Lagos Marriott Hotel, GRA, Ikeja, Lagos, Nigeria
-- Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY — An accident does not select a tribe, profession, company or class."
-- Recipient Name: ${recipientName}
-- Recipient Position: ${recipientPosition || 'Executive Leader'}
-- Recipient Organisation: ${recipientOrg}
-- Recipient Sector: ${category || 'Industry'}
-- Proposed Event Role: ${eventRole || 'Special Guest'}
-- Proposed Discussion Topic: ${proposedTopic || 'Corporate Leadership & Shared Safety Accountability'}
-- Sponsorship Mention: ${sponsorshipOption ? `Mention corporate sponsorship partnership opportunity for ${sponsorshipOption}` : 'No sponsorship requested'}
-- Special Note from Secretariat: ${specialMessage || 'None'}
+Generate a formal invitation letter for:
+- Recipient: ${recipientName}
+- Position: ${recipientPosition}
+- Organisation: ${recipientOrg}
+- Sector: ${category}
+- Proposed Role: ${eventRole}
+- Proposed Topic: ${proposedTopic}
+- Sponsorship mention: ${sponsorshipOption || 'None'}
+- Special note: ${specialMessage || 'None'}
 
-STRICT PROTOCOL REQUIREMENTS:
-1. Tone must be aristocratic, respectful, professional, and urgent about the collective sanctity of human life in Nigerian airspace.
-2. Emphasize why their specific sector (${category} / ${recipientOrg}) belongs at an aviation safety summit (finance, telecoms, oil & gas, insurance, logistics, public advocacy, or governance).
-3. Explicitly state that the proposed topic is a PROPOSED DISCUSSION AREA — SUBJECT TO FORMAL ACCEPTANCE.
-4. If the person is a Faith Leader (e.g. Bishop David Oyedepo or Sultan of Sokoto), treat them with the utmost spiritual dignity, highlighting the sanctity of human life and leadership ethics, rather than technical aerodynamics.
+Summit context:
+- ${SUMMIT_INFO}
+- Theme: ${SUMMIT_THEME}
+- Sector relevance hint: ${categoryMeta?.whyCorporateBelongs || 'This sector intersects with aviation safety.'}
 
-Respond in JSON format with these exact keys:
+Rules:
+- Keep the tone diplomatic, formal, and respectful.
+- Explain why the recipient's sector matters to aviation safety.
+- State clearly that the topic is proposed and subject to acceptance.
+- Do not invent benefits or commitments.
+
+Return strict JSON with:
 {
   "subject": "string",
   "formalSalutation": "string",
@@ -2179,166 +2859,204 @@ Respond in JSON format with these exact keys:
   "proposedRoleText": "string",
   "callToActionText": "string",
   "signatureBlock": "string",
-  "fullHtmlContent": "string (clean formatted HTML suitable for email)"
-}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
+  "fullHtmlContent": "string"
+}`,
         config: {
-          temperature: 0.25,
-          responseMimeType: "application/json"
+          responseMimeType: 'application/json',
+          temperature: 0.2
         }
       });
 
-      const parsed = JSON.parse(response.text || '{}');
-      if (parsed.subject) subject = parsed.subject;
-      if (parsed.formalSalutation) formalSalutation = parsed.formalSalutation;
-      if (parsed.formalInvitationText) formalInvitationText = parsed.formalInvitationText;
-      if (parsed.eventDetailsText) eventDetailsText = parsed.eventDetailsText;
-      if (parsed.sectorRelevanceText) sectorRelevanceText = parsed.sectorRelevanceText;
-      if (parsed.proposedRoleText) proposedRoleText = parsed.proposedRoleText;
-      if (parsed.callToActionText) callToActionText = parsed.callToActionText;
-      if (parsed.signatureBlock) signatureBlock = parsed.signatureBlock;
-    } catch (err: any) {
-      console.error('Gemini Letter Generation Error:', err);
+      const parsed = safeJsonParse<Partial<GeneratedInvitationLetter>>(response.text);
+      if (parsed) {
+        subject = sanitizeText(parsed.subject, 220) || subject;
+        formalSalutation = sanitizeText(parsed.formalSalutation, 160) || formalSalutation;
+        formalInvitationText = sanitizeText(parsed.formalInvitationText, 700) || formalInvitationText;
+        eventDetailsText = sanitizeText(parsed.eventDetailsText, 500) || eventDetailsText;
+        sectorRelevanceText = sanitizeText(parsed.sectorRelevanceText, 700) || sectorRelevanceText;
+        proposedRoleText = sanitizeText(parsed.proposedRoleText, 500) || proposedRoleText;
+        callToActionText = sanitizeText(parsed.callToActionText, 500) || callToActionText;
+        signatureBlock = sanitizeText(parsed.signatureBlock, 400).replace(/\\n/g, '\n') || signatureBlock;
+        fullHtmlContent = typeof parsed.fullHtmlContent === 'string' && parsed.fullHtmlContent.trim()
+          ? parsed.fullHtmlContent.trim()
+          : buildFullHtmlContent();
+        aiGenerated = true;
+      }
+    } catch (error) {
+      console.error('Stakeholder letter Gemini error:', error);
     }
   }
 
-  // Pre-generate Gmail Web direct composition URL and mailto link
+  fullHtmlContent = buildFullHtmlContent();
   const emailBodyText = `${formalSalutation}\n\n${formalInvitationText}\n\n${eventDetailsText}\n\n${sectorRelevanceText}\n\n${proposedRoleText}\n\n${callToActionText}\n\n${signatureBlock}`;
-  const gmailDraftUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail || '')}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
-  const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
+  const gmailDraftUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
+  const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
 
-  res.json({
-    success: true,
-    letter: {
-      id: `ltr-${Date.now()}`,
-      recipientName,
-      recipientPosition,
-      recipientOrg,
-      recipientEmail,
-      category,
-      eventRole,
-      proposedTopic,
-      subject,
-      formalSalutation,
-      formalInvitationText,
-      eventDetailsText,
-      sectorRelevanceText,
-      proposedRoleText,
-      callToActionText,
-      signatureBlock,
-      gmailDraftUrl,
-      mailtoUrl,
-      createdAt: new Date().toISOString()
-    }
-  });
+  const letter: GeneratedInvitationLetter = {
+    id: `ltr-${Date.now()}`,
+    recipientName,
+    recipientPosition,
+    recipientOrg,
+    recipientEmail,
+    category,
+    eventRole,
+    proposedTopic,
+    sponsorshipOption,
+    specialMessage,
+    subject,
+    formalSalutation,
+    formalInvitationText,
+    eventDetailsText,
+    sectorRelevanceText,
+    proposedRoleText,
+    callToActionText,
+    signatureBlock,
+    fullHtmlContent,
+    gmailDraftUrl,
+    mailtoUrl,
+    status: 'DRAFT',
+    createdAt: createTimestamp()
+  };
+
+  return sendAiSuccess(res, aiGenerated, { letter }, aiGenerated ? `${AI_UNVERIFIED_DISCLAIMER}. Letter content should be reviewed before dispatch.` : undefined);
 });
 
 // 7. POST /api/stakeholders/ai-sponsorship-proposal (Corporate Sponsorship Proposition)
 app.post('/api/stakeholders/ai-sponsorship-proposal', async (req, res) => {
-  const { companyName, industry, executiveName, executivePosition } = req.body;
+  const companyName = sanitizeText(req.body?.companyName, 160);
+  const industry = sanitizeText(req.body?.industry, 120) || 'OTHER';
+  const executiveName = sanitizeText(req.body?.executiveName, 160) || 'Executive Leadership';
+  const executivePosition = sanitizeText(req.body?.executivePosition, 160) || 'Leadership';
 
   if (!companyName) {
-    return res.status(400).json({ error: 'Company name is required' });
+    return sendValidationError(res, 'Company name is required.');
   }
 
-  const ai = getAiClient();
-  let proposal = {
-    headline: `Strategic Safety Partnership Proposal for ${companyName}`,
-    whySectorMatters: `Aviation safety is a vital catalyst for ${industry || 'corporate Nigeria'}. Reliable, zero-accident air transport protects executive human capital, secures supply chains, and safeguards investor confidence.`,
-    howParticipationSupportsSafety: `By partnering with the Aviation Safety Summit 2026, ${companyName} directly champions preventative safety audits, pilot recurrent training simulators, and multi-agency emergency readiness.`,
-    recommendedTiers: [
-      {
-        tier: "PLATINUM SAFETY BENEFACTOR",
-        feeNGN: "₦25,000,000",
-        feeUSD: "$16,500",
-        benefits: [
-          "VIP Plenary Keynote / High-Table Representation",
-          "Prominent Double-Page Centerfold in Official Summit Hardcover Programme",
-          "Prime 6m x 3m Exhibition Pavilion at Marriott Foyer",
-          "Exclusive Brand Display on all Digital Stream Broadcasts & TV B-Roll",
-          "10 VIP Delegate Access Passes with Marriott Executive Luncheon"
-        ]
-      },
-      {
-        tier: "GOLD SECTOR CHAMPION",
-        feeNGN: "₦15,000,000",
-        feeUSD: "$10,000",
-        benefits: [
-          "Executive Panelist Speaking Role in Sector Specialized Session",
-          "Full-Page Colour Advertisement in Summit Programme",
-          "3m x 3m Standard Exhibition Space",
-          "5 VIP Delegate Passes with Sky Party Dinner Access",
-          "Corporate Logo across Global Media Press Releases"
-        ]
-      },
-      {
-        tier: "SILVER SAFETY ADVOCATE",
-        feeNGN: "₦8,000,000",
-        feeUSD: "$5,300",
-        benefits: [
-          "Corporate Recognition during Official Summit Commendation",
-          "Half-Page Colour Display in Summit Hardcover Book",
-          "3 VIP Delegate Badges",
-          "Logo Presence on Summit Digital Directory & PWA Applet"
-        ]
-      }
-    ],
-    callToAction: "Connect with the Summit Commercial & Sponsorship Director at domislinkint@gmail.com to lock your package."
+  const data = readDb();
+  const packages = (data.sponsorship_packages || INITIAL_SPONSORSHIP_PACKAGES) as SponsorshipPackage[];
+  const packageMap = new Map(packages.map((pkg) => [pkg.tier, pkg] as const));
+  const approvedTierOrder: SponsorshipPackage['tier'][] = ['PLATINUM', 'GOLD', 'SILVER', 'SAFETY', 'SIMULATION', 'TITLE'];
+  const categoryMeta = findStakeholderCategoryMeta(industry);
+
+  const buildTierRecommendation = (tier: SponsorshipPackage['tier'], rationale: string): SponsorshipTierRecommendation | null => {
+    const pkg = packageMap.get(tier);
+    if (!pkg) return null;
+
+    return {
+      id: pkg.id,
+      tier: pkg.tier,
+      name: pkg.name,
+      rationale,
+      feeNGN: formatMoney(pkg.priceNGN, 'NGN'),
+      feeUSD: formatMoney(pkg.priceUSD, 'USD'),
+      benefits: pkg.benefits,
+      status: pkg.status
+    };
   };
 
+  const fallbackTierSelection = [
+    buildTierRecommendation('PLATINUM', `Recommended for ${companyName} if the goal is maximum executive visibility and broad summit-wide authority.`),
+    buildTierRecommendation('GOLD', `Recommended for ${companyName} as a balanced route to visibility, exhibition presence, and programme recognition.`),
+    buildTierRecommendation(
+      industry === 'TECHNOLOGY' || industry === 'AIR_NAVIGATION' ? 'SAFETY'
+        : industry === 'ACADEMIA' || industry === 'AIRLINES' ? 'SIMULATION'
+        : 'SILVER',
+      `Recommended because ${categoryMeta?.whyCorporateBelongs?.toLowerCase() || 'the sector has a direct safety stake in aviation outcomes.'}`
+    )
+  ].filter((tier): tier is SponsorshipTierRecommendation => Boolean(tier));
+
+  const fallbackProposal: SponsorshipProposalData = {
+    headline: `Strategic Aviation Safety Partnership Proposal for ${companyName}`,
+    whySectorMatters: `${companyName} operates in a sector where ${categoryMeta?.whyCorporateBelongs?.toLowerCase() || 'operational continuity, public confidence, and risk prevention directly affect aviation safety.'}`,
+    howParticipationSupportsSafety: `By partnering with Aviation Safety Summit 2026, ${companyName} can support informed dialogue, operational discipline, and practical collaboration across regulators, operators, infrastructure owners, and service providers.`,
+    recommendedTiers: fallbackTierSelection,
+    callToAction: `To progress, the Domislink commercial team can prepare a formal quotation for ${companyName} and align the preferred sponsorship tier with ${executiveName}'s office.`
+  };
+
+  const ai = getAiClient();
   if (ai) {
     try {
-      const prompt = `You are the Commercial Director of the Aviation Safety Summit 2026.
-Generate a high-converting, tailored corporate sponsorship proposition for:
-Company: ${companyName}
-Industry: ${industry || 'Corporate Nigeria'}
-Target Executive: ${executiveName || 'Executive Leadership'} (${executivePosition || 'Leadership'})
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: `You are the Commercial Director for Aviation Safety Summit 2026.
 
-STRICT GUIDELINES:
-1. Explain specifically WHY aviation safety matters to ${companyName}'s specific sector (${industry}).
-2. Explain HOW their participation directly champions aviation safety.
-3. Recommend tiers from our approved inventory: Platinum (₦25M), Gold (₦15M), Silver (₦8M), Session Sponsor (₦5M), Exhibition Booth (₦2.5M), Programme Ad (₦1M).
-4. DO NOT promise benefits outside the approved sponsorship package.
+Prepare a sponsorship proposal for:
+- Company: ${companyName}
+- Industry: ${industry}
+- Executive: ${executiveName} (${executivePosition})
 
-Respond in valid JSON matching this schema:
+Approved sponsorship tiers only:
+${JSON.stringify(approvedTierOrder.map((tier) => {
+  const pkg = packageMap.get(tier);
+  return pkg ? {
+    tier: pkg.tier,
+    id: pkg.id,
+    name: pkg.name,
+    priceNGN: pkg.priceNGN,
+    priceUSD: pkg.priceUSD,
+    benefits: pkg.benefits
+  } : null;
+}).filter(Boolean))}
+
+Rules:
+- Explain why aviation safety matters to this sector.
+- Use only approved tiers and approved benefits.
+- Recommend up to 3 tiers by tier code, not invented names.
+- Prices must remain exactly as supplied in the approved tier list.
+
+Return strict JSON:
 {
   "headline": "string",
   "whySectorMatters": "string",
   "howParticipationSupportsSafety": "string",
   "recommendedTiers": [
-    {
-      "tier": "string",
-      "feeNGN": "string",
-      "feeUSD": "string",
-      "benefits": ["string"]
-    }
+    { "tier": "PLATINUM|GOLD|SILVER|SAFETY|SIMULATION|TITLE", "rationale": "string" }
   ],
   "callToAction": "string"
-}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
+}`,
         config: {
-          temperature: 0.2,
-          responseMimeType: "application/json"
+          responseMimeType: 'application/json',
+          temperature: 0.2
         }
       });
 
-      const parsed = JSON.parse(response.text || '{}');
-      if (parsed.headline) proposal = parsed;
-    } catch (err: any) {
-      console.error('Gemini Sponsorship Proposal Error:', err);
+      const parsed = safeJsonParse<{
+        headline?: string;
+        whySectorMatters?: string;
+        howParticipationSupportsSafety?: string;
+        recommendedTiers?: Array<{ tier?: SponsorshipPackage['tier']; rationale?: string }>;
+        callToAction?: string;
+      }>(response.text);
+
+      const validatedTiers = dedupeById(
+        (parsed?.recommendedTiers || [])
+          .map((entry) => {
+            if (!entry?.tier || !approvedTierOrder.includes(entry.tier)) return null;
+            return buildTierRecommendation(entry.tier, sanitizeText(entry.rationale, 220) || `Recommended for ${companyName} based on its sector fit and summit objectives.`);
+          })
+          .filter((tier): tier is SponsorshipTierRecommendation => Boolean(tier))
+      ).slice(0, 3);
+
+      if (validatedTiers.length > 0) {
+        return sendAiSuccess<SponsorshipProposalData>(
+          res,
+          true,
+          {
+            headline: sanitizeText(parsed?.headline, 220) || fallbackProposal.headline,
+            whySectorMatters: sanitizeText(parsed?.whySectorMatters, 700) || fallbackProposal.whySectorMatters,
+            howParticipationSupportsSafety: sanitizeText(parsed?.howParticipationSupportsSafety, 700) || fallbackProposal.howParticipationSupportsSafety,
+            recommendedTiers: validatedTiers,
+            callToAction: sanitizeText(parsed?.callToAction, 400) || fallbackProposal.callToAction
+          },
+          `${AI_UNVERIFIED_DISCLAIMER}. Proposal language is advisory; commercial approval still depends on the official sponsorship inventory.`
+        );
+      }
+    } catch (error) {
+      console.error('Sponsorship proposal Gemini error:', error);
     }
   }
 
-  res.json({
-    success: true,
-    proposal
-  });
+  return sendAiSuccess<SponsorshipProposalData>(res, false, fallbackProposal);
 });
 
 // 8. POST /api/stakeholders/dispatch-letter (Record sent invitation & auto-schedule 5-day follow-up)

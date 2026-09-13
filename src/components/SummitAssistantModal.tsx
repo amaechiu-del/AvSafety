@@ -42,11 +42,12 @@ export default function SummitAssistantModal({ isOpen, onClose }: SummitAssistan
         body: JSON.stringify({ message: userMsg })
       });
       const data = await res.json();
+      const payload = data.data || data;
       
       if (data.error) {
         setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error: ' + data.error }]);
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: payload.text || 'That information is not currently available in the official summit programme.' }]);
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I am unable to reach the server right now.' }]);

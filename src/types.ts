@@ -468,6 +468,18 @@ export interface CreativeServiceRequest {
   logoUrl?: string;
   referenceImages?: string[];
   aiDraftConcept?: string;
+  concepts?: Array<{
+    title: 'Concept A' | 'Concept B';
+    headline: string;
+    bodyCopy: string;
+    visualNotes: string;
+    callToAction: string;
+  }>;
+  uploadTracking?: {
+    logoProvided: boolean;
+    uploadedAssetCount: number;
+    uploadedAssets: string[];
+  };
   status: 'SUBMITTED' | 'CONCEPT_DRAFTED' | 'CUSTOMER_APPROVED' | 'IN_PRODUCTION' | 'COMPLETED';
   createdAt: string;
 }
@@ -622,6 +634,8 @@ export interface InvitationLetter {
   callToActionText: string;
   signatureBlock: string;
   fullHtmlContent: string;
+  gmailDraftUrl?: string;
+  mailtoUrl?: string;
   status: 'DRAFT' | 'APPROVED' | 'SENT' | 'GMAIL_DRAFTED';
   sentAt?: string;
   followUpDueAt?: string;
@@ -644,4 +658,3 @@ export interface StakeholderStats {
   exhibitorInterestCount: number;
   byCategory: Record<string, number>;
 }
-
