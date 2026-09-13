@@ -31,6 +31,7 @@ import SimulationTraining from './components/SimulationTraining';
 import SafetyVsAccident from './components/SafetyVsAccident';
 import SkyParty from './components/SkyParty';
 import InteractiveMap from './components/InteractiveMap';
+import FeedbackSuggestionFocus from './components/FeedbackSuggestionFocus';
 import KnowledgeHub from './components/KnowledgeHub';
 import Partnership from './components/Partnership';
 import RegistrationForm from './components/RegistrationForm';
@@ -403,6 +404,9 @@ export default function App() {
       <div id="register">
         <RegistrationForm onRegister={handleRegisterDelegate} />
       </div>
+
+      {/* FEEDBACK & SUGGESTION FOCUS */}
+      <FeedbackSuggestionFocus />
 
       {/* 18. CONTACT / SECRETARIAT */}
       <section id="contact" className="py-24 bg-white border-b border-[#D4AF37]/15">

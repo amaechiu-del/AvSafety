@@ -45,6 +45,7 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
     { id: 'sky-party', label: 'Sky Party' },
     { id: 'partners', label: 'Partners' },
     { id: 'register', label: 'Register' },
+    { id: 'feedback', label: 'Feedback' },
     { id: 'contact', label: 'Contact' }
   ];
 
