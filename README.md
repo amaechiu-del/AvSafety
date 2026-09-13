@@ -4,13 +4,10 @@
 ![License](https://img.shields.io/badge/License-Apache%202.0-green)
 ![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue)
 ![React](https://img.shields.io/badge/Framework-React%2019-blue)
-![Hosted](https://img.shields.io/badge/Hosted-Cloudflare-orange)
 
 ## Overview
 
 **AvSafety** is a comprehensive digital platform for the **Aviation Safety Summit 2026**, scheduled for **17 November 2026** at the **Marriott Hotel, Ikeja, Lagos, Nigeria**.
-
-**Live Site:** [summit.domislink.com](https://summit.domislink.com)
 
 ### Summit Theme
 > "EVERYBODY IS INVOLVED IN AVIATION SAFETY — An accident does not select a tribe, profession, company or class."
@@ -21,7 +18,7 @@
 
 ## Key Features
 
-### 🎫 Core Functionality
+### 🎯 Core Functionality
 - **Event Management** - Multi-session summit coordination with speaker scheduling
 - **Speaker Management** - Verified speakers with AI-powered topic suggestions
 - **Stakeholder Management** - Comprehensive invitation system with AI support
@@ -70,11 +67,6 @@
 ### Payment
 - **Paystack** - Payment gateway integration
 
-### Hosting
-- **Cloudflare Pages** - Frontend hosting with automatic deployments
-- **Cloudflare Workers** - Serverless backend functions
-- **Cloudflare KV** - Key-value storage for data persistence
-
 ### Utilities
 - **ESBuild** - Code bundling for production
 - **Vite PWA Plugin** - Progressive Web App configuration
@@ -92,12 +84,10 @@ AvSafety/
 │   └── index.css           # Global styles
 ├── data/
 │   └── db.json            # JSON database (auto-generated)
-├── functions/             # Cloudflare Workers functions (optional)
 ├── server.ts              # Express server and API endpoints
 ├── vite.config.ts         # Vite configuration
 ├── tsconfig.json          # TypeScript configuration
 ├── tailwind.config.js     # Tailwind CSS configuration
-├── wrangler.toml          # Cloudflare Wrangler configuration
 ├── package.json           # Dependencies and scripts
 └── README.md              # This file
 ```
@@ -108,7 +98,6 @@ AvSafety/
 - Node.js 18+ (recommended: 20 LTS)
 - npm or yarn
 - Git
-- Cloudflare account (for deployment)
 
 ### Local Development
 
@@ -734,177 +723,64 @@ All AI agent functions use Google's Gemini API with graceful fallback implementa
 
 ## Deployment
 
-### Cloudflare Pages + Workers Deployment
+### GitHub Pages Deployment
 
-This application is currently hosted on Cloudflare at **summit.domislink.com**.
-
-#### Setup Cloudflare Account
-
-1. **Create Cloudflare Account**
-   - Visit [Cloudflare](https://dash.cloudflare.com/)
-   - Sign up or log in
-
-2. **Connect Your Domain**
-   - Add your domain to Cloudflare
-   - Update domain nameservers to Cloudflare's
-   - Configure DNS records
-
-3. **Install Wrangler CLI**
+1. **Build the project**
    ```bash
-   npm install -g wrangler
-   # Or use npx
-   npx wrangler --version
+   npm run build
    ```
 
-#### Deploy Frontend to Cloudflare Pages
+2. **Create GitHub Actions workflow**
+   Create `.github/workflows/deploy.yml`:
+   ```yaml
+   name: Deploy to GitHub Pages
 
-1. **Create GitHub Repository**
-   ```bash
-   git remote add origin https://github.com/yourusername/AvSafety.git
-   git push -u origin main
+   on:
+     push:
+       branches: [main]
+
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         - uses: actions/setup-node@v3
+           with:
+             node-version: '20'
+         - run: npm ci
+         - run: npm run build
+         - name: Deploy
+           uses: peaceiris/actions-gh-pages@v3
+           with:
+             github_token: ${{ secrets.GITHUB_TOKEN }}
+             publish_dir: ./dist
    ```
 
-2. **Connect Cloudflare Pages**
-   - Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-   - Pages → Connect to Git
-   - Select your GitHub repository
-   - Configure build settings:
-     - Build command: `npm run build`
-     - Build output directory: `dist`
-     - Environment variables:
-       - `GEMINI_API_KEY`
-       - `PAYSTACK_SECRET_KEY`
-       - `PAYSTACK_PUBLIC_KEY`
+3. **Enable GitHub Pages**
+   - Go to Settings → Pages
+   - Select "Deploy from a branch"
+   - Choose `gh-pages` branch
 
-3. **Automatic Deployments**
-   - Cloudflare Pages automatically deploys on push to main branch
-   - Preview deployments for pull requests
+### Node.js Server Deployment
 
-#### Deploy Backend to Cloudflare Workers (Optional)
+**Production build:**
+```bash
+npm run build
+npm start
+```
 
-If you want to run the Express backend on Cloudflare Workers instead of locally:
+The app runs on port 3000 (configurable via `PORT` env var).
 
-1. **Configure `wrangler.toml`**
-   ```toml
-   name = "avsafety-api"
-   main = "worker.ts"
-   type = "service"
-   
-   [env.production]
-   route = "https://summit.domislink.com/api/*"
-   zone_id = "your_zone_id"
-   
-   [[kv_namespaces]]
-   binding = "STORAGE"
-   id = "your_kv_id"
-   
-   [env.production.kv_namespaces]
-   binding = "STORAGE"
-   id = "your_production_kv_id"
-   ```
-
-2. **Create Worker Adapter**
-   ```bash
-   npm install wrangler
-   ```
-
-3. **Deploy**
-   ```bash
-   npx wrangler deploy --env production
-   ```
-
-#### Using Cloudflare KV for Data Persistence
-
-Instead of file-based JSON storage, use Cloudflare KV:
-
-1. **Create KV Namespace**
-   ```bash
-   npx wrangler kv:namespace create "DB"
-   npx wrangler kv:namespace create "DB" --preview
-   ```
-
-2. **Update Code**
-   ```typescript
-   // In server.ts or worker.ts
-   async function readDb() {
-     const data = await STORAGE.get('db', 'json') || defaultDb;
-     return data;
-   }
-   
-   async function writeDb(data: any) {
-     await STORAGE.put('db', JSON.stringify(data));
-   }
-   ```
-
-### Docker Deployment
-
-For self-hosted environments:
-
+**Docker deployment (optional):**
 ```dockerfile
 FROM node:20-alpine
-
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci --omit=dev
-
 COPY . .
 RUN npm run build
-
 EXPOSE 3000
-
 CMD ["npm", "start"]
-```
-
-Build and run:
-```bash
-docker build -t avsafety .
-docker run -p 3000:3000 \
-  -e GEMINI_API_KEY=your_key \
-  -e PAYSTACK_SECRET_KEY=your_key \
-  avsafety
-```
-
-### GitHub Actions CI/CD
-
-Create `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy to Cloudflare
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Type check
-        run: npm run lint
-      
-      - name: Build
-        run: npm run build
-      
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: avsafety
-          directory: dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## Available Scripts
@@ -917,7 +793,6 @@ jobs:
 
 ## Data Persistence
 
-### Local Development
 The application uses a JSON file database at `data/db.json`. This includes:
 - Event details
 - Speakers and stakeholders
@@ -927,13 +802,6 @@ The application uses a JSON file database at `data/db.json`. This includes:
 - Memos and submissions
 
 **Important:** Always backup `data/db.json` before major operations.
-
-### Production (Cloudflare)
-Use Cloudflare KV for distributed, persistent data storage:
-- KV namespaces for event data
-- Automatic replication across Cloudflare's edge network
-- 1000 transactions per second per key
-- Eventually consistent reads
 
 ## Privacy & Compliance
 
@@ -963,38 +831,23 @@ Contributions welcome! Please:
 ### Gemini API Issues
 
 **Problem:** "Gemini API not configured"
-- **Solution:** Add `GEMINI_API_KEY` to environment variables
-- **Cloudflare:** Add via Pages → Settings → Environment variables
+- **Solution:** Add `GEMINI_API_KEY` to `.env.local`
 
 **Problem:** AI features falling back to defaults
 - **Solution:** Verify API key is valid and not expired
-- **Check:** `npm run dev` and look for initialization errors in console
+- **Check:** `npm run dev` and look for initialization errors
 
 ### Payment Issues
 
 **Problem:** "Payment verification failed"
 - **Solution:** Verify `PAYSTACK_SECRET_KEY` is correct
 - **Note:** Test keys won't process real payments
-- **Check:** Ensure key matches live/test environment
 
 ### Database Issues
 
 **Problem:** "Error reading DB"
 - **Solution:** Delete `data/db.json` to regenerate
 - **Warning:** This will clear all custom data
-- **Backup:** Always maintain backups before operations
-
-### Cloudflare Deployment Issues
-
-**Problem:** "Build failed on Cloudflare Pages"
-- **Solution:** Check build logs in Cloudflare Dashboard
-- **Ensure:** Node version is 18+ in settings
-- **Verify:** Environment variables are set correctly
-
-**Problem:** "Worker deployment failed"
-- **Solution:** Verify Wrangler authentication: `npx wrangler login`
-- **Check:** `wrangler.toml` configuration is valid
-- **Ensure:** KV namespace bindings match your account
 
 ## Support
 
@@ -1002,7 +855,6 @@ For issues or questions:
 1. Check existing GitHub issues
 2. Create a detailed issue report
 3. Include error messages and environment details
-4. Specify if running locally or on Cloudflare
 
 ## License
 
@@ -1012,13 +864,10 @@ Licensed under Apache License 2.0. See LICENSE file for details.
 
 **Project:** Aviation Safety Summit 2026  
 **Organizer:** Domislink International Services Ltd  
-**Platform:** AvSafety  
-**Hosted on:** Cloudflare Pages + Workers  
 **Built with:** React, TypeScript, Express, Gemini AI  
 **Created:** 2026
 
 ---
 
-**Live Site:** [summit.domislink.com](https://summit.domislink.com)  
 **Theme:** "EVERYBODY IS INVOLVED IN AVIATION SAFETY"  
 An accident does not select a tribe, profession, company or class.
