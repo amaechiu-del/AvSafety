@@ -36,9 +36,18 @@ export default function () {
     },
   );
 
+  let registrationBody = {};
+  try {
+    registrationBody = JSON.parse(registration.body || '{}');
+  } catch (error) {
+    registrationBody = {};
+  }
+
   check(registration, {
     'registration request succeeds': (res) => res.status === 200,
-    'registration code returned': (res) => JSON.parse(res.body).registration.registrationCode.length > 0,
+    'registration code returned': () =>
+      typeof registrationBody.registration?.registrationCode === 'string' &&
+      registrationBody.registration.registrationCode.length > 0,
   });
 
   sleep(1);

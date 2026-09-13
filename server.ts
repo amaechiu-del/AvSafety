@@ -581,7 +581,7 @@ function writeDb(data: any) {
   const dbPath = getDbPath();
   ensureDirExists(dbPath);
   try {
-    const tempPath = `${dbPath}.tmp`;
+    const tempPath = `${dbPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
     fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
     fs.renameSync(tempPath, dbPath);
   } catch (err) {

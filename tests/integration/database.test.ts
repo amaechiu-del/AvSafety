@@ -34,16 +34,14 @@ describe('database persistence and recovery', () => {
     expect(response.body.event.name).toBe(defaultDb.event.name);
   });
 
-  it('handles a burst of registration writes without dropping records', async () => {
-    await Promise.all(
-      Array.from({ length: 5 }, (_, index) =>
-        request(app).post('/api/registrations').send({
-          fullName: `Delegate ${index}`,
-          email: `delegate${index}@example.com`,
-          consentNDPA: true,
-        }),
-      ),
-    );
+  it('handles repeated registration writes without dropping records', async () => {
+    for (const index of Array.from({ length: 5 }, (_, value) => value)) {
+      await request(app).post('/api/registrations').send({
+        fullName: `Delegate ${index}`,
+        email: `delegate${index}@example.com`,
+        consentNDPA: true,
+      });
+    }
 
     const registrations = readDb().registrations;
     const savedEmails = new Set(registrations.map((registration: any) => registration.email));

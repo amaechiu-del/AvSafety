@@ -29,7 +29,7 @@ jobs:
       - name: Start server
         run: |
           set -euo pipefail
-          node dist/server.cjs > /tmp/avsafety-server.log 2>&1 &
+          DB_PATH=/tmp/avsafety-performance-db.json node dist/server.cjs > /tmp/avsafety-server.log 2>&1 &
           healthy=0
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
