@@ -2102,9 +2102,15 @@ ${sessionsData}
     const lowerMessage = normalizeForMatch(message);
     let fallbackText = 'That information is not currently available in the official programme.';
 
-    if (lowerMessage.includes('date')) {
+    if (lowerMessage.includes('date') || lowerMessage.includes('when')) {
       fallbackText = `The summit date in the official programme is ${currentDb.event?.date || '17 NOVEMBER 2026'}.`;
-    } else if (lowerMessage.includes('venue') || lowerMessage.includes('location')) {
+    } else if (
+      lowerMessage.includes('venue') ||
+      lowerMessage.includes('location') ||
+      lowerMessage.includes('where') ||
+      lowerMessage.includes('place') ||
+      lowerMessage.includes('held')
+    ) {
       fallbackText = `The official venue is ${currentDb.event?.venue || 'MARRIOTT HOTEL, IKEJA, LAGOS, NIGERIA'}.`;
     } else if (lowerMessage.includes('theme')) {
       fallbackText = `The official summit theme is "${currentDb.event?.theme || 'EVERYBODY IS INVOLVED IN AVIATION SAFETY'}".`;

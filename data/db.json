@@ -2358,5 +2358,51 @@
       "verificationSource": "Broadcasting Organisations of Nigeria (BON) Directory",
       "sponsorshipInterest": "SILVER"
     }
+  ],
+  "creative_requests": [
+    {
+      "id": "cr-1789300003049",
+      "companyName": "Test Air",
+      "contactPerson": "Jane Doe",
+      "email": "jane@example.com",
+      "phone": "",
+      "message": "Need a summit advert for our avionics safety services",
+      "targetAudience": "Airline CEOs",
+      "preferredSizeFormat": "A4 programme advert",
+      "deadline": "",
+      "logoProvided": true,
+      "logoUrl": "https://example.com/logo.png",
+      "referenceImages": [],
+      "aiDraftConcept": "Concept A — Executive Authority\nHeadline: \"Safety Leadership That Travels With Test Air\"\nBody: Test Air is presented as a trusted partner in safer aviation operations, emphasising reliability, executive stewardship, and measurable operational discipline.\nVisual Notes: Deep navy palette, gold summit accents, strong logo lock-up, executive portrait or product silhouette, clear venue/date footer.\nCTA: Meet the team at Aviation Safety Summit 2026 and request a formal partnership conversation.\n\nConcept B — Innovation & Systems\nHeadline: \"Test Air: Powering Safer Decisions Across the Aviation Ecosystem\"\nBody: Position Test Air as a systems-thinking brand connecting technology, people, and operational resilience for safer flights and safer passenger journeys.\nVisual Notes: Clean technology grid, route-line motif, safety dashboard imagery, concise proof points, optional product or facility photography.\nCTA: Discover the company’s safety-driven solutions at the summit exhibition and official programme channels.",
+      "status": "CONCEPT_DRAFTED",
+      "createdAt": "2026-09-13T11:46:43.049Z",
+      "updatedAt": "2026-09-13T11:46:43.049Z",
+      "concepts": [
+        {
+          "name": "Concept A — Executive Authority",
+          "headline": "Safety Leadership That Travels With Test Air",
+          "body": "Test Air is presented as a trusted partner in safer aviation operations, emphasising reliability, executive stewardship, and measurable operational discipline.",
+          "visualNotes": "Deep navy palette, gold summit accents, strong logo lock-up, executive portrait or product silhouette, clear venue/date footer.",
+          "callToAction": "Meet the team at Aviation Safety Summit 2026 and request a formal partnership conversation."
+        },
+        {
+          "name": "Concept B — Innovation & Systems",
+          "headline": "Test Air: Powering Safer Decisions Across the Aviation Ecosystem",
+          "body": "Position Test Air as a systems-thinking brand connecting technology, people, and operational resilience for safer flights and safer passenger journeys.",
+          "visualNotes": "Clean technology grid, route-line motif, safety dashboard imagery, concise proof points, optional product or facility photography.",
+          "callToAction": "Discover the company’s safety-driven solutions at the summit exhibition and official programme channels."
+        }
+      ],
+      "assetsNeeded": [
+        "Primary logo file (SVG, PNG, or high-resolution JPG)",
+        "Approved brand colours and typography guidance",
+        "One short proof point or campaign statement cleared by the client"
+      ],
+      "assetTracker": {
+        "logoProvided": true,
+        "logoUrl": "https://example.com/logo.png",
+        "referenceImages": []
+      }
+    }
   ]
 }
