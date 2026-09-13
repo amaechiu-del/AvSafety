@@ -1,0 +1,51 @@
+name: Security
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  application-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API privacy and validation security tests
+        run: npm run test:security
+
+      - name: Lightweight secret detection
+        run: |
+          set -euo pipefail
+          if git grep -nE '(AKIA[0-9A-Z]{16}|sk_live_[0-9A-Za-z]+|AIza[0-9A-Za-z\-_]{35}|-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----)' -- . ':(exclude).env.example'; then
+            echo "Potential secret detected"
+            exit 1
+          fi
+          echo "No high-signal secrets detected"
+
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - uses: github/codeql-action/autobuild@v3
+
+      - uses: github/codeql-action/analyze@v3

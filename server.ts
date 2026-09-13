@@ -7,7 +7,6 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { INITIAL_AD_POSITIONS, INITIAL_SPONSORSHIP_PACKAGES } from './src/data/marketplaceData';
 import { INITIAL_VERIFIED_SPEAKERS } from './src/data/speakersData';
@@ -15,8 +14,8 @@ import { INITIAL_STAKEHOLDERS, STAKEHOLDER_CATEGORIES } from './src/data/stakeho
 
 
 
-const app = express();
-const PORT = 3000;
+export const app = express();
+const PORT = Number(process.env.PORT || 3000);
 
 // Initialize Gemini SDK with lazy initialization
 let aiClient: GoogleGenAI | null = null;
@@ -40,8 +39,9 @@ function getAiClient(): GoogleGenAI | null {
   }
 }
 
-// Path to JSON DB file
-const dbPath = path.join(process.cwd(), 'data', 'db.json');
+function getDbPath() {
+  return process.env.DB_PATH || path.join(process.cwd(), 'data', 'db.json');
+}
 
 // Helper to ensure data directory exists
 function ensureDirExists(filePath: string) {
@@ -550,6 +550,7 @@ const defaultDb = {
 
 // Reads db.json or loads defaults
 function readDb() {
+  const dbPath = getDbPath();
   ensureDirExists(dbPath);
   try {
     if (fs.existsSync(dbPath)) {
@@ -577,9 +578,12 @@ function readDb() {
 
 // Writes db.json safely
 function writeDb(data: any) {
+  const dbPath = getDbPath();
   ensureDirExists(dbPath);
   try {
-    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf8');
+    const tempPath = `${dbPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tempPath, dbPath);
   } catch (err) {
     console.error('Error writing to DB:', err);
   }
@@ -590,7 +594,16 @@ app.use(express.json());
 
 // API health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  const data = readDb();
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      database: data ? 'ok' : 'unavailable',
+      gemini: process.env.GEMINI_API_KEY ? 'configured' : 'not_configured',
+      paystack: process.env.PAYSTACK_SECRET_KEY ? 'configured' : 'sandbox'
+    }
+  });
 });
 
 // API endpoints
@@ -2400,6 +2413,7 @@ async function start() {
   const server = http.createServer(app);
 
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -2420,6 +2434,10 @@ async function start() {
   });
 }
 
-start().catch((err) => {
-  console.error('Failed to start fullstack server:', err);
-});
+export { defaultDb, ensureDirExists, getAiClient, getDbPath, readDb, writeDb, start };
+
+if (process.env.NODE_ENV !== 'test') {
+  start().catch((err) => {
+    console.error('Failed to start fullstack server:', err);
+  });
+}
