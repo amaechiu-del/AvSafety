@@ -622,6 +622,8 @@ export interface InvitationLetter {
   callToActionText: string;
   signatureBlock: string;
   fullHtmlContent: string;
+  gmailDraftUrl?: string;
+  mailtoUrl?: string;
   status: 'DRAFT' | 'APPROVED' | 'SENT' | 'GMAIL_DRAFTED';
   sentAt?: string;
   followUpDueAt?: string;
@@ -644,4 +646,3 @@ export interface StakeholderStats {
   exhibitorInterestCount: number;
   byCategory: Record<string, number>;
 }
-
