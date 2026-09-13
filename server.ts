@@ -272,15 +272,6 @@ function classifyGeminiError(error: unknown): GeminiFailure {
   };
 }
 
-function safeJsonParse<T>(value: string | undefined | null, fallback: T): T {
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 async function generateGeminiContent<T = string>({
   prompt,
   systemInstruction,
@@ -331,7 +322,24 @@ async function generateGeminiContent<T = string>({
       };
     }
 
-    return { ok: true, data: (responseMimeType ? safeJsonParse(text, {} as T) : text) as T extends string ? string : T };
+    if (responseMimeType === 'application/json') {
+      try {
+        return { ok: true, data: JSON.parse(text) as T extends string ? string : T };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Invalid JSON response';
+        return {
+          ok: false,
+          error: {
+            status: 502,
+            code: 'invalid_response',
+            message,
+            userMessage: 'The AI service returned malformed structured data, so a grounded fallback response was used.',
+          },
+        };
+      }
+    }
+
+    return { ok: true, data: text as T extends string ? string : T };
   } catch (error) {
     const failure = classifyGeminiError(error);
     console.warn('Gemini request failed:', failure.message);
@@ -2149,8 +2157,9 @@ app.post('/api/speakers/ai-suggest-topics', async (req, res) => {
   }
 
   const currentDb = readDb();
+  const organisationKey = normalizeForMatch(organisation);
   const existingTopics = ((currentDb.speakers || []) as Speaker[])
-    .filter((speaker) => speaker.organisation !== organisation && speaker.topic)
+    .filter((speaker) => normalizeForMatch(speaker.organisation) !== organisationKey && speaker.topic)
     .map((speaker) => speaker.topic)
     .slice(0, 12);
 
@@ -2685,6 +2694,64 @@ ${JSON.stringify(currentStakeholders.map((stakeholder) => ({ name: stakeholder.n
   }
 
   const existingOrgs = new Set(currentStakeholders.map((stakeholder) => normalizeForMatch(stakeholder.organisation)));
+  const staticFallbackSuggestions: StakeholderBrainstormSuggestion[] = [
+    {
+      name: 'DHL Express Nigeria Leadership',
+      position: 'Country Managing Director / Official Representative',
+      organisation: 'DHL Express Nigeria',
+      category: 'LOGISTICS',
+      whyRelevant: 'Cargo integrity, dangerous goods compliance, and intermodal logistics safety directly affect aviation operations.',
+      proposedTopic: 'Air Cargo Safety Standards, Dangerous Goods Compliance and Intermodal Coordination',
+      proposedRole: 'PANELIST',
+      verificationStatus: AI_UNVERIFIED_STATUS,
+      suggestedSponsorship: 'SILVER',
+    },
+    {
+      name: 'Healthcare Federation of Nigeria Leadership',
+      position: 'President / Official Representative',
+      organisation: 'Healthcare Federation of Nigeria',
+      category: 'HEALTHCARE',
+      whyRelevant: 'Aeromedical readiness, emergency care coordination, and passenger health protections are core aviation safety concerns.',
+      proposedTopic: 'Aeromedical Preparedness, In-Flight Emergency Response and Passenger Health Protection',
+      proposedRole: 'PANELIST',
+      verificationStatus: AI_UNVERIFIED_STATUS,
+      suggestedSponsorship: 'EXHIBITION',
+    },
+    {
+      name: 'Federal Ministry of Education Leadership',
+      position: 'Honourable Minister / Official Representative',
+      organisation: 'Federal Ministry of Education',
+      category: 'ACADEMIA',
+      whyRelevant: 'Training pipelines, research capacity, and technical education influence long-term aviation safety competence.',
+      proposedTopic: 'Sustaining Aerospace Talent, Research Capacity and Safety Culture in Higher Institutions',
+      proposedRole: 'SPECIAL GUEST',
+      verificationStatus: AI_UNVERIFIED_STATUS,
+      suggestedSponsorship: 'NONE',
+    },
+    {
+      name: 'Heirs Holdings Leadership',
+      position: 'Group Chairman / Official Representative',
+      organisation: 'Heirs Holdings',
+      category: 'INVESTORS',
+      whyRelevant: 'Long-term capital allocation and infrastructure investment affect airport resilience, energy reliability, and safety modernization.',
+      proposedTopic: 'Catalysing Private Capital for Safety-Critical Aviation Infrastructure',
+      proposedRole: 'GUEST OF HONOUR',
+      verificationStatus: AI_UNVERIFIED_STATUS,
+      suggestedSponsorship: 'PLATINUM',
+    },
+    {
+      name: 'Manufacturers Association of Nigeria Leadership',
+      position: 'President / Council Representative',
+      organisation: 'Manufacturers Association of Nigeria',
+      category: 'MANUFACTURING',
+      whyRelevant: 'Quality systems, engineering discipline, and component reliability are foundational to aviation safety performance.',
+      proposedTopic: 'High-Reliability Manufacturing Principles for Aviation Maintenance and Supply Chains',
+      proposedRole: 'PANELIST',
+      verificationStatus: AI_UNVERIFIED_STATUS,
+      suggestedSponsorship: 'SILVER',
+    },
+  ];
+
   const fallbackSuggestions = organisations
     .filter((org: any) => !existingOrgs.has(normalizeForMatch(org.name)))
     .map((org: any) => {
@@ -2716,9 +2783,11 @@ ${JSON.stringify(currentStakeholders.map((stakeholder) => ({ name: stakeholder.n
     .sort((a, b) => (sectorCounts[a.category] || 0) - (sectorCounts[b.category] || 0))
     .slice(0, 5);
 
+  const guaranteedSuggestions = fallbackSuggestions.length > 0 ? fallbackSuggestions : staticFallbackSuggestions;
+
   res.json({
     success: true,
-    suggestions: fallbackSuggestions,
+    suggestions: guaranteedSuggestions,
     aiGenerated: false,
     gapAnalysis: underrepresentedSectors,
     disclaimer: 'AI-GENERATED CANDIDATES — NOT YET VERIFIED. MUST BE AUDITED BEFORE OFFICIAL INVITATION.',
@@ -2896,6 +2965,7 @@ app.post('/api/stakeholders/ai-sponsorship-proposal', async (req, res) => {
     })
     .slice(0, 3);
 
+  let usedAiProposal = false;
   let proposal = {
     headline: `Strategic Safety Partnership Proposal for ${companyName}`,
     whySectorMatters: `Aviation safety is a vital catalyst for ${industry || 'corporate Nigeria'}. Reliable, zero-accident air transport protects executive human capital, secures supply chains, and safeguards investor confidence.`,
@@ -2984,13 +3054,14 @@ Respond in valid JSON matching this schema:
         recommendedTiers,
         callToAction: asTrimmedString(parsed.callToAction, proposal.callToAction),
       };
+      usedAiProposal = true;
     }
   }
 
   res.json({
     success: true,
     proposal,
-    aiGenerated: aiResult.ok,
+    aiGenerated: usedAiProposal,
     timestamp,
     warning: aiWarning,
   });
