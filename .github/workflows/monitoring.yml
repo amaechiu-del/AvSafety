@@ -1,0 +1,25 @@
+name: Uptime Monitoring
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /api/health
+        env:
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+        run: |
+          if [ -z "$HEALTHCHECK_URL" ]; then
+            echo "HEALTHCHECK_URL secret is not configured";
+            exit 1;
+          fi
+          status_code=$(curl -s -o response.json -w "%{http_code}" "$HEALTHCHECK_URL/api/health")
+          cat response.json
+          if [ "$status_code" -ge 400 ]; then
+            echo "Health check failed with status $status_code"
+            exit 1
+          fi

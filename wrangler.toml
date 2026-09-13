@@ -1,0 +1,16 @@
+name = "avsafety"
+main = "worker.ts"
+compatibility_date = "2026-09-13"
+
+[observability]
+enabled = true
+
+[analytics_engine_datasets]
+
+[vars]
+SENTRY_ENVIRONMENT = "production"
+SENTRY_TRACES_SAMPLE_RATE = "0.1"
+
+[[routes]]
+pattern = "summit.domislink.com/api/*"
+zone_name = "domislink.com"
