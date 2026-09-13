@@ -2358,5 +2358,45 @@
       "verificationSource": "Broadcasting Organisations of Nigeria (BON) Directory",
       "sponsorshipInterest": "SILVER"
     }
+  ],
+  "creative_requests": [
+    {
+      "id": "cr-1789300459995",
+      "companyName": "Example Bank",
+      "contactPerson": "Jane Doe",
+      "email": "jane@example.com",
+      "phone": "+2348000000000",
+      "message": "Promote executive visibility",
+      "targetAudience": "Aviation decision-makers, regulators, and summit delegates",
+      "preferredSizeFormat": "Digital and print-safe summit advertising format",
+      "deadline": "",
+      "logoProvided": false,
+      "logoUrl": "",
+      "referenceImages": [],
+      "concepts": [
+        {
+          "title": "Concept A",
+          "headline": "Example Bank: Safety Leadership That Travels With Every Flight",
+          "bodyCopy": "Example Bank presents a disciplined message of operational confidence, highlighting how its solutions support safer flights, stronger compliance, and dependable passenger outcomes across Nigeria and West Africa.",
+          "visualNotes": "Use a deep navy aviation backdrop, the Example Bank logo, aircraft or control-room imagery, and summit gold accent lines to emphasize trust and executive authority.",
+          "callToAction": "Meet our team at Aviation Safety Summit 2026 to explore approved safety-focused partnership opportunities."
+        },
+        {
+          "title": "Concept B",
+          "headline": "Innovation for Safer Skies with Example Bank",
+          "bodyCopy": "Position Example Bank as a forward-looking contributor to aviation safety through resilient technology, disciplined operations, and practical support for regulators, airlines, and airport stakeholders.",
+          "visualNotes": "Showcase product detail, digital dashboards, radar or aircraft systems imagery, and a clean executive layout built for both exhibition and digital deployment.",
+          "callToAction": "Request a summit commercial consultation and creative review with the Domislink secretariat."
+        }
+      ],
+      "uploadTracking": {
+        "logoProvided": false,
+        "uploadedAssetCount": 0,
+        "uploadedAssets": []
+      },
+      "aiDraftConcept": "Concept A\nHeadline: Example Bank: Safety Leadership That Travels With Every Flight\nBody Copy: Example Bank presents a disciplined message of operational confidence, highlighting how its solutions support safer flights, stronger compliance, and dependable passenger outcomes across Nigeria and West Africa.\nVisual Notes: Use a deep navy aviation backdrop, the Example Bank logo, aircraft or control-room imagery, and summit gold accent lines to emphasize trust and executive authority.\nCTA: Meet our team at Aviation Safety Summit 2026 to explore approved safety-focused partnership opportunities.\n\nConcept B\nHeadline: Innovation for Safer Skies with Example Bank\nBody Copy: Position Example Bank as a forward-looking contributor to aviation safety through resilient technology, disciplined operations, and practical support for regulators, airlines, and airport stakeholders.\nVisual Notes: Showcase product detail, digital dashboards, radar or aircraft systems imagery, and a clean executive layout built for both exhibition and digital deployment.\nCTA: Request a summit commercial consultation and creative review with the Domislink secretariat.",
+      "status": "CONCEPT_DRAFTED",
+      "createdAt": "2026-09-13T11:54:19.995Z"
+    }
   ]
 }

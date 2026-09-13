@@ -89,8 +89,9 @@ export default function AIAdvertisingAdvisor({
       });
 
       const data = await res.json();
+      const payload = data.data || data;
       if (data.success) {
-        setRecommendationResult(data);
+        setRecommendationResult(payload);
       }
     } catch (err) {
       console.error('AI recommendation error:', err);

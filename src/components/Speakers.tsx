@@ -201,9 +201,10 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
         })
       });
       const data = await res.json();
-      if (data.topics && Array.isArray(data.topics)) {
-        setAiTopicSuggestions(data.topics);
-        setAiTopicDisclaimer(data.disclaimer || 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL');
+      const payload = data.data || data;
+      if (payload.topics && Array.isArray(payload.topics)) {
+        setAiTopicSuggestions(payload.topics);
+        setAiTopicDisclaimer(payload.disclaimer || data.disclaimer || 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL');
       }
     } catch (err) {
       console.error('Failed to get AI topics:', err);
@@ -226,8 +227,9 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
         body: JSON.stringify({ question: questionToAsk })
       });
       const data = await res.json();
-      if (data.answer) {
-        setAiAnswer(data.answer);
+      const payload = data.data || data;
+      if (payload.answer) {
+        setAiAnswer(payload.answer);
       } else {
         setAiAnswer('Unable to retrieve speaker answer at this moment.');
       }

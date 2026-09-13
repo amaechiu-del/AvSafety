@@ -173,7 +173,7 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
       });
       if (res.ok) {
         const data = await res.json();
-        setLetterData(data.letter);
+        setLetterData(data.data?.letter || data.letter);
       }
     } catch (err) {
       console.error('Failed to generate letter:', err);
@@ -232,7 +232,8 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
       });
       if (res.ok) {
         const data = await res.json();
-        setProposalData(data.proposal);
+        const payload = data.data || data;
+        setProposalData(payload.proposal || data.proposal || null);
       }
     } catch (err) {
       console.error('Failed to generate sponsorship proposal:', err);
@@ -249,8 +250,9 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
       const res = await fetch('/api/stakeholders/ai-brainstorm', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        setBrainstormSuggestions(data.suggestions || []);
-        setBrainstormDisclaimer(data.disclaimer);
+        const payload = data.data || data;
+        setBrainstormSuggestions(payload.suggestions || data.suggestions || []);
+        setBrainstormDisclaimer(payload.disclaimer || data.disclaimer);
       }
     } catch (err) {
       console.error('Failed to brainstorm:', err);
