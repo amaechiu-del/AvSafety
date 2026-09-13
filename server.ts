@@ -12,11 +12,18 @@ import { GoogleGenAI } from '@google/genai';
 import { INITIAL_AD_POSITIONS, INITIAL_SPONSORSHIP_PACKAGES } from './src/data/marketplaceData';
 import { INITIAL_VERIFIED_SPEAKERS } from './src/data/speakersData';
 import { INITIAL_STAKEHOLDERS, STAKEHOLDER_CATEGORIES } from './src/data/stakeholdersData';
+import { logger, logWithContext } from './src/utils/logger';
+import { captureException, initSentry } from './src/utils/sentry';
+import { getHealthSnapshot, nowMs, recordDependencyCheck, recordExternalServiceMetric } from './src/utils/metrics';
+import { performanceMonitoringMiddleware } from './src/middleware/performance';
 
 
 
 const app = express();
 const PORT = 3000;
+const serverStartedAtMs = Date.now();
+
+initSentry();
 
 // Initialize Gemini SDK with lazy initialization
 let aiClient: GoogleGenAI | null = null;
@@ -35,13 +42,14 @@ function getAiClient(): GoogleGenAI | null {
     });
     return aiClient;
   } catch (e) {
-    console.error("Failed to initialize GoogleGenAI:", e);
+    logger.error('Failed to initialize GoogleGenAI', { error: e });
+    captureException(e, { module: 'aiClientInit' });
     return null;
   }
 }
 
 // Path to JSON DB file
-const dbPath = path.join(process.cwd(), 'data', 'db.json');
+const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'data', 'db.json');
 
 // Helper to ensure data directory exists
 function ensureDirExists(filePath: string) {
@@ -550,6 +558,7 @@ const defaultDb = {
 
 // Reads db.json or loads defaults
 function readDb() {
+  const dbReadStart = nowMs();
   ensureDirExists(dbPath);
   try {
     if (fs.existsSync(dbPath)) {
@@ -565,10 +574,13 @@ function readDb() {
         parsed.stakeholders = INITIAL_STAKEHOLDERS;
         writeDb(parsed);
       }
+      recordExternalServiceMetric('database', nowMs() - dbReadStart, false);
       return parsed;
     }
   } catch (err) {
-    console.error('Error reading DB, resetting to defaults:', err);
+    logger.error('Error reading DB, resetting to defaults', { error: err });
+    captureException(err, { module: 'readDb' });
+    recordExternalServiceMetric('database', nowMs() - dbReadStart, true);
   }
   // If db doesn't exist, write defaults
   writeDb(defaultDb);
@@ -577,20 +589,60 @@ function readDb() {
 
 // Writes db.json safely
 function writeDb(data: any) {
+  const dbWriteStart = nowMs();
   ensureDirExists(dbPath);
   try {
     fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error writing to DB:', err);
+    logger.error('Error writing to DB', { error: err });
+    captureException(err, { module: 'writeDb' });
+    recordExternalServiceMetric('database', nowMs() - dbWriteStart, true);
+    return;
   }
+  recordExternalServiceMetric('database', nowMs() - dbWriteStart, false);
 }
 
 // Middleware
 app.use(express.json());
+app.use(performanceMonitoringMiddleware);
 
 // API health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  const dbCheckStart = nowMs();
+  let dbStatus: 'up' | 'down' = 'up';
+  let dbMessage = 'Database file accessible';
+  try {
+    ensureDirExists(dbPath);
+    if (fs.existsSync(dbPath)) {
+      fs.readFileSync(dbPath, 'utf8');
+    }
+  } catch (error) {
+    dbStatus = 'down';
+    dbMessage = 'Database unavailable';
+    captureException(error, { module: 'healthcheck', dependency: 'database' });
+  } finally {
+    recordDependencyCheck('database', dbStatus, nowMs() - dbCheckStart, dbMessage);
+  }
+
+  const geminiEnabled = !!process.env.GEMINI_API_KEY;
+  recordDependencyCheck(
+    'gemini',
+    geminiEnabled ? 'up' : 'degraded',
+    0,
+    geminiEnabled ? 'Gemini key configured' : 'Gemini key is missing'
+  );
+
+  const paystackEnabled = !!(process.env.PAYSTACK_SECRET_KEY && process.env.PAYSTACK_PUBLIC_KEY);
+  recordDependencyCheck(
+    'paystack',
+    paystackEnabled ? 'up' : 'degraded',
+    0,
+    paystackEnabled ? 'Paystack keys configured' : 'Paystack keys are missing'
+  );
+
+  const health = getHealthSnapshot(serverStartedAtMs);
+  const statusCode = health.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // API endpoints
@@ -821,7 +873,7 @@ Currency: ${currency}`;
         const parsed = JSON.parse(result.text || '{}');
         return res.json({ success: true, aiGenerated: true, ...parsed });
       } catch (geminiErr) {
-        console.warn('Gemini API call failed, using catalogue rule engine:', geminiErr);
+        logWithContext('warn', 'marketplace.ai-advisor', 'Gemini API call failed, using catalogue rule engine', { error: geminiErr });
       }
     }
 
@@ -903,7 +955,8 @@ Currency: ${currency}`;
       nextSteps: `1. Review the tailored catalogue items below -> 2. Select any add-ons -> 3. Proceed to instant Paystack checkout or generate a formal invoice -> 4. Submit artwork to the Domislink Secretariat.`
     });
   } catch (err: any) {
-    console.error('Error in AI Assistant endpoint:', err);
+    logger.error('Error in AI Assistant endpoint', { error: err });
+    captureException(err, { module: 'marketplace.ai-advisor' });
     res.status(500).json({ error: 'AI Assistant temporarily unavailable', details: err.message });
   }
 });
@@ -1025,7 +1078,7 @@ app.post('/api/paystack/initialize', async (req, res) => {
           });
         }
       } catch (apiErr) {
-        console.warn('Paystack live initialization failed, falling back to secure sandbox:', apiErr);
+        logWithContext('warn', 'payments.initialize', 'Paystack live initialization failed, falling back to secure sandbox', { error: apiErr });
       }
     }
 
@@ -1044,7 +1097,8 @@ app.post('/api/paystack/initialize', async (req, res) => {
       message: 'Paystack Secure Transaction Initialized (Sandbox / Test Mode Active)'
     });
   } catch (err: any) {
-    console.error('Paystack initialization error:', err);
+    logger.error('Paystack initialization error', { error: err });
+    captureException(err, { module: 'payments.initialize' });
     res.status(500).json({ error: 'Failed to initialize Paystack checkout', details: err.message });
   }
 });
@@ -1087,7 +1141,7 @@ app.post('/api/paystack/verify', async (req, res) => {
           };
         }
       } catch (verifyErr) {
-        console.warn('Paystack live verification error, verifying sandbox reference:', verifyErr);
+        logWithContext('warn', 'payments.verify', 'Paystack live verification error, verifying sandbox reference', { error: verifyErr });
       }
     } else {
       // Sandbox reference verification: verify format
@@ -1141,7 +1195,8 @@ app.post('/api/paystack/verify', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (err: any) {
-    console.error('Paystack verification error:', err);
+    logger.error('Paystack verification error', { error: err });
+    captureException(err, { module: 'payments.verify' });
     res.status(500).json({ error: 'Verification failed', details: err.message });
   }
 });
@@ -1414,7 +1469,7 @@ Ensure all copy respects aviation safety standards and requires final customer a
         });
         aiConcept = result.text || aiConcept;
       } catch (e) {
-        console.warn('Creative AI generation failed, using standard template:', e);
+        logWithContext('warn', 'creative.ai-request', 'Creative AI generation failed, using standard template', { error: e });
       }
     }
 
@@ -1569,7 +1624,8 @@ ${sessionsData}
 
     res.json({ text: response.text });
   } catch (error: any) {
-    console.error('Gemini API Error:', error);
+    logger.error('Gemini API Error', { error });
+    captureException(error, { module: 'gemini.chat' });
     res.status(500).json({ error: error.message || 'Error communicating with AI assistant' });
   }
 });
@@ -1625,7 +1681,8 @@ Return a JSON array of 3 strings containing only the topic titles, for example:
         disclaimer: 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL'
       });
     } catch (err: any) {
-      console.error('Error generating AI topics:', err);
+      logger.error('Error generating AI topics', { error: err });
+      captureException(err, { module: 'speakers.ai-topics' });
     }
   }
 
@@ -1706,7 +1763,8 @@ ${speakerContext}
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
-      console.error('Gemini Speaker Assistant Error:', err);
+      logger.error('Gemini Speaker Assistant Error', { error: err });
+      captureException(err, { module: 'speakers.ai-assistant' });
     }
   }
 
@@ -2045,7 +2103,8 @@ Respond ONLY with valid JSON array in this exact schema:
         disclaimer: 'AI-GENERATED CANDIDATES — NOT YET VERIFIED. MUST BE AUDITED BEFORE OFFICIAL INVITATION.'
       });
     } catch (err: any) {
-      console.error('Gemini Brainstorm Error:', err);
+      logger.error('Gemini Brainstorm Error', { error: err });
+      captureException(err, { module: 'stakeholders.ai-brainstorm' });
     }
   }
 
@@ -2201,7 +2260,8 @@ Respond in JSON format with these exact keys:
       if (parsed.callToActionText) callToActionText = parsed.callToActionText;
       if (parsed.signatureBlock) signatureBlock = parsed.signatureBlock;
     } catch (err: any) {
-      console.error('Gemini Letter Generation Error:', err);
+      logger.error('Gemini Letter Generation Error', { error: err });
+      captureException(err, { module: 'stakeholders.invitation-letter' });
     }
   }
 
@@ -2331,7 +2391,8 @@ Respond in valid JSON matching this schema:
       const parsed = JSON.parse(response.text || '{}');
       if (parsed.headline) proposal = parsed;
     } catch (err: any) {
-      console.error('Gemini Sponsorship Proposal Error:', err);
+      logger.error('Gemini Sponsorship Proposal Error', { error: err });
+      captureException(err, { module: 'stakeholders.sponsorship-proposal' });
     }
   }
 
@@ -2416,10 +2477,11 @@ async function start() {
   }
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[FULLSTACK SERVER] running on http://0.0.0.0:${PORT}`);
+    logger.info(`[FULLSTACK SERVER] running on http://0.0.0.0:${PORT}`);
   });
 }
 
 start().catch((err) => {
-  console.error('Failed to start fullstack server:', err);
+  logger.error('Failed to start fullstack server', { error: err });
+  captureException(err, { module: 'server.start' });
 });

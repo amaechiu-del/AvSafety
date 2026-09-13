@@ -1,0 +1,30 @@
+{
+  "level": "info",
+  "format": "json",
+  "destinations": {
+    "console": true,
+    "file": {
+      "enabled": true,
+      "directory": "logs",
+      "rotation": "daily",
+      "retentionDays": 30
+    },
+    "cloud": {
+      "enabled": true,
+      "provider": "sentry"
+    }
+  },
+  "redaction": {
+    "maskKeys": [
+      "authorization",
+      "password",
+      "token",
+      "secret",
+      "apiKey",
+      "cardNumber",
+      "cvv",
+      "email",
+      "phone"
+    ]
+  }
+}
