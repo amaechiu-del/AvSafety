@@ -3,7 +3,7 @@
 ## 1. Prerequisites
 - GitHub access to `amaechiu-del/AvSafety`
 - Cloudflare account with access to `domislink.com`
-- Node.js 18+ (Node.js 20 recommended)
+- Node.js 22+ (matches the checked-in Wrangler toolchain)
 - `npm` and Wrangler CLI access (`npm install` already provides `npx wrangler`)
 
 ## 2. Target architecture
@@ -37,6 +37,7 @@ Configure these in **Settings → Secrets and variables → Actions**.
 
 ### Secrets
 - `CLOUDFLARE_API_TOKEN`
+- `ADMIN_API_TOKEN`
 - `GEMINI_API_KEY`
 - `PAYSTACK_SECRET_KEY`
 
@@ -107,7 +108,8 @@ npx wrangler pages deploy dist --project-name "$CLOUDFLARE_PAGES_PROJECT_NAME" -
 
 ## 9. Environment management
 ### Worker runtime variables
-Set these in Cloudflare or preserve them with `--keep-vars` during deploys:
+Set these in Cloudflare or sync them from GitHub Actions:
+- `ADMIN_API_TOKEN`
 - `APP_URL`
 - `CORS_ORIGIN`
 - `API_ORIGIN` (optional hybrid fallback if you want the Worker to proxy unported routes)
@@ -115,6 +117,8 @@ Set these in Cloudflare or preserve them with `--keep-vars` during deploys:
 - `GEMINI_API_KEY`
 - `PAYSTACK_SECRET_KEY`
 - `PAYSTACK_PUBLIC_KEY`
+
+`ADMIN_API_TOKEN` protects Worker admin-only routes such as full registration export and destructive database reset/update operations. Send it either as a bearer token in the `Authorization` header or in the `x-admin-token` header.
 
 ### Pages variables
 The frontend currently reads relative `/api/*` URLs, so no separate frontend API base URL is required for Cloudflare Pages.

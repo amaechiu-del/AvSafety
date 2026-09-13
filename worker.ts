@@ -15,6 +15,7 @@ interface AssetsBinding {
 interface WorkerEnv {
   AVSAFETY_KV: KVNamespaceLike;
   ASSETS?: AssetsBinding;
+  ADMIN_API_TOKEN?: string;
   APP_URL?: string;
   API_ORIGIN?: string;
   CORS_ORIGIN?: string;
@@ -37,6 +38,44 @@ function paystackHeaders(secretKey: string) {
   return {
     ...jsonContentType,
     Authorization: ['Bearer', secretKey].join(' '),
+  };
+}
+
+function isAdminRequest(request: Request, env: WorkerEnv) {
+  const configuredToken = env.ADMIN_API_TOKEN?.trim();
+  if (!configuredToken) return false;
+
+  const bearerToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+  const headerToken = request.headers.get('x-admin-token')?.trim();
+  return bearerToken === configuredToken || headerToken === configuredToken;
+}
+
+function requireAdmin(request: Request, env: WorkerEnv) {
+  if (!env.ADMIN_API_TOKEN) {
+    return json({ success: false, error: 'ADMIN_API_TOKEN is not configured for protected admin routes.' }, { status: 503 });
+  }
+
+  if (!isAdminRequest(request, env)) {
+    return json({ success: false, error: 'Unauthorized admin request.' }, { status: 401 });
+  }
+
+  return null;
+}
+
+function publicDbView(db: any) {
+  return {
+    event: db.event,
+    speakers: db.speakers,
+    organisations: db.organisations,
+    sessions: db.sessions,
+    memo_submissions: db.memo_submissions,
+    book: db.book,
+    investment: db.investment,
+    announcements: db.announcements,
+    partners: db.partners,
+    ad_positions: db.ad_positions,
+    sponsorship_packages: db.sponsorship_packages,
+    proof_of_displays: db.proof_of_displays,
   };
 }
 
@@ -599,10 +638,12 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/db' && request.method === 'GET') {
-    return json(await readDb(env));
+    return json(publicDbView(await readDb(env)));
   }
 
   if (pathname === '/api/db/update' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const payload = await parseJson(request);
     const current = await readDb(env);
     const updated = mergeDeep(current, payload);
@@ -611,12 +652,16 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/db/reset' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const resetDb = cloneDefaultDb();
     await writeDb(env, resetDb);
     return json({ success: true, db: resetDb });
   }
 
   if (pathname === '/api/admin/registrations' && request.method === 'GET') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     return json({ registrations: db.registrations || [] });
   }
@@ -673,6 +718,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/marketplace/inventory/update' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     db.ad_positions = (db.ad_positions || INITIAL_AD_POSITIONS).map((position: any) => position.id === payload.id ? { ...position, ...payload } : position);
@@ -683,6 +730,10 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   if (pathname === '/api/marketplace/orders' && request.method === 'GET') {
     const db = await readDb(env);
     const email = (searchParams.get('email') || '').toLowerCase();
+    if (!email) {
+      const adminError = requireAdmin(request, env);
+      if (adminError) return adminError;
+    }
     const orders = (db.marketplace_orders || []).filter((order: any) => !email || String(order.email || '').toLowerCase() === email);
     return json({ success: true, orders });
   }
@@ -714,6 +765,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/marketplace/orders/status' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     db.marketplace_orders = (db.marketplace_orders || []).map((order: any) => order.id === payload.orderId ? { ...order, orderStatus: payload.orderStatus, updatedAt: new Date().toISOString() } : order);
@@ -748,6 +801,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/marketplace/orders/artwork-status' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     let updatedOrder = null;
@@ -773,6 +828,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/marketplace/proof-of-display' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     const proof = {
@@ -788,6 +845,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/marketplace/quotes' && request.method === 'GET') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     return json({ success: true, quotes: db.custom_quotes || [] });
   }
@@ -865,6 +924,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/stakeholders' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     const now = new Date().toISOString();
@@ -882,6 +943,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
 
   const stakeholderMatch = pathname.match(/^\/api\/stakeholders\/([^/]+)$/);
   if (stakeholderMatch && request.method === 'PUT') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     let updatedStakeholder = null;
@@ -895,6 +958,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (stakeholderMatch && request.method === 'DELETE') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const before = (db.stakeholders || []).length;
     db.stakeholders = (db.stakeholders || []).filter((stakeholder: any) => stakeholder.id !== stakeholderMatch[1]);
@@ -903,18 +968,26 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/stakeholders/ai-brainstorm' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     return handleStakeholderBrainstorm(request, env);
   }
 
   if (pathname === '/api/stakeholders/ai-letter' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     return handleStakeholderLetter(request);
   }
 
   if (pathname === '/api/stakeholders/ai-sponsorship-proposal' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     return handleStakeholderProposal(request, env);
   }
 
   if (pathname === '/api/stakeholders/dispatch-letter' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     const now = new Date();
@@ -934,6 +1007,10 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
       };
       return invitee;
     });
+
+    if (!invitee) {
+      return json({ success: false, error: 'Stakeholder invitee not found.' }, { status: 404 });
+    }
 
     db.invitation_letters = [
       {
