@@ -1,0 +1,132 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
+      CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+      CLOUDFLARE_KV_NAMESPACE_ID: ${{ vars.CLOUDFLARE_KV_NAMESPACE_ID }}
+      CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID: ${{ vars.CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PAYSTACK_PUBLIC_KEY: ${{ vars.PAYSTACK_PUBLIC_KEY }}
+      PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Inject deployment-specific Wrangler settings
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const replacements = {
+            'name = "avsafety-api"': `name = "${process.env.CLOUDFLARE_WORKER_NAME || 'avsafety-api'}"`,
+            'id = "11111111111111111111111111111111"': `id = "${process.env.CLOUDFLARE_KV_NAMESPACE_ID || '11111111111111111111111111111111'}"`,
+            'preview_id = "22222222222222222222222222222222"': `preview_id = "${process.env.CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID || '22222222222222222222222222222222'}"`,
+            'id = "22222222222222222222222222222222"': `id = "${process.env.CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID || '22222222222222222222222222222222'}"`,
+          };
+          let content = fs.readFileSync('wrangler.toml', 'utf8');
+          for (const [from, to] of Object.entries(replacements)) {
+            content = content.replaceAll(from, to);
+          }
+          fs.writeFileSync('wrangler.toml', content);
+          NODE
+
+      - name: Type-check repository
+        run: npm run lint
+
+      - name: Build frontend and Node bundle
+        run: npm run build
+
+      - name: Build Worker bundle
+        run: npm run worker:build
+
+      - name: Deploy Cloudflare Pages preview
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_PAGES_PROJECT_NAME != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name ${{ env.CLOUDFLARE_PAGES_PROJECT_NAME }} --branch pr-${{ github.event.pull_request.number }}
+
+      - name: Deploy Cloudflare Worker preview
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env preview --keep-vars
+
+      - name: Deploy Cloudflare Pages production
+        if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_PAGES_PROJECT_NAME != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name ${{ env.CLOUDFLARE_PAGES_PROJECT_NAME }} --branch main
+
+      - name: Deploy Cloudflare Worker production
+        if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_KV_NAMESPACE_ID != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --keep-vars
+
+      - name: Publish deployment summary
+        run: |
+          {
+            echo "## Cloudflare deployment summary"
+            echo ""
+            echo "- Event: ${{ github.event_name }}"
+            echo "- Frontend target: Cloudflare Pages project \\`${{ env.CLOUDFLARE_PAGES_PROJECT_NAME || 'configure CLOUDFLARE_PAGES_PROJECT_NAME' }}\\`"
+            echo "- Worker target: \\`${{ env.CLOUDFLARE_WORKER_NAME || 'avsafety-api' }}\\`"
+            echo "- Production URL: https://summit.domislink.com"
+            echo "- API route: https://summit.domislink.com/api/health"
+            echo "- Preview Pages branch: pr-${{ github.event.pull_request.number || 'n/a' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment preview instructions on pull requests
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const lines = [
+              'Cloudflare validation completed for this pull request.',
+              '',
+              `- Pages preview branch: \`pr-${context.payload.pull_request.number}\``,
+              '- Worker preview environment: `preview`',
+              '- Review deployment details in the workflow summary tab.',
+            ];
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: lines.join('\n'),
+            });
