@@ -1806,7 +1806,7 @@ app.post('/api/marketplace/creative-request', async (req, res) => {
   const normalizedMessage = sanitizeText(message, 1200);
   const normalizedAudience = sanitizeText(targetAudience, 240) || 'Aviation decision-makers, regulators, and summit delegates';
   const normalizedFormat = sanitizeText(preferredSizeFormat, 180) || 'Digital and print-safe summit advertising format';
-  const normalizedDeadline = sanitizeText(deadline, 80) || createTimestamp().split('T')[0];
+  const normalizedDeadline = sanitizeText(deadline, 80);
   const normalizedLogoUrl = sanitizeText(logoUrl, 500);
   const normalizedReferenceImages = sanitizeStringArray(referenceImages, 8);
 
@@ -2877,9 +2877,6 @@ Return strict JSON with:
         proposedRoleText = sanitizeText(parsed.proposedRoleText, 500) || proposedRoleText;
         callToActionText = sanitizeText(parsed.callToActionText, 500) || callToActionText;
         signatureBlock = sanitizeText(parsed.signatureBlock, 400).replace(/\\n/g, '\n') || signatureBlock;
-        fullHtmlContent = typeof parsed.fullHtmlContent === 'string' && parsed.fullHtmlContent.trim()
-          ? parsed.fullHtmlContent.trim()
-          : buildFullHtmlContent();
         aiGenerated = true;
       }
     } catch (error) {
@@ -2887,9 +2884,7 @@ Return strict JSON with:
     }
   }
 
-  if (!fullHtmlContent.trim()) {
-    fullHtmlContent = buildFullHtmlContent();
-  }
+  fullHtmlContent = buildFullHtmlContent();
   const emailBodyText = `${formalSalutation}\n\n${formalInvitationText}\n\n${eventDetailsText}\n\n${sectorRelevanceText}\n\n${proposedRoleText}\n\n${callToActionText}\n\n${signatureBlock}`;
   const gmailDraftUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
   const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
@@ -2937,7 +2932,8 @@ app.post('/api/stakeholders/ai-sponsorship-proposal', async (req, res) => {
   const data = readDb();
   const packages = (data.sponsorship_packages || INITIAL_SPONSORSHIP_PACKAGES) as SponsorshipPackage[];
   const packageMap = new Map(packages.map((pkg) => [pkg.tier, pkg] as const));
-  const approvedTierOrder: SponsorshipPackage['tier'][] = ['PLATINUM', 'GOLD', 'SILVER', 'SAFETY', 'SIMULATION', 'TITLE'];
+  const approvedTierOrder: SponsorshipPackage['tier'][] = ['TITLE', 'PLATINUM', 'GOLD', 'SILVER', 'SAFETY', 'SIMULATION'];
+  const isTopTierSector = ['BANKING_AND_FINANCE', 'OIL_AND_GAS', 'AIRLINES', 'GOVERNMENT', 'STATE_GOVERNMENT', 'TECHNOLOGY'].includes(industry);
   const categoryMeta = findStakeholderCategoryMeta(industry);
 
   const buildTierRecommendation = (tier: SponsorshipPackage['tier'], rationale: string): SponsorshipTierRecommendation | null => {
@@ -2956,8 +2952,12 @@ app.post('/api/stakeholders/ai-sponsorship-proposal', async (req, res) => {
     };
   };
 
-  const fallbackTierSelection = [
-    buildTierRecommendation('PLATINUM', `Recommended for ${companyName} if the goal is maximum executive visibility and broad summit-wide authority.`),
+  const fallbackTierSelection = dedupeById([
+    buildTierRecommendation(
+      isTopTierSector ? 'TITLE' : 'PLATINUM',
+      `Recommended for ${companyName} if the goal is maximum executive visibility and broad summit-wide authority.`
+    ),
+    buildTierRecommendation('PLATINUM', `Recommended for ${companyName} as a premier partnership option with strong executive visibility and exhibition presence.`),
     buildTierRecommendation('GOLD', `Recommended for ${companyName} as a balanced route to visibility, exhibition presence, and programme recognition.`),
     buildTierRecommendation(
       industry === 'TECHNOLOGY' || industry === 'AIR_NAVIGATION' ? 'SAFETY'
@@ -2965,7 +2965,7 @@ app.post('/api/stakeholders/ai-sponsorship-proposal', async (req, res) => {
         : 'SILVER',
       `Recommended because ${categoryMeta?.whyCorporateBelongs?.toLowerCase() || 'the sector has a direct safety stake in aviation outcomes.'}`
     )
-  ].filter((tier): tier is SponsorshipTierRecommendation => Boolean(tier));
+  ].filter((tier): tier is SponsorshipTierRecommendation => Boolean(tier)));
 
   const fallbackProposal: SponsorshipProposalData = {
     headline: `Strategic Aviation Safety Partnership Proposal for ${companyName}`,
