@@ -685,6 +685,8 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   }
 
   if (pathname === '/api/registrations/status' && request.method === 'POST') {
+    const adminError = requireAdmin(request, env);
+    if (adminError) return adminError;
     const db = await readDb(env);
     const payload = await parseJson(request);
     const registrations = (db.registrations || []) as any[];
@@ -823,7 +825,16 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
   if (pathname === '/api/marketplace/proof-of-display' && request.method === 'GET') {
     const db = await readDb(env);
     const orderId = searchParams.get('orderId');
-    const proofs = (db.proof_of_displays || []).filter((proof: any) => !orderId || proof.orderId === orderId);
+    const visibility = searchParams.get('visibility');
+    if (!orderId && visibility !== 'public') {
+      const adminError = requireAdmin(request, env);
+      if (adminError) return adminError;
+    }
+    const proofs = (db.proof_of_displays || []).filter((proof: any) => {
+      if (orderId) return proof.orderId === orderId;
+      if (visibility === 'public') return proof.isPublic !== false;
+      return true;
+    });
     return json({ success: true, proofs });
   }
 
@@ -833,10 +844,11 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
     const db = await readDb(env);
     const payload = await parseJson(request);
     const proof = {
+      ...payload,
       id: createId('pod'),
       uploadedAt: new Date().toISOString(),
       verifiedBy: payload.verifiedBy || 'Domislink Digital Broadcast Officer',
-      ...payload,
+      isPublic: payload.isPublic ?? false,
     };
     db.proof_of_displays = [proof, ...(db.proof_of_displays || [])];
     db.marketplace_orders = (db.marketplace_orders || []).map((order: any) => order.id === payload.orderId ? { ...order, proofOfDisplay: [proof, ...(order.proofOfDisplay || [])] } : order);
@@ -855,11 +867,11 @@ async function handleApiRequest(request: Request, env: WorkerEnv, _ctx: WorkerEx
     const db = await readDb(env);
     const payload = await parseJson(request);
     const quote = {
+      ...payload,
       id: createId('quote'),
       quoteNumber: createReference('Q-AVS26').toUpperCase(),
       createdAt: new Date().toISOString(),
-      status: payload.status || 'DRAFT',
-      ...payload,
+      status: 'PENDING_REVIEW',
     };
     db.custom_quotes = [quote, ...(db.custom_quotes || [])];
     await writeDb(env, db);

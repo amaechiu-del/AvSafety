@@ -123,6 +123,9 @@ Set these in Cloudflare or sync them from GitHub Actions:
 ### Pages variables
 The frontend currently reads relative `/api/*` URLs, so no separate frontend API base URL is required for Cloudflare Pages.
 
+### Proof-of-display visibility
+Proof-of-display records default to private in the Worker. Set `isPublic: true` when creating a proof record if it should appear in the public gallery endpoint used by the marketplace UI.
+
 ## 10. Monitoring and logs
 - **Pages deployments:** Cloudflare dashboard → Pages → Deployments
 - **Worker logs:**

@@ -25,7 +25,7 @@ export default function ProofOfDisplayGallery({ initialProofs = [] }: ProofOfDis
 
   const fetchProofs = async () => {
     try {
-      const res = await fetch('/api/marketplace/proof-of-display');
+      const res = await fetch('/api/marketplace/proof-of-display?visibility=public');
       if (res.ok) {
         const data = await res.json();
         if (data.proofs) setProofs(data.proofs);
