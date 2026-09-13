@@ -2887,7 +2887,9 @@ Return strict JSON with:
     }
   }
 
-  fullHtmlContent = buildFullHtmlContent();
+  if (!fullHtmlContent.trim()) {
+    fullHtmlContent = buildFullHtmlContent();
+  }
   const emailBodyText = `${formalSalutation}\n\n${formalInvitationText}\n\n${eventDetailsText}\n\n${sectorRelevanceText}\n\n${proposedRoleText}\n\n${callToActionText}\n\n${signatureBlock}`;
   const gmailDraftUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
   const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyText)}`;
@@ -3038,15 +3040,17 @@ Return strict JSON:
       ).slice(0, 3);
 
       if (validatedTiers.length > 0) {
-        return sendAiSuccess<SponsorshipProposalData>(
+        return sendAiSuccess(
           res,
           true,
           {
-            headline: sanitizeText(parsed?.headline, 220) || fallbackProposal.headline,
-            whySectorMatters: sanitizeText(parsed?.whySectorMatters, 700) || fallbackProposal.whySectorMatters,
-            howParticipationSupportsSafety: sanitizeText(parsed?.howParticipationSupportsSafety, 700) || fallbackProposal.howParticipationSupportsSafety,
-            recommendedTiers: validatedTiers,
-            callToAction: sanitizeText(parsed?.callToAction, 400) || fallbackProposal.callToAction
+            proposal: {
+              headline: sanitizeText(parsed?.headline, 220) || fallbackProposal.headline,
+              whySectorMatters: sanitizeText(parsed?.whySectorMatters, 700) || fallbackProposal.whySectorMatters,
+              howParticipationSupportsSafety: sanitizeText(parsed?.howParticipationSupportsSafety, 700) || fallbackProposal.howParticipationSupportsSafety,
+              recommendedTiers: validatedTiers,
+              callToAction: sanitizeText(parsed?.callToAction, 400) || fallbackProposal.callToAction
+            }
           },
           `${AI_UNVERIFIED_DISCLAIMER}. Proposal language is advisory; commercial approval still depends on the official sponsorship inventory.`
         );
@@ -3056,7 +3060,7 @@ Return strict JSON:
     }
   }
 
-  return sendAiSuccess<SponsorshipProposalData>(res, false, fallbackProposal);
+  return sendAiSuccess(res, false, { proposal: fallbackProposal });
 });
 
 // 8. POST /api/stakeholders/dispatch-letter (Record sent invitation & auto-schedule 5-day follow-up)

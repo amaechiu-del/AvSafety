@@ -204,7 +204,7 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
       const payload = data.data || data;
       if (payload.topics && Array.isArray(payload.topics)) {
         setAiTopicSuggestions(payload.topics);
-        setAiTopicDisclaimer(data.disclaimer || 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL');
+        setAiTopicDisclaimer(payload.disclaimer || data.disclaimer || 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL');
       }
     } catch (err) {
       console.error('Failed to get AI topics:', err);
