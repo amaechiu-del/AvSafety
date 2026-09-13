@@ -46,6 +46,17 @@ describe('database persistence and recovery', () => {
     );
 
     const registrations = readDb().registrations;
+    const savedEmails = new Set(registrations.map((registration: any) => registration.email));
+
     expect(registrations).toHaveLength(5);
+    expect(savedEmails).toEqual(
+      new Set([
+        'delegate0@example.com',
+        'delegate1@example.com',
+        'delegate2@example.com',
+        'delegate3@example.com',
+        'delegate4@example.com',
+      ]),
+    );
   });
 });
