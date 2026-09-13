@@ -46,10 +46,10 @@ export default function HandbookGenerator() {
       });
 
       const data = await res.json();
-      if (data?.success) {
-        setSuccessMsg(`Successfully generated complete tangible handbook for "${currentRecord.speakerName}"! Record updated to APPROVED status.`);
+      if (data?.success && data?.handbook) {
+        setSuccessMsg(`Successfully generated complete tangible handbook draft for "${currentRecord.speakerName}".`);
       } else {
-        setSuccessMsg('Handbook generation service returned an unexpected response.');
+        setSuccessMsg('Handbook generation service returned an incomplete response.');
       }
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (error) {

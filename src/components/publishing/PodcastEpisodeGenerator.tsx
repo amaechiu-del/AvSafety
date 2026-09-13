@@ -67,16 +67,17 @@ export default function PodcastEpisodeGenerator({ onEpisodeGenerated }: PodcastE
         if (Array.isArray(episode.keyTakeaways)) {
           setKeyTakeaways(episode.keyTakeaways.join('\n'));
         }
-        if (episode.status) {
-          setStatus(episode.status);
+          if (episode.status) {
+            setStatus(episode.status);
+          }
+          setSuccessMsg('Podcast episode metadata, show notes, and chapter markers successfully generated from approved speaker recording and transcript!');
+          if (onEpisodeGenerated) {
+            onEpisodeGenerated(finalTitle);
+          }
+        } else {
+          setSuccessMsg('Podcast generation service returned an incomplete response.');
         }
-      }
-
-      setSuccessMsg('Podcast episode metadata, show notes, and chapter markers successfully generated from approved speaker recording and transcript!');
-      if (onEpisodeGenerated) {
-        onEpisodeGenerated(finalTitle);
-      }
-      setTimeout(() => setSuccessMsg(null), 4000);
+        setTimeout(() => setSuccessMsg(null), 4000);
     } catch (error) {
       console.error('Episode generation failed:', error);
       setSuccessMsg('Unable to reach podcast generation service. Please try again.');

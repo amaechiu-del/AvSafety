@@ -13,6 +13,16 @@ import { INITIAL_VERIFIED_SPEAKERS } from '../../data/speakersData';
 import { Speaker } from '../../types';
 import SpeakerAudioUpload from './SpeakerAudioUpload';
 
+interface GeneratedHandbookPayload {
+  title: string;
+  executiveSummary: string;
+  chapterOutline: string[];
+  keyLessons: string[];
+  recommendations: string[];
+  checklist: string[];
+  status: 'SPEAKER_REVIEW';
+}
+
 export default function SpeakerHandbookEngine() {
   const [speakers, setSpeakers] = useState<Speaker[]>(INITIAL_VERIFIED_SPEAKERS);
   const [selectedSpeakerId, setSelectedSpeakerId] = useState<string>(speakers[0]?.id || '');
@@ -32,6 +42,7 @@ export default function SpeakerHandbookEngine() {
   const [customPrice, setCustomPrice] = useState<string>('4500');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [generatedHandbook, setGeneratedHandbook] = useState<GeneratedHandbookPayload | null>(null);
 
   const selectedSpeaker = speakers.find(s => s.id === selectedSpeakerId) || speakers[0];
 
@@ -62,12 +73,13 @@ export default function SpeakerHandbookEngine() {
         })
       });
       const data = await res.json();
-      if (data?.success) {
+      if (data?.success && data?.handbook) {
+        setGeneratedHandbook(data.handbook);
         setHandbookGenerated(true);
         setHandbookStatus('SPEAKER_REVIEW');
         setSuccessMsg('Speaker handbook successfully structured and generated according to DomisLink publishing standards!');
       } else {
-        setSuccessMsg('Handbook generation service returned an unexpected response.');
+        setSuccessMsg('Handbook generation service returned an incomplete response.');
       }
     } catch (error) {
       console.error('Speaker handbook generation failed:', error);
@@ -315,14 +327,25 @@ Using only the material I provide, create a structured handbook outline containi
                 <div className="space-y-4 text-xs">
                   <div className="p-4 bg-[#071324] rounded-xl border border-white/10 space-y-2">
                     <h5 className="font-bold text-[#D4AF37] uppercase tracking-wider">1. Title & Cover Verification</h5>
-                    <p className="text-white">{constructedTitle}</p>
+                    <p className="text-white">{generatedHandbook?.title || constructedTitle}</p>
                   </div>
 
                   <div className="p-4 bg-[#071324] rounded-xl border border-white/10 space-y-2">
                     <h5 className="font-bold text-[#D4AF37] uppercase tracking-wider">2. Core Chapters & Action Points</h5>
-                    <p className="text-neutral-300 leading-relaxed">
-                      Includes verbatim speaker transcript extracts combined with structured DomisLink editorial safety frameworks. Fully checked against attribution guidelines.
-                    </p>
+                    {generatedHandbook ? (
+                      <div className="space-y-3 text-neutral-300 leading-relaxed">
+                        <p>{generatedHandbook.executiveSummary}</p>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {generatedHandbook.chapterOutline.slice(0, 4).map((chapter, idx) => (
+                            <li key={idx}>{chapter}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-neutral-300 leading-relaxed">
+                        Includes verbatim speaker transcript extracts combined with structured DomisLink editorial safety frameworks. Fully checked against attribution guidelines.
+                      </p>
+                    )}
                   </div>
                 </div>
 

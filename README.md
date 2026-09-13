@@ -6,7 +6,7 @@ AvSafety is a full-stack React + Express application for managing the Aviation S
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind-style utility classes
 - **Backend:** Express (TypeScript, `server.ts`)
-- **AI:** Google Gemini (`@google/genai`) with deterministic fallbacks when API keys are unavailable
+- **AI:** Google Gemini (`@google/genai`) where available, with deterministic fallbacks when keys are missing, model access fails, or model output is unusable
 - **Storage:** JSON file database at `/home/runner/work/AvSafety/AvSafety/data/db.json`
 - **Payments:** Paystack (initialize + verify endpoints)
 
@@ -42,7 +42,7 @@ AvSafety is a full-stack React + Express application for managing the Aviation S
 
 Copy `.env.example` into `.env` and set:
 
-- `GEMINI_API_KEY` — Enables all AI routes
+- `GEMINI_API_KEY` — Enables Gemini-backed AI routes when model access is available
 - `APP_URL` — Application base URL
 - `PAYSTACK_SECRET_KEY` — Required for payment initialization/verification
 - `PAYSTACK_PUBLIC_KEY` — Exposed for client checkout flow
@@ -104,4 +104,4 @@ npm run start
 ## Notes
 
 - AI routes are designed with strict grounding/fallback logic to reduce hallucinated content.
-- If Gemini is unavailable, the app still returns deterministic fallback content for agent workflows.
+- If Gemini is unavailable, model invocation fails, or JSON outputs are malformed, the app still returns deterministic fallback content for agent workflows.
