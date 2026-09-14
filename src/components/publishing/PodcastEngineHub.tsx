@@ -123,8 +123,17 @@ export default function PodcastEngineHub() {
             
             {/* Left Column: Player & Cover */}
             <div className="space-y-6 lg:col-span-1">
-              <div className="relative rounded-2xl overflow-hidden border border-[#D4AF37]/40 shadow-2xl group">
-                <img src={activeEpisode.photographUrl} alt={activeEpisode.speakerName} className="w-full h-72 object-cover group-hover:scale-105 transition duration-500" />
+              <div className="relative rounded-2xl overflow-hidden border border-[#D4AF37]/40 shadow-2xl group bg-gradient-to-br from-[#050B1A] to-[#0A192F]">
+                {activeEpisode.photographUrl ? (
+                  <img src={activeEpisode.photographUrl} alt={activeEpisode.speakerName} className="w-full h-72 object-cover group-hover:scale-105 transition duration-500" />
+                ) : (
+                  <div className="w-full h-72 flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-20 h-20 rounded-2xl bg-[#0A192F] border-2 border-[#D4AF37] flex items-center justify-center font-serif font-bold text-2xl text-[#FFD700] mb-2 shadow-lg">
+                      {activeEpisode.speakerName.split(' ').filter(Boolean).slice(-2).map(p => p[0]).join('').toUpperCase()}
+                    </div>
+                    <span className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-wider">OFFICIAL PROFILE</span>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0A192F] via-transparent to-black/40 flex flex-col justify-between p-6">
                   <span className="self-start px-3 py-1 rounded-full bg-[#D4AF37] text-[#0A192F] text-[10px] font-mono font-bold">
                     EPISODE #{activeEpisode.podcastEpisodeNumber}
@@ -271,8 +280,17 @@ export default function PodcastEngineHub() {
                   activeEpisode?.id === rec.id ? 'border-[#D4AF37] shadow-xl shadow-[#D4AF37]/10' : 'border-white/10 hover:border-[#D4AF37]/50'
                 }`}
               >
-                <div className="relative h-48 overflow-hidden">
-                  <img src={rec.photographUrl} alt={rec.speakerName} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                <div className="relative h-48 overflow-hidden bg-gradient-to-br from-[#050B1A] to-[#0A192F]">
+                  {rec.photographUrl ? (
+                    <img src={rec.photographUrl} alt={rec.speakerName} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-4">
+                      <div className="w-14 h-14 rounded-xl bg-[#0A192F] border border-[#D4AF37] flex items-center justify-center font-serif font-bold text-lg text-[#FFD700] mb-1">
+                        {rec.speakerName.split(' ').filter(Boolean).slice(-2).map(p => p[0]).join('').toUpperCase()}
+                      </div>
+                      <span className="text-[8px] font-mono text-gray-400 uppercase">OFFICIAL MONOGRAM</span>
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0A192F] via-transparent to-black/30 p-4 flex flex-col justify-between">
                     <span className="self-start px-2.5 py-0.5 rounded bg-[#D4AF37] text-[#0A192F] text-[10px] font-mono font-bold">
                       EP #{rec.podcastEpisodeNumber}

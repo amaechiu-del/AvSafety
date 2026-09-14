@@ -27,25 +27,17 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
 
   const navItems = [
     { id: 'home', label: 'Home' },
-    { id: 'marketplace', label: 'Advertise & Sponsor' },
+    { id: 'dignitaries', label: 'Dignitaries' },
     { id: 'theme', label: 'Theme' },
-    { id: 'about', label: 'Why Summit Matters' },
-    { id: 'glance', label: 'At A Glance' },
-    { id: 'poster', label: 'Summit Poster' },
     { id: 'speakers', label: 'Speakers' },
     { id: 'stakeholders', label: '24+ Stakeholders' },
-    { id: 'industry', label: '33+ Sectors' },
     { id: 'programme', label: 'Programme' },
-    { id: 'google-docs', label: 'Google Docs' },
+    { id: 'domislink-bookstore', label: 'Bookstore' },
     { id: 'challenge', label: 'Memoir Challenge' },
-    { id: 'book', label: 'Book Launch' },
+    { id: 'marketplace', label: 'Advertise & Sponsor' },
     { id: 'investment', label: 'Safety Investment' },
     { id: 'simulation', label: 'Simulation & Training' },
-    { id: 'safety-vs-mishap', label: 'Safety vs Accident' },
-    { id: 'sky-party', label: 'Sky Party' },
-    { id: 'partners', label: 'Partners' },
     { id: 'register', label: 'Register' },
-    { id: 'feedback', label: 'Feedback' },
     { id: 'contact', label: 'Contact' }
   ];
 
@@ -77,8 +69,11 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
                   2026
                 </span>
               </div>
-              <div className="text-[9px] text-[#8A99AD] uppercase tracking-wider font-semibold font-sans">
-                Domislink International Services Ltd
+              <div className="flex items-center space-x-2 text-[9px] text-[#8A99AD] font-sans">
+                <span className="uppercase tracking-wider font-semibold">Domislink International Services Ltd</span>
+                <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-white/5 border border-[#D4AF37]/35 text-[#D4AF37] font-mono font-bold">
+                  RC - 9266988
+                </span>
               </div>
             </div>
           </div>
@@ -101,6 +96,15 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
             
             {/* Quick Access Admin Dashboard & PWA Install Button */}
             <PWAInstallButton variant="navbar" className="ml-1" />
+            <a
+              href="https://sec.domislink.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 px-2.5 py-1 bg-gradient-to-r from-[#D4AF37]/10 to-[#AA7C11]/20 hover:from-[#D4AF37]/20 hover:to-[#AA7C11]/30 border border-[#D4AF37]/40 text-[#D4AF37] rounded text-[11px] font-semibold tracking-wider transition-all duration-200 flex items-center gap-1.5"
+            >
+              <Shield className="h-3 w-3" />
+              DIGITAL SECRETARIAT
+            </a>
             <button
               onClick={onOpenAdmin}
               className="ml-2 px-2.5 py-1 bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 border border-[#D4AF37]/40 text-[#D4AF37] rounded text-[11px] font-semibold tracking-wider transition-all duration-200"
@@ -195,6 +199,15 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
             ))}
             <div className="border-t border-[#D4AF37]/15 pt-3 px-4 flex flex-col gap-2">
               <PWAInstallButton variant="navbar" className="w-full justify-center py-2" />
+              <a
+                href="https://sec.domislink.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full text-xs text-[#D4AF37] font-bold flex items-center justify-center space-x-1.5 py-2 hover:bg-[#D4AF37]/10 rounded border border-[#D4AF37]/30"
+              >
+                <Shield className="h-3.5 w-3.5" />
+                <span>Digital Secretariat</span>
+              </a>
               <button
                 onClick={() => { setIsOpen(false); onOpenAdmin(); }}
                 className="text-xs text-[#D4AF37] font-bold flex items-center justify-center space-x-1 py-1.5 hover:bg-white/5 rounded"

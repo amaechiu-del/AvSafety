@@ -778,14 +778,28 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
                 </button>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => handleUpdateStatus(selectedStakeholder.id, 'CONFIRMED')}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1"
+              <div className="flex items-center space-x-2 flex-wrap gap-1">
+                <label className="text-[10px] text-slate-400 font-mono">Update Status:</label>
+                <select
+                  value={selectedStakeholder.status}
+                  onChange={(e) => handleUpdateStatus(selectedStakeholder.id, e.target.value as StakeholderStatus)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#D4AF37]"
                 >
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Mark Confirmed</span>
-                </button>
+                  <option value="PROPOSED">PROPOSED</option>
+                  <option value="INVITATION TO BE SENT">INVITATION TO BE SENT</option>
+                  <option value="INVITED">INVITED</option>
+                  <option value="PENDING RESPONSE">PENDING RESPONSE</option>
+                  <option value="ACCEPTED">ACCEPTED</option>
+                  <option value="CONFIRMED">CONFIRMED</option>
+                  <option value="DECLINED">DECLINED</option>
+                  <option value="WITHDRAWN">WITHDRAWN</option>
+                  <option value="PROPOSED INVITEE">PROPOSED INVITEE</option>
+                  <option value="INVITATION SENT">INVITATION SENT</option>
+                  <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                  <option value="INTERESTED">INTERESTED</option>
+                  <option value="NO RESPONSE">NO RESPONSE</option>
+                  <option value="ARCHIVED">ARCHIVED</option>
+                </select>
               </div>
             </div>
           </div>
@@ -866,7 +880,7 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
               <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center space-x-2">
                   <a
-                    href={letterData.gmailDraftUrl}
+                    href={letterData.gmailDraftUrl || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 shadow"
@@ -875,7 +889,7 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
                     <span>Open in Gmail Web (Draft)</span>
                   </a>
                   <a
-                    href={letterData.mailtoUrl}
+                    href={letterData.mailtoUrl || '#'}
                     className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700"
                   >
                     Open in Mail App
@@ -1143,14 +1157,30 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
                     onChange={(e) => setNewFormData({ ...newFormData, eventRole: e.target.value as StakeholderEventRole })}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37]"
                   >
-                    <option value="SPECIAL GUEST">Special Guest</option>
-                    <option value="GUEST OF HONOUR">Guest of Honour</option>
-                    <option value="KEYNOTE SPEAKER">Keynote Speaker</option>
-                    <option value="PANELIST">Panelist</option>
-                    <option value="GUEST">Guest / Delegate</option>
-                    <option value="SPONSOR">Corporate Sponsor</option>
-                    <option value="EXHIBITOR">Exhibitor</option>
-                    <option value="PARTNER">Strategic Partner</option>
+                    <optgroup label="VIP & Dignitaries">
+                      <option value="SPECIAL GUEST">Special Guest</option>
+                      <option value="GUEST OF HONOUR">Guest of Honour</option>
+                      <option value="KEYNOTE SPEAKER">Keynote Speaker</option>
+                      <option value="PANELIST">Panelist</option>
+                      <option value="SPEAKER">Speaker</option>
+                      <option value="INVITED GUEST">Invited Guest</option>
+                    </optgroup>
+                    <optgroup label="Faith, Community & Moral Leadership">
+                      <option value="INTERFAITH SAFETY PRAYER">Interfaith Safety Prayer</option>
+                      <option value="OPENING PRAYER">Opening Prayer</option>
+                      <option value="CLOSING PRAYER">Closing Prayer</option>
+                      <option value="GOODWILL MESSAGE">Goodwill Message</option>
+                      <option value="PATRON">Patron</option>
+                      <option value="ADVISER">Adviser</option>
+                      <option value="SAFETY ADVOCATE">Safety Advocate</option>
+                    </optgroup>
+                    <optgroup label="Commercial & Partnership">
+                      <option value="SPONSOR">Corporate Sponsor</option>
+                      <option value="EXHIBITOR">Exhibitor</option>
+                      <option value="PARTNER">Strategic Partner</option>
+                      <option value="ADVERTISER">Programme Advertiser</option>
+                      <option value="ATTENDEE">Summit Attendee</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div>

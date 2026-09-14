@@ -1176,10 +1176,10 @@
   ],
   "book": {
     "id": "bk-1",
-    "title": "[BOOK TITLE TO BE SUPPLIED]",
-    "author": "[AUTHOR TO BE SUPPLIED]",
-    "description": "[BOOK DESCRIPTION TO BE SUPPLIED]",
-    "coverImagePlaceholder": "[BOOK COVER IMAGE TO BE SUPPLIED]"
+    "title": "CLEARED FOR TAKEOFF",
+    "author": "AMAECHI UBADIKE",
+    "description": "A Pilot, Controller, and Inspector's Unfiltered Account of 25 Years Above the Clouds and Behind the Radar.",
+    "coverImagePlaceholder": "CLEARED FOR TAKEOFF"
   },
   "investment": {
     "id": "inv-1",

@@ -53,6 +53,39 @@ export default function Partnership({ partners, onUpdatePartners, isAdmin }: Par
           </p>
         </div>
 
+        {/* PROMINENT DONOR / SPONSOR / ADVERTISER BANNER */}
+        <div className="mb-14 rounded-2xl bg-gradient-to-r from-[#050B1A] via-[#0D1E38] to-[#132545] border-2 border-[#D4AF37] p-8 sm:p-10 shadow-2xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-96 h-96 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div className="space-y-3 text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#FFD700] text-[10px] font-mono font-bold uppercase tracking-widest">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Global Donor, Sponsor & Advertiser Portal</span>
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-serif font-extrabold text-white tracking-wide">
+                Partner with Aviation Safety Summit 2026
+              </h3>
+              <p className="text-sm text-[#8A99AD] max-w-2xl font-light">
+                Unlock premier visibility across official summit publications, VIP delegate lounges, and international broadcast channels. Custom sponsorship and advertiser placement opportunities available.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3.5 shrink-0">
+              <a
+                href="#contact-secretariat"
+                className="px-6 py-3.5 bg-gradient-to-r from-[#D4AF37] to-[#C59B27] text-[#050B1A] font-serif font-bold text-xs uppercase tracking-widest rounded-xl shadow-lg hover:brightness-110 transition-all text-center"
+              >
+                Inquire Sponsorship
+              </a>
+              <a
+                href="mailto:INFO@DOMISLINK.COM?subject=Donor%20or%20Sponsor%20Inquiry%20-%20Aviation%20Safety%20Summit%202026"
+                className="px-6 py-3.5 bg-[#0A192F] border border-[#D4AF37]/50 text-white font-serif font-bold text-xs uppercase tracking-widest rounded-xl shadow hover:bg-[#132545] transition-all text-center flex items-center justify-center gap-2"
+              >
+                <span>Email Secretariat</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* Partnership Tiers Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {partners.map((partner) => {

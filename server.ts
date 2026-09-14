@@ -12,6 +12,7 @@ import { GoogleGenAI } from '@google/genai';
 import { INITIAL_AD_POSITIONS, INITIAL_SPONSORSHIP_PACKAGES } from './src/data/marketplaceData';
 import { INITIAL_VERIFIED_SPEAKERS } from './src/data/speakersData';
 import { INITIAL_STAKEHOLDERS, STAKEHOLDER_CATEGORIES } from './src/data/stakeholdersData';
+import { INITIAL_PROGRAMME_SESSIONS } from './src/data/programmeData';
 
 
 
@@ -65,6 +66,7 @@ const defaultDb = {
   },
   speakers: INITIAL_VERIFIED_SPEAKERS,
   stakeholders: INITIAL_STAKEHOLDERS,
+  sessions: INITIAL_PROGRAMME_SESSIONS,
   organisations: [
     {
       id: 'org-1',
@@ -259,80 +261,6 @@ const defaultDb = {
       colorTheme: 'green'
     }
   ],
-  sessions: [
-    {
-      id: 'ses-1',
-      time: '[TIME TO BE CONFIRMED]',
-      title: 'Aviation Safety Summit Opening Plenary',
-      type: 'Plenary Session',
-      speaker: '[SPEAKER TO BE CONFIRMED]',
-      organisation: 'Federal Ministry of Aviation & NCAA / Domislink',
-      topic: '[TOPIC TO BE CONFIRMED]',
-      description: 'Opening protocols, national safety directives, and inaugural address for the Aviation Safety Summit 2026.',
-      room: 'Grand Ballroom, Marriott Hotel, Ikeja, Lagos',
-      status: 'To Be Confirmed'
-    },
-    {
-      id: 'ses-2',
-      time: '[TIME TO BE CONFIRMED]',
-      title: 'Official Book Launch',
-      type: 'Book Launch',
-      speaker: '[SPEAKER TO BE CONFIRMED]',
-      organisation: 'Domislink International Services Ltd',
-      topic: '[TOPIC TO BE CONFIRMED]',
-      description: 'Official presentation and dedication of the milestone aviation safety publication.',
-      room: 'Grand Ballroom, Marriott Hotel, Ikeja, Lagos',
-      status: 'To Be Confirmed'
-    },
-    {
-      id: 'ses-3',
-      time: '[TIME TO BE CONFIRMED]',
-      title: 'Aviation Memoir Challenge Session',
-      type: 'Challenge Session',
-      speaker: '[SPEAKER TO BE CONFIRMED]',
-      organisation: 'Domislink International / Aviation Memoir Project',
-      topic: '[TOPIC TO BE CONFIRMED]',
-      description: 'Why aviators must not die with their experience: presentation of anonymised flight operations lessons and near-miss learnings.',
-      room: 'Grand Ballroom, Marriott Hotel, Ikeja, Lagos',
-      status: 'To Be Confirmed'
-    },
-    {
-      id: 'ses-4',
-      time: '[TIME TO BE CONFIRMED]',
-      title: 'Safety Investment Session',
-      type: 'Investment Panel',
-      speaker: '[SPEAKER TO BE CONFIRMED]',
-      organisation: 'Aviation Finance & Energy Stakeholders',
-      topic: '[TOPIC TO BE CONFIRMED]',
-      description: 'Cross-sector funding strategies for safety technology, flight simulators, meteorological intelligence, and aerodrome infrastructure.',
-      room: 'Executive Hall A, Marriott Hotel, Ikeja, Lagos',
-      status: 'To Be Confirmed'
-    },
-    {
-      id: 'ses-5',
-      time: '[TIME TO BE CONFIRMED]',
-      title: 'Simulation & Training Technical Session',
-      type: 'Technical Masterclass',
-      speaker: '[SPEAKER TO BE CONFIRMED]',
-      organisation: 'Training Organisations & Flight Simulator Evaluators',
-      topic: '[TOPIC TO BE CONFIRMED]',
-      description: 'Sim saves fuel, dollars, and lives: synthetic training devices, Level D simulator credits, and recurrent competence cycles.',
-      room: 'Executive Hall B, Marriott Hotel, Ikeja, Lagos',
-      status: 'To Be Confirmed'
-    },
-    {
-      id: 'ses-6',
-      time: '[TIME TO BE CONFIRMED]',
-      title: 'The Sky Party & Executive Networking',
-      type: 'Networking Reception',
-      speaker: '[SPEAKER TO BE CONFIRMED]',
-      organisation: 'Aviation Safety Summit 2026 Secretariat',
-      topic: '[TOPIC TO BE CONFIRMED]',
-      description: 'Executive networking reception, industry honors, and closing fellowship for all summit delegates and dignitaries.',
-      room: 'Skyline Terrace, Marriott Hotel, Ikeja, Lagos',
-      status: 'To Be Confirmed'
-    }
-  ],
   registrations: [] as any[],
   memo_submissions: [
     {
@@ -366,10 +294,10 @@ const defaultDb = {
   ],
   book: {
     id: 'bk-1',
-    title: '[BOOK TITLE TO BE SUPPLIED]',
-    author: '[AUTHOR TO BE SUPPLIED]',
-    description: '[BOOK DESCRIPTION TO BE SUPPLIED]',
-    coverImagePlaceholder: '[BOOK COVER IMAGE TO BE SUPPLIED]'
+    title: 'CLEARED FOR TAKEOFF',
+    author: 'AMAECHI UBADIKE',
+    description: "A Pilot, Controller, and Inspector's Unfiltered Account of 25 Years Above the Clouds and Behind the Radar.",
+    coverImagePlaceholder: 'CLEARED FOR TAKEOFF'
   },
   investment: {
     id: 'inv-1',
@@ -563,6 +491,11 @@ function readDb() {
       // Auto-migrate if stakeholders is missing or empty
       if (!parsed.stakeholders || parsed.stakeholders.length < 5) {
         parsed.stakeholders = INITIAL_STAKEHOLDERS;
+        writeDb(parsed);
+      }
+      // Auto-migrate if sessions is missing or empty
+      if (!parsed.sessions || parsed.sessions.length === 0) {
+        parsed.sessions = INITIAL_PROGRAMME_SESSIONS;
         writeDb(parsed);
       }
       return parsed;
@@ -2403,7 +2336,7 @@ async function start() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : undefined,
+        hmr: false,
       },
       appType: 'spa',
     });

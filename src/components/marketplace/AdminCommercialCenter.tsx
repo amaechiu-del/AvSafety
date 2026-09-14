@@ -579,7 +579,13 @@ export default function AdminCommercialCenter({ onClose, onRefreshData }: AdminC
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {proofs.map((p) => (
                   <div key={p.id} className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
-                    <img src={p.mediaUrl} alt={p.title} className="w-full h-36 object-cover" />
+                    {p.mediaUrl ? (
+                      <img src={p.mediaUrl} alt={p.title} className="w-full h-36 object-cover" />
+                    ) : (
+                      <div className="w-full h-36 bg-slate-900 flex items-center justify-center text-slate-500 font-mono text-xs">
+                        NO PREVIEW
+                      </div>
+                    )}
                     <div className="p-3 space-y-1.5 text-xs">
                       <span className="font-bold text-white block">{p.companyName}</span>
                       <span className="text-slate-400 block">{p.title} • {p.location}</span>

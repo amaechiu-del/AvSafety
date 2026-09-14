@@ -1,1 +1,222 @@
 @import "tailwindcss";
+
+@keyframes pulseSlide {
+  0% {
+    left: -20%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes marqueeSlow {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes marqueeReverse {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Stepped Pause Flow: Glides smoothly then introduces a subtle pause for comfortable reading */
+@keyframes marqueeWithPauses {
+  0%, 10% {
+    transform: translate3d(0%, 0, 0);
+  }
+  20%, 30% {
+    transform: translate3d(-10%, 0, 0);
+  }
+  40%, 50% {
+    transform: translate3d(-20%, 0, 0);
+  }
+  60%, 70% {
+    transform: translate3d(-30%, 0, 0);
+  }
+  80%, 90% {
+    transform: translate3d(-40%, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+/* Breathing Cadence Flow: Organic inhale-exhale rhythm with subtle drifting pauses */
+@keyframes marqueeBreathingHold {
+  0%, 12% {
+    transform: translate3d(0%, 0, 0);
+  }
+  12.1% {
+    transform: translate3d(0%, 0, 0);
+  }
+  25%, 37% {
+    transform: translate3d(-12.5%, 0, 0);
+  }
+  50%, 62% {
+    transform: translate3d(-25%, 0, 0);
+  }
+  75%, 87% {
+    transform: translate3d(-37.5%, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes beaconGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes textShimmerFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes jetStreamFlow {
+  0% {
+    transform: translateX(-100%) scaleX(0.5);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(200%) scaleX(1.2);
+    opacity: 0;
+  }
+}
+
+/* Movement Mode 1: Gentle Continuous Slow Glide */
+.animate-marquee-slow {
+  display: flex;
+  width: max-content;
+  animation: marqueeSlow 65s linear infinite;
+}
+
+.animate-marquee-slow:hover {
+  animation-play-state: paused;
+}
+
+/* Movement Mode 2: Stepped Pause & Read Flow (Holds text still for comfortable comprehension) */
+.animate-marquee-paused {
+  display: flex;
+  width: max-content;
+  animation: marqueeWithPauses 75s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+.animate-marquee-paused:hover {
+  animation-play-state: paused;
+}
+
+/* Movement Mode 3: Breathing Cadence / Pulse & Glide (Organic inhale/exhale pace) */
+.animate-marquee-breathing {
+  display: flex;
+  width: max-content;
+  animation: marqueeBreathingHold 85s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+.animate-marquee-breathing:hover {
+  animation-play-state: paused;
+}
+
+.animate-marquee-reverse {
+  display: flex;
+  width: max-content;
+  animation: marqueeReverse 70s linear infinite;
+}
+
+.animate-marquee-reverse:hover {
+  animation-play-state: paused;
+}
+
+.animate-marquee-fast {
+  display: flex;
+  width: max-content;
+  animation: marqueeSlow 45s linear infinite;
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 8s linear infinite;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+.animate-beacon {
+  animation: beaconGlow 2.5s ease-in-out infinite;
+}
+
+.animate-jet-stream {
+  animation: jetStreamFlow 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-shimmer-text {
+  background-size: 200% 200%;
+  animation: textShimmerFlow 4s ease infinite;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

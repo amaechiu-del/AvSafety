@@ -154,7 +154,7 @@ export default function SimulationTraining() {
 
   const filteredPillars = activeTab === 'all' 
     ? discussionPillars 
-    : discussionPillars.filter(p => p.category === activeTab || activeTab === 'all');
+    : discussionPillars.filter(p => p.category === activeTab);
 
   return (
     <section id="simulation" className="py-24 bg-[#FCFBF7] border-b border-[#D4AF37]/10 relative">

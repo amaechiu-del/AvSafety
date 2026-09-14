@@ -10,13 +10,17 @@ export default function SkyParty() {
   return (
     <section id="sky-party" className="py-24 bg-[#0A192F] text-white border-b border-[#D4AF37]/10 relative overflow-hidden">
       
-      {/* Background Graphic Patterns */}
-      <div className="absolute inset-0 z-0 opacity-5">
+      {/* Background Graphic Patterns with Animated Beacons */}
+      <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="50%" cy="50%" r="40%" fill="none" stroke="#D4AF37" strokeWidth="2" strokeDasharray="10 15" />
+          <circle cx="50%" cy="50%" r="40%" fill="none" stroke="#D4AF37" strokeWidth="2" strokeDasharray="10 15" className="animate-radar-sweep origin-center" />
           <circle cx="50%" cy="50%" r="30%" fill="none" stroke="#1E3A8A" strokeWidth="1" />
         </svg>
       </div>
+
+      {/* Floating Ambient Lighting Aura */}
+      <div className="absolute top-1/2 left-1/4 w-72 h-72 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none animate-beacon" />
+      <div className="absolute bottom-10 right-1/4 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl pointer-events-none animate-beacon" style={{ animationDelay: '2s' }} />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
         <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Registration, MemoSubmission } from '../types';
 import StakeholderManager from './admin/StakeholderManager';
+import { AdminProtectedView } from './AdminAuthWrapper';
 
 interface AdminProps {
   registrations: Registration[];
@@ -152,6 +153,7 @@ export default function AdminPanel({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6">
       <div className="bg-white border-2 border-[#D4AF37] rounded-3xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-fadeIn">
+        <AdminProtectedView>
         
         {/* Header bar */}
         <div className="bg-[#0A192F] text-white p-5 border-b border-[#D4AF37]/30 flex items-center justify-between">
@@ -689,6 +691,7 @@ export default function AdminPanel({
           </div>
         )}
 
+        </AdminProtectedView>
       </div>
     </div>
   );

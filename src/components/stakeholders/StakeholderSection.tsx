@@ -213,24 +213,48 @@ export default function StakeholderSection({ onOpenNominateModal }: StakeholderS
                   Why Aviation Safety Matters to this Sector
                 </p>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  {currentCategoryObj.description}
+                  {currentCategoryObj.whyCorporateBelongs || currentCategoryObj.description}
                 </p>
               </div>
 
               {/* Strategic Value Pillars */}
               <div className="space-y-2 text-xs">
-                <div className="flex items-start space-x-2 text-slate-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>Protects critical human capital, executives, and essential personnel in transit.</span>
-                </div>
-                <div className="flex items-start space-x-2 text-slate-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>Mitigates severe operational downtime, supply chain halts, and insurance claims.</span>
-                </div>
-                <div className="flex items-start space-x-2 text-slate-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>Advances national safety culture from reactive blame to proactive investment.</span>
-                </div>
+                {(selectedCategory === 'CHRISTIAN_LEADERS' || selectedCategory === 'MUSLIM_LEADERS' || selectedCategory === 'FAITH_AND_COMMUNITY') ? (
+                  <>
+                    <div className="p-3 bg-gradient-to-r from-amber-500/10 to-purple-500/10 border border-[#D4AF37]/30 rounded-lg text-amber-200 text-xs leading-relaxed space-y-1">
+                      <p className="font-bold font-serif text-white flex items-center space-x-1.5">
+                        <HeartHandshake className="h-4 w-4 text-[#D4AF37]" />
+                        <span>Why Men of God & Spiritual Leaders are on the Safety Checklist:</span>
+                      </p>
+                      <p className="text-slate-300 italic">
+                        "Anytime there is crisis or severe turbulence in an aircraft in flight, the sound you hear from within the cabin across every seat are prayers from different tongues and denominations. It is not drama; it is faith in action. We actively seek their recommendations and prayers for the preservation of human life."
+                      </p>
+                    </div>
+                    <div className="flex items-start space-x-2 text-slate-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Moral stewardship and ethical conscience in maintenance, piloting, and regulation.</span>
+                    </div>
+                    <div className="flex items-start space-x-2 text-slate-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Interfaith safety prayers and spiritual vigilance for Nigerian and global airspace.</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start space-x-2 text-slate-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Protects critical human capital, executives, and essential personnel in transit.</span>
+                    </div>
+                    <div className="flex items-start space-x-2 text-slate-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Mitigates severe operational downtime, supply chain halts, and insurance claims.</span>
+                    </div>
+                    <div className="flex items-start space-x-2 text-slate-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Advances national safety culture from reactive blame to proactive investment.</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="pt-2">
@@ -306,9 +330,19 @@ export default function StakeholderSection({ onOpenNominateModal }: StakeholderS
 
                         {/* Lifecycle Status Badge */}
                         <div className="text-right shrink-0">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
                             person.status === 'CONFIRMED'
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : person.status === 'ACCEPTED'
+                              ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
+                              : person.status === 'INVITED' || person.status === 'INVITATION SENT'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              : person.status === 'PENDING RESPONSE' || person.status === 'ACKNOWLEDGED' || person.status === 'INTERESTED'
+                              ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                              : person.status === 'DECLINED'
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                              : person.status === 'WITHDRAWN' || person.status === 'NO RESPONSE'
+                              ? 'bg-zinc-500/20 text-zinc-400 border-zinc-500/40'
                               : 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                           }`}>
                             {person.status}

@@ -12,6 +12,8 @@ import {
   RefreshCw, Utensils, Accessibility, HeartHandshake, EyeOff
 } from 'lucide-react';
 import { Registration } from '../types';
+import jsPDF from 'jspdf';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface RegisterProps {
   onRegister: (reg: {
@@ -219,6 +221,97 @@ export default function RegistrationForm({ onRegister }: RegisterProps) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Download VIP Pass PDF with jsPDF
+  const handleDownloadPdf = () => {
+    if (!confirmationData) return;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const primaryColor = [10, 25, 47]; // #0A192F
+    const goldColor = [212, 175, 55]; // #D4AF37
+
+    doc.setFillColor(252, 251, 247);
+    doc.rect(0, 0, 210, 297, 'F');
+
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(10, 10, 190, 45, 'F');
+
+    doc.setLineWidth(0.8);
+    doc.setDrawColor(goldColor[0], goldColor[1], goldColor[2]);
+    doc.rect(10, 10, 190, 45, 'S');
+
+    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('DOMISLINK INTERNATIONAL SERVICES LTD', 20, 22);
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.text('OFFICIAL VIP DELEGATE PASS', 20, 33);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('AVIATION SAFETY SUMMIT 2026', 20, 42);
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(220, 220, 220);
+    doc.roundedRect(10, 60, 190, 150, 3, 3, 'FD');
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REGISTRATION CODE:', 20, 75);
+    doc.setTextColor(10, 25, 47);
+    doc.setFontSize(14);
+    doc.text(confirmationData.registrationCode || confirmationData.id, 20, 83);
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.text('FULL NAME:', 20, 98);
+    doc.setTextColor(10, 25, 47);
+    doc.setFontSize(14);
+    doc.text(confirmationData.fullName.toUpperCase(), 20, 106);
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.text('POSITION & ORGANISATION:', 20, 121);
+    doc.setTextColor(10, 25, 47);
+    doc.setFontSize(11);
+    doc.text(`${confirmationData.position} - ${confirmationData.organisation}`, 20, 129);
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.text('ATTENDANCE CATEGORY & INDUSTRY:', 20, 144);
+    doc.setTextColor(10, 25, 47);
+    doc.setFontSize(11);
+    doc.text(`${confirmationData.attendanceCategory} | ${confirmationData.industry}`, 20, 152);
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.text('COUNTRY & ACCESS:', 20, 167);
+    doc.setTextColor(10, 25, 47);
+    doc.setFontSize(11);
+    doc.text(`${confirmationData.country} (${confirmationData.attendanceType || 'In-Person'})`, 20, 175);
+
+    doc.setFillColor(245, 247, 250);
+    doc.roundedRect(20, 185, 170, 20, 2, 2, 'F');
+    doc.setTextColor(10, 25, 47);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('VENUE: Marriott Hotel, Ikeja, Lagos, Nigeria  |  DATE: 17 November 2026', 25, 197);
+
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Protected under Nigeria Data Protection Act (NDPA) 2023. Please present this pass at reception.', 15, 230);
+    doc.text('Domislink International Services Ltd - Official Accreditation', 15, 236);
+
+    doc.save(`Domislink_VIP_Pass_${confirmationData.registrationCode || confirmationData.id}.pdf`);
   };
 
   return (
@@ -459,6 +552,14 @@ export default function RegistrationForm({ onRegister }: RegisterProps) {
               </button>
 
               <div className="flex flex-col sm:flex-row items-stretch gap-3">
+                <button
+                  onClick={handleDownloadPdf}
+                  className="px-5 py-3.5 bg-gradient-to-r from-[#D4AF37] to-[#C59B27] hover:brightness-110 text-[#050B1A] font-mono text-xs uppercase font-extrabold rounded-xl transition-all shadow-md flex items-center justify-center space-x-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download VIP Pass (PDF)</span>
+                </button>
+
                 <button
                   onClick={handleDownloadCalendar}
                   className="px-5 py-3.5 bg-white border border-[#D4AF37]/50 hover:bg-[#FCFBF7] text-[#0A192F] font-mono text-xs uppercase font-bold rounded-xl transition-all shadow-sm flex items-center justify-center space-x-2"

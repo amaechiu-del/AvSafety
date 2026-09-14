@@ -99,7 +99,13 @@ export default function SpeakerKnowledgeHub() {
                   selectedRecordId === rec.id ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white shadow-lg' : 'bg-[#0A192F] border-white/10 text-[#8A99AD] hover:text-white'
                 }`}
               >
-                <img src={rec.photographUrl} alt={rec.speakerName} className="w-10 h-10 rounded-full object-cover border border-[#D4AF37]/40 shrink-0" />
+                {rec.photographUrl ? (
+                  <img src={rec.photographUrl} alt={rec.speakerName} className="w-10 h-10 rounded-full object-cover border border-[#D4AF37]/40 shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-[#050B1A] border border-[#D4AF37]/60 flex items-center justify-center font-serif font-bold text-xs text-[#FFD700] shrink-0">
+                    {rec.speakerName.split(' ').filter(Boolean).slice(-2).map(p => p[0]).join('').toUpperCase()}
+                  </div>
+                )}
                 <div className="overflow-hidden">
                   <h4 className="font-serif font-bold text-xs text-white truncate">{rec.speakerName}</h4>
                   <p className="text-[10px] text-[#D4AF37] truncate mt-0.5">{rec.organisation}</p>
@@ -115,7 +121,13 @@ export default function SpeakerKnowledgeHub() {
           {/* Speaker Profile Header */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-white/10 pb-6">
             <div className="flex items-center space-x-5">
-              <img src={currentRecord.photographUrl} alt={currentRecord.speakerName} className="w-20 h-20 rounded-2xl object-cover border-2 border-[#D4AF37]/50 shadow-lg" />
+              {currentRecord.photographUrl ? (
+                <img src={currentRecord.photographUrl} alt={currentRecord.speakerName} className="w-20 h-20 rounded-2xl object-cover border-2 border-[#D4AF37]/50 shadow-lg" />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-[#050B1A] border-2 border-[#D4AF37]/50 flex items-center justify-center font-serif font-bold text-2xl text-[#FFD700] shadow-lg shrink-0">
+                  {currentRecord.speakerName.split(' ').filter(Boolean).slice(-2).map(p => p[0]).join('').toUpperCase()}
+                </div>
+              )}
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
                   <span className="px-2.5 py-0.5 rounded bg-[#D4AF37]/20 text-[#D4AF37] text-[10px] font-mono">{currentRecord.category}</span>

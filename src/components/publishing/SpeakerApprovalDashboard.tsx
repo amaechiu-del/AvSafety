@@ -89,16 +89,27 @@ export default function SpeakerApprovalDashboard() {
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
                   <div className="flex items-center space-x-4">
-                    <img src={rec.photographUrl} alt={rec.speakerName} className="w-16 h-16 rounded-xl object-cover border-2 border-[#D4AF37]/50 shadow-md" />
+                    {rec.photographUrl ? (
+                      <img src={rec.photographUrl} alt={rec.speakerName} className="w-16 h-16 rounded-xl object-cover border-2 border-[#D4AF37]/50 shadow-md" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-[#050B1A] border-2 border-[#D4AF37]/50 flex items-center justify-center font-serif font-bold text-base text-[#FFD700] shadow-md shrink-0">
+                        {rec.speakerName.split(' ').filter(Boolean).slice(-2).map(p => p[0]).join('').toUpperCase()}
+                      </div>
+                    )}
                     <div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="px-2.5 py-0.5 rounded bg-[#D4AF37]/20 text-[#D4AF37] text-[10px] font-mono">{rec.category}</span>
+                        {rec.specialRole && (
+                          <span className="px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono border border-purple-500/30">
+                            ROLE: {rec.specialRole.toUpperCase()} {rec.publicVisibility === 'PUBLIC' && '(PUBLICLY VISIBLE)'}
+                          </span>
+                        )}
                         <span className={`px-2.5 py-0.5 rounded text-[10px] font-mono ${allApproved ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
                           {allApproved ? 'READY FOR PUBLIC RELEASE' : 'PENDING APPROVALS'}
                         </span>
                       </div>
-                      <h3 className="text-lg sm:text-xl font-serif font-bold text-white mt-1">{rec.speakerName}</h3>
-                      <p className="text-xs text-[#8A99AD] font-mono">{rec.position} • <span className="text-white">{rec.organisation}</span></p>
+                      <h3 className="text-lg sm:text-xl font-serif font-bold text-white">{rec.speakerName}</h3>
+                      <p className="text-xs text-[#8A99AD] font-mono mt-0.5">{rec.position} • <span className="text-white">{rec.organisation}</span></p>
                     </div>
                   </div>
 

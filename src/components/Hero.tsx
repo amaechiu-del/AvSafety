@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Calendar, MapPin, ArrowRight, ShieldCheck, Landmark } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, ShieldCheck, Landmark, Radio, Plane, Sparkles, Compass } from 'lucide-react';
 
 interface HeroProps {
   onNavigate: (sectionId: string) => void;
@@ -16,6 +16,10 @@ export default function Hero({ onNavigate, eventDate, venue }: HeroProps) {
   return (
     <section className="relative min-h-screen bg-[#0A192F] pt-24 pb-16 flex items-center overflow-hidden">
       
+      {/* Dynamic Animated Jet Stream Lines */}
+      <div className="absolute top-1/3 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent pointer-events-none animate-jet-stream" />
+      <div className="absolute top-2/3 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-sky-400/40 to-transparent pointer-events-none animate-jet-stream" style={{ animationDelay: '3s' }} />
+
       {/* Editorial Aviation Grid Backdrop */}
       <div className="absolute inset-0 z-0 opacity-10">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -28,9 +32,9 @@ export default function Hero({ onNavigate, eventDate, venue }: HeroProps) {
         </svg>
       </div>
 
-      {/* Modern Runway Coordinate Graphic Overlays */}
+      {/* Modern Runway Coordinate Graphic Overlays with Pulsing Altitude */}
       <div className="absolute top-1/4 right-5 sm:right-10 md:right-20 pointer-events-none opacity-20 hidden md:block text-right">
-        <div className="text-[12rem] font-serif font-extrabold leading-none text-transparent bg-clip-text bg-gradient-to-b from-[#D4AF37] to-transparent">
+        <div className="text-[12rem] font-serif font-extrabold leading-none text-transparent bg-clip-text bg-gradient-to-b from-[#D4AF37] to-transparent animate-beacon">
           26
         </div>
         <div className="text-sm font-mono tracking-widest text-[#D4AF37] mt-[-2rem]">
@@ -38,12 +42,31 @@ export default function Hero({ onNavigate, eventDate, venue }: HeroProps) {
         </div>
       </div>
 
-      <div className="absolute bottom-10 left-5 sm:left-10 pointer-events-none opacity-10 hidden sm:block">
+      {/* Live Airspace Radar Widget on the right (Desktop) */}
+      <div className="absolute right-8 top-1/3 hidden lg:flex flex-col items-center z-10 pointer-events-none">
+        <div className="relative w-44 h-44 rounded-full border border-[#D4AF37]/30 bg-[#071324]/80 backdrop-blur-md flex items-center justify-center shadow-2xl overflow-hidden animate-float-gentle">
+          {/* Radar Sweep Needle */}
+          <div className="absolute inset-0 border-t-2 border-r-2 border-emerald-400/50 rounded-full animate-radar-sweep origin-center" />
+          <div className="absolute w-28 h-28 rounded-full border border-dashed border-[#D4AF37]/20" />
+          <div className="absolute w-14 h-14 rounded-full border border-sky-400/20" />
+          
+          {/* Central Blip */}
+          <div className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] animate-ping" />
+          
+          {/* Live Flight Tag */}
+          <div className="absolute bottom-2 text-[9px] font-mono text-emerald-300 font-bold bg-black/60 px-2 py-0.5 rounded border border-emerald-500/30">
+            FL350 // LAGOS SECTOR
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute bottom-10 left-5 sm:left-10 pointer-events-none opacity-20 hidden sm:block">
         <div className="text-xs font-mono tracking-widest text-[#E2E8F0]">
           NAV-AIDS // ATC // COM_01 // SEC_C90
         </div>
-        <div className="text-xs font-mono tracking-widest text-[#D4AF37]">
-          LAGOS SECTOR: FL350 SAFE SKIES
+        <div className="text-xs font-mono tracking-widest text-[#D4AF37] flex items-center space-x-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+          <span>LAGOS SECTOR: FL350 SAFE SKIES</span>
         </div>
       </div>
 
@@ -53,19 +76,20 @@ export default function Hero({ onNavigate, eventDate, venue }: HeroProps) {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full">
         <div className="lg:w-2/3 flex flex-col justify-center space-y-8">
           
-          {/* Eyebrow Label */}
+          {/* Eyebrow Label with Pulsing Beacon */}
           <div className="inline-flex items-center space-x-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest text-[#D4AF37] w-fit">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             <ShieldCheck className="h-4 w-4 mr-1 text-[#D4AF37]" />
-            Aviation Industry Summit
+            <span>Aviation Industry Summit 2026</span>
           </div>
 
           {/* Headline and Core Theme */}
           <div className="space-y-4">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-extrabold tracking-tight text-white leading-tight">
               AVIATION SAFETY <br className="hidden sm:inline" />
-              <span className="text-[#D4AF37] bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB]">SUMMIT 2026</span>
+              <span className="text-[#D4AF37] bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#FFF3B0] to-[#D4AF37] animate-shimmer-text">SUMMIT 2026</span>
             </h1>
-            <div className="h-1.5 w-24 bg-gradient-to-r from-[#D4AF37] to-[#F59E0B]"></div>
+            <div className="h-1.5 w-24 bg-gradient-to-r from-[#D4AF37] to-[#F59E0B] animate-pulse"></div>
             <p className="text-xl sm:text-2xl font-serif font-bold text-[#E2E8F0] tracking-wide uppercase max-w-xl">
               EVERYBODY IS INVOLVED IN AVIATION SAFETY
             </p>

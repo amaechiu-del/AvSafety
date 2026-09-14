@@ -66,6 +66,10 @@ export default function InteractiveMap() {
       role: 'Strategic Asset Funding & Safety Bonds',
       connection: 'Backs regional aviation growth by investing in certified carrier startups and high-efficiency airport construction projects.'
     },
+    'Faith & Spiritual Leaders': {
+      role: 'Spiritual Recommendations, Airspace Intercession & Moral Conscience',
+      connection: 'In crisis and turbulence, cabin prayers prove faith in action. Spiritual leaders guide moral responsibility in technical stewardship and lead interfaith prayers for passenger safety.'
+    },
     'Passengers': {
       role: 'Compliance, Trust & Active Vigilance',
       connection: 'The ultimate beneficiaries. Comply with crew mandates, behave responsibly, and trust the air safety system.'
@@ -78,7 +82,7 @@ export default function InteractiveMap() {
     { level: 'Level 3: Ground & Sky Operations', nodes: ['Airlines', 'Airports', 'ATC'] },
     { level: 'Level 4: Technical & Human Assets', nodes: ['Engineers', 'Training', 'Technology'] },
     { level: 'Level 5: Commercial Support', nodes: ['Oil & Gas', 'Banks', 'Industry'] },
-    { level: 'Level 6: Capital Resource', nodes: ['Investors'] },
+    { level: 'Level 6: Capital Resource & Moral Guardians', nodes: ['Investors', 'Faith & Spiritual Leaders'] },
     { level: 'Level 7: System Beneficiary', nodes: ['Passengers'] }
   ];
 

@@ -146,6 +146,14 @@ export default function SafetyMessage() {
       desc: 'Commercial manufacturers, logistics shippers, and tourism bodies. Responsible for aligning business supply chains with safety-certified air transport standards.'
     },
     {
+      id: 'faith_leaders',
+      name: 'MEN OF GOD & FAITH LEADERS',
+      category: 'POLICY_CAPITAL',
+      icon: <HeartHandshake className="h-5 w-5" />,
+      tagline: 'Moral Conscience & Airspace Intercession',
+      desc: 'Spiritual fathers, imams, and moral leaders. In times of in-flight turbulence and crisis, spontaneous prayers fill the cabin across all tongues and faiths — proving safety is a sacred covenant. We actively invite their recommendations, ethics, and intercession to protect human life.'
+    },
+    {
       id: 'emergency_services',
       name: 'EMERGENCY SERVICES',
       category: 'INFRASTRUCTURE',
@@ -271,6 +279,44 @@ export default function SafetyMessage() {
               <ShieldCheck className="h-8 w-8 mx-auto mb-1 text-[#0A192F]" />
               <p className="text-[9px] font-mono font-bold uppercase tracking-widest">ALL CONNECT TO:</p>
               <p className="text-base font-serif font-black uppercase tracking-wider">AVIATION SAFETY</p>
+            </div>
+          </div>
+
+          {/* Faith in Action / The In-Flight Cabin Reality Callout */}
+          <div className="mt-8 p-6 sm:p-8 bg-gradient-to-br from-[#0F223D] via-[#0A192F] to-[#081528] border-2 border-[#D4AF37]/50 rounded-2xl text-slate-100 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 transform translate-x-8 -translate-y-8 w-48 h-48 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+              <div className="space-y-3 max-w-3xl">
+                <div className="inline-flex items-center space-x-2 bg-[#D4AF37]/20 border border-[#D4AF37]/40 px-3 py-1 rounded-full text-[11px] font-mono text-[#D4AF37] font-bold uppercase tracking-wider">
+                  <HeartHandshake className="h-3.5 w-3.5 mr-1" />
+                  <span>WHY MEN OF GOD & SPIRITUAL LEADERS ARE ON OUR SAFETY CHECKLIST</span>
+                </div>
+                
+                <h3 className="text-xl sm:text-2xl font-serif font-bold text-white leading-snug">
+                  "When Turbulence Strikes at 35,000 Feet, the Cabin Speaks in One Voice: Faith in Action."
+                </h3>
+                
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Anytime there is severe turbulence, an engine anomaly, or an emergency in an aircraft in flight, the immediate sound that fills the cabin across every seat is prayer in different tongues, languages, and denominations.
+                </p>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-light">
+                  <strong className="text-amber-300 font-medium">It is not a drama; it is faith in action.</strong> In moments of acute vulnerability, humanity instinctively turns to the Creator for preservation. Aviation safety is therefore not only a technical discipline of aerodynamics and avionics — it is a sacred covenant for the protection of human life. We earnestly invite their recommendations, ethical stewardship, spiritual vigilance, and interfaith prayers to guard our skies.
+                </p>
+              </div>
+
+              <div className="bg-[#05101E] border border-[#D4AF37]/30 p-4 rounded-xl text-center shrink-0 w-full lg:w-64 space-y-2">
+                <div className="w-10 h-10 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37] flex items-center justify-center mx-auto text-[#D4AF37]">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-serif font-bold text-white">Spiritual Recommendations</p>
+                <p className="text-[11px] text-slate-400">
+                  Inviting Senior Christian & Muslim Leaders to advise the summit on conscience, integrity in public duties, and airspace intercession.
+                </p>
+                <span className="inline-block text-[10px] font-mono text-[#D4AF37] uppercase font-bold tracking-wider">
+                  Theme: EVERYBODY IS INVOLVED
+                </span>
+              </div>
             </div>
           </div>
 

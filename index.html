@@ -11,45 +11,101 @@
     <script>
       // Suppress benign [vite] websocket connection messages in sandboxed preview environments
       (function() {
-        function shouldSuppress(args) {
-          for (let i = 0; i < args.length; i++) {
-            const item = args[i];
-            if (typeof item === 'string' && (item.includes('[vite]') || item.includes('websocket') || item.includes('WebSocket') || item.includes('preamble'))) return true;
-            if (item && typeof item.message === 'string' && (item.message.includes('[vite]') || item.message.includes('websocket') || item.message.includes('WebSocket') || item.message.includes('preamble'))) return true;
+        // 1. Silent WebSocket stub for Vite HMR in sandbox
+        const OriginalWebSocket = window.WebSocket;
+        if (OriginalWebSocket) {
+          function isViteSocket(url, protocols) {
+            const u = String(url || '');
+            const p = String(protocols || '');
+            return p.includes('vite-hmr') || p.includes('vite-ping') || u.includes('token=') || u.includes('@vite') || u.includes('5173');
           }
+
+          class MockViteSocket extends EventTarget {
+            constructor(url, protocols) {
+              super();
+              this.url = url;
+              this.protocol = Array.isArray(protocols) ? protocols[0] || '' : (protocols || '');
+              this.readyState = 1; // WebSocket.OPEN
+              this.CONNECTING = 0;
+              this.OPEN = 1;
+              this.CLOSING = 2;
+              this.CLOSED = 3;
+              this.binaryType = 'blob';
+              this.bufferedAmount = 0;
+              this.extensions = '';
+
+              queueMicrotask(() => {
+                const evt = new Event('open');
+                this.dispatchEvent(evt);
+                if (typeof this.onopen === 'function') this.onopen(evt);
+              });
+            }
+
+            send() {}
+
+            close(code = 1000, reason = '') {
+              this.readyState = 3;
+              const evt = new CloseEvent('close', { code, reason, wasClean: true });
+              this.dispatchEvent(evt);
+              if (typeof this.onclose === 'function') this.onclose(evt);
+            }
+          }
+
+          MockViteSocket.CONNECTING = 0;
+          MockViteSocket.OPEN = 1;
+          MockViteSocket.CLOSING = 2;
+          MockViteSocket.CLOSED = 3;
+
+          function CustomWebSocket(url, protocols) {
+            if (isViteSocket(url, protocols)) {
+              return new MockViteSocket(url, protocols);
+            }
+            return new OriginalWebSocket(url, protocols);
+          }
+          CustomWebSocket.prototype = OriginalWebSocket.prototype;
+          CustomWebSocket.CONNECTING = 0;
+          CustomWebSocket.OPEN = 1;
+          CustomWebSocket.CLOSING = 2;
+          CustomWebSocket.CLOSED = 3;
+          window.WebSocket = CustomWebSocket;
+        }
+
+        // 2. Comprehensive console suppression for benign [vite] logs
+        function shouldSuppress(args) {
+          if (!args || !args.length) return false;
+          try {
+            for (let i = 0; i < args.length; i++) {
+              const item = args[i];
+              if (!item) continue;
+              const str = typeof item === 'string' ? item : (item.message || item.stack || (typeof item.toString === 'function' ? item.toString() : ''));
+              if (/\[vite\]|websocket|WebSocket|preamble|vite-hmr|vite-ping/i.test(str)) return true;
+            }
+            const full = Array.from(args).map(a => {
+              try { return typeof a === 'object' ? JSON.stringify(a) : String(a); } catch { return String(a); }
+            }).join(' ');
+            if (/\[vite\]|websocket|WebSocket|preamble|vite-hmr|vite-ping/i.test(full)) return true;
+          } catch (e) {}
           return false;
         }
-        const _error = console.error;
-        console.error = function(...args) {
-          if (shouldSuppress(args)) return;
-          _error.apply(console, args);
-        };
-        const _warn = console.warn;
-        console.warn = function(...args) {
-          if (shouldSuppress(args)) return;
-          _warn.apply(console, args);
-        };
-        const _log = console.log;
-        console.log = function(...args) {
-          if (shouldSuppress(args)) return;
-          _log.apply(console, args);
-        };
-        const _info = console.info;
-        console.info = function(...args) {
-          if (shouldSuppress(args)) return;
-          _info.apply(console, args);
-        };
-        const _debug = console.debug;
-        console.debug = function(...args) {
-          if (shouldSuppress(args)) return;
-          _debug.apply(console, args);
-        };
+
+        const methods = ['error', 'warn', 'log', 'info', 'debug'];
+        methods.forEach(function(m) {
+          const orig = console[m];
+          if (typeof orig === 'function') {
+            console[m] = function(...args) {
+              if (shouldSuppress(args)) return;
+              orig.apply(console, args);
+            };
+          }
+        });
+
         window.addEventListener('error', function(e) {
-          if (e && (shouldSuppress([e.message]) || (e.filename && e.filename.includes('client.mjs')))) {
+          if (e && (shouldSuppress([e.message]) || (e.filename && (e.filename.includes('client.mjs') || e.filename.includes('@vite'))))) {
             e.stopImmediatePropagation();
             e.preventDefault();
           }
         }, true);
+
         window.addEventListener('unhandledrejection', function(e) {
           if (e && shouldSuppress([e.reason, e.reason && e.reason.message])) {
             e.stopImmediatePropagation();

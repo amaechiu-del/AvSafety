@@ -12,6 +12,7 @@ import {
   Info, RefreshCw, Star
 } from 'lucide-react';
 import { Speaker, SpeakerIndustry, SpeakerStatus, PhotoRightsStatus, SpeakerWorkflowStage } from '../types';
+import PhotoVerificationStatus from './PhotoVerificationStatus';
 
 interface SpeakersProps {
   speakers: Speaker[];
@@ -343,27 +344,17 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
                 >
                   <div className="space-y-3">
                     {/* Header: Photo or Silhouette */}
-                    <div className="w-full aspect-[4/3] rounded-lg overflow-hidden bg-gradient-to-br from-[#0A192F] to-[#1E3A8A] flex items-center justify-center relative border border-gray-200">
-                      {leader.photoUrl ? (
-                        <img 
-                          src={leader.photoUrl} 
-                          alt={leader.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="text-center p-2">
-                          <User className="w-10 h-10 text-[#D4AF37]/60 mx-auto mb-1" />
-                          <p className="text-[9px] font-mono text-[#D4AF37] font-bold uppercase tracking-wider">
-                            OFFICIAL PHOTO
-                          </p>
-                          <p className="text-[8px] font-mono text-gray-300 uppercase">
-                            TO BE SUPPLIED
-                          </p>
-                        </div>
-                      )}
-                      <div className="absolute top-2 left-2">
-                        <span className="px-2 py-0.5 bg-[#0A192F]/90 backdrop-blur-sm text-[#D4AF37] text-[8px] font-mono font-bold uppercase rounded">
+                    <div className="w-full aspect-[4/3] rounded-lg overflow-hidden flex items-center justify-center relative">
+                      <PhotoVerificationStatus
+                        photoUrl={leader.photoUrl}
+                        name={leader.name}
+                        organisation={leader.organisation}
+                        photoRights={leader.photoRights}
+                        size="lg"
+                        className="w-full h-full aspect-[4/3] rounded-lg"
+                      />
+                      <div className="absolute top-2 left-2 z-10">
+                        <span className="px-2 py-0.5 bg-[#0A192F]/90 backdrop-blur-sm text-[#D4AF37] text-[8px] font-mono font-bold uppercase rounded shadow">
                           {leader.category}
                         </span>
                       </div>
@@ -534,38 +525,15 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
                   {/* Photo & Identity Section */}
                   <div className="flex gap-4 items-start">
                     {/* Portrait Photo or Silhouette */}
-                    <div className="w-24 h-28 sm:w-28 sm:h-32 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-[#0A192F] to-[#1E3A8A] border border-gray-200 flex flex-col items-center justify-center relative shadow-inner">
-                      {speaker.photoUrl ? (
-                        <img 
-                          src={speaker.photoUrl} 
-                          alt={speaker.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="text-center p-2 space-y-1">
-                          <User className="w-8 h-8 text-[#D4AF37]/60 mx-auto" />
-                          <p className="text-[7.5px] font-mono text-[#D4AF37] font-bold uppercase tracking-tight leading-none">
-                            OFFICIAL PHOTO
-                          </p>
-                          <p className="text-[7px] font-mono text-gray-300 uppercase leading-none">
-                            TO BE SUPPLIED
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Photo Rights Indicator */}
-                      <div className="absolute bottom-1 right-1">
-                        {speaker.photoRights === 'RIGHTS_VERIFIED' ? (
-                          <span className="p-0.5 bg-emerald-600 text-white rounded-full block" title="Official Verified Portrait">
-                            <Check className="w-2.5 h-2.5" />
-                          </span>
-                        ) : (
-                          <span className="p-0.5 bg-gray-700/80 text-gray-300 rounded-full block" title="Official Portrait Pending">
-                            <Info className="w-2.5 h-2.5" />
-                          </span>
-                        )}
-                      </div>
+                    <div className="w-24 h-28 sm:w-28 sm:h-32 shrink-0 rounded-xl overflow-hidden relative shadow-inner">
+                      <PhotoVerificationStatus
+                        photoUrl={speaker.photoUrl}
+                        name={speaker.name}
+                        organisation={speaker.organisation}
+                        photoRights={speaker.photoRights}
+                        size="lg"
+                        className="w-full h-full rounded-xl"
+                      />
                     </div>
 
                     {/* Executive Info */}

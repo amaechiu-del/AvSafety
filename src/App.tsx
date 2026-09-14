@@ -14,10 +14,13 @@ import {
 import TopEventBar from './components/TopEventBar';
 import Navigation from './components/Navigation';
 import Hero from './components/Hero';
+import SummitIntroExperience from './components/SummitIntroExperience';
+import SafetyPulse from './components/SafetyPulse';
 import SafetyMessage from './components/SafetyMessage';
 import About from './components/About';
 import SummitGlance from './components/SummitGlance';
 import SummitPoster from './components/SummitPoster';
+import OfficialDignitariesSection from './components/dignitaries/OfficialDignitariesSection';
 import Speakers from './components/Speakers';
 import GovernmentLeaders from './components/GovernmentLeaders';
 import IndustryParticipants from './components/IndustryParticipants';
@@ -26,6 +29,7 @@ import SummitProgramme from './components/SummitProgramme';
 import GoogleWorkspaceHub from './components/GoogleWorkspaceHub';
 import AviationMemoirChallenge from './components/AviationMemoirChallenge';
 import BookLaunch from './components/BookLaunch';
+import DyingLibraryPolicy from './components/DyingLibraryPolicy';
 import SafetyInvestment from './components/SafetyInvestment';
 import SimulationTraining from './components/SimulationTraining';
 import SafetyVsAccident from './components/SafetyVsAccident';
@@ -39,6 +43,8 @@ import StickyMobileRegister from './components/StickyMobileRegister';
 import AdminPanel from './components/AdminPanel';
 import MarketplaceHub from './components/marketplace/MarketplaceHub';
 import DomisLinkBookstore from './components/bookstore/DomisLinkBookstore';
+import DynamicFlowTicker from './components/DynamicFlowTicker';
+import KineticWordRibbon from './components/KineticWordRibbon';
 import SpeakerHandbookEngine from './components/publishing/SpeakerHandbookEngine';
 import HandbookGenerator from './components/publishing/HandbookGenerator';
 import SpeakerKnowledgeHub from './components/publishing/SpeakerKnowledgeHub';
@@ -47,17 +53,29 @@ import PodcastEngineHub from './components/publishing/PodcastEngineHub';
 import QRConnector from './components/publishing/QRConnector';
 import { PWAInstallButton } from './components/pwa/PWAInstallButton';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
+import GeminiLiveVoiceModal from './components/GeminiLiveVoiceModal';
 
 import { 
   Speaker, Organisation, Session, Registration, 
   MemoSubmission, BookInfo, InvestmentOpportunity, Partner 
 } from './types';
 import { INITIAL_VERIFIED_SPEAKERS } from './data/speakersData';
+import { INITIAL_PROGRAMME_SESSIONS } from './data/programmeData';
+import { useAdminAuth, AdminProtectedView } from './components/AdminAuthWrapper';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('home');
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [isAdminMode, setIsAdminMode] = useState(true);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const { isAdmin, signIn, signOutAdmin } = useAdminAuth();
+
+  useEffect(() => {
+    if (!isAdmin) setIsAdminMode(false);
+  }, [isAdmin]);
+  const [showIntro, setShowIntro] = useState(() => {
+    return !sessionStorage.getItem('domislink_intro_viewed');
+  });
 
   // State Store
   const [eventInfo, setEventInfo] = useState({
@@ -71,13 +89,13 @@ export default function App() {
   });
   const [speakers, setSpeakers] = useState<Speaker[]>(INITIAL_VERIFIED_SPEAKERS);
   const [organisations, setOrganisations] = useState<Organisation[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<Session[]>(INITIAL_PROGRAMME_SESSIONS);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [memos, setMemos] = useState<MemoSubmission[]>([]);
   const [book, setBook] = useState<BookInfo>({
     id: 'bk-1',
     title: 'CLEARED FOR TAKEOFF',
-    author: 'Capt. Domis Amaechiu',
+    author: 'AMAECHI UBADIKE',
     description: 'A Pilot, Controller, and Inspector\'s Unfiltered Account of 25 Years Above the Clouds and Behind the Radar.',
     coverImagePlaceholder: 'CLEARED FOR TAKEOFF'
   });
@@ -251,6 +269,16 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#FCFBF7] text-[#0A192F] font-sans antialiased selection:bg-[#D4AF37]/30 selection:text-[#0A192F] pb-16 md:pb-0">
       
+      {/* Dynamic Cinematic Intro Experience */}
+      {showIntro && (
+        <SummitIntroExperience 
+          onComplete={() => {
+            setShowIntro(false);
+            sessionStorage.setItem('domislink_intro_viewed', 'true');
+          }} 
+        />
+      )}
+
       {/* PWA Announcement Banner */}
       <PWAInstallButton variant="banner" />
 
@@ -264,6 +292,41 @@ export default function App() {
         onOpenAdmin={() => setIsAdminOpen(true)} 
       />
 
+      {/* PROMINENT HIGH-VISIBILITY DONOR / SPONSOR / ADVERTISER TOP BANNER */}
+      <div className="bg-gradient-to-r from-[#050B1A] via-[#0D1E38] to-[#050B1A] border-b-2 border-[#D4AF37] py-3.5 px-4 text-white relative z-30 shadow-lg">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="flex items-center space-x-3">
+            <span className="flex h-3 w-3 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#FFD700]"></span>
+            </span>
+            <div>
+              <p className="text-xs font-mono font-bold uppercase tracking-wider text-[#FFD700]">
+                Global Donors, Sponsors & Advertisers Portal // Aviation Safety Summit 2026
+              </p>
+              <p className="text-[11px] text-[#8A99AD] font-sans">
+                Position your brand at Nigeria's premier aviation safety convergence. Premium sponsorship & exhibitor packages available.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => handleNavigate('marketplace')}
+              className="px-4 py-2 bg-gradient-to-r from-[#D4AF37] to-[#C59B27] text-[#050B1A] font-serif font-bold text-xs uppercase tracking-widest rounded-lg shadow-md hover:brightness-110 transition-all flex items-center space-x-1.5"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Explore Marketplace</span>
+            </button>
+            <a
+              href="mailto:INFO@DOMISLINK.COM?subject=Sponsorship%20or%20Donor%20Inquiry"
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-mono text-xs uppercase rounded-lg border border-white/25 transition-all"
+            >
+              Contact Desk
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* 2. HERO */}
       <div id="home">
         <Hero 
@@ -272,6 +335,11 @@ export default function App() {
           venue={eventInfo.venue} 
         />
       </div>
+
+      {/* Dynamic Flow Ticker Stream 1: National Mandate & Coordinates */}
+      <DynamicFlowTicker variant="gold" initialMotionMode="stepped-pause" />
+
+      <SafetyPulse label="SAFETY PULSE // EVERYBODY IS INVOLVED IN AVIATION SAFETY" />
 
       {/* 3. THEME: EVERYBODY IS INVOLVED IN AVIATION SAFETY */}
       <div id="theme">
@@ -293,7 +361,17 @@ export default function App() {
         <SummitPoster onNavigate={handleNavigate} />
       </div>
 
-      {/* 7. SPEAKERS & DIGNITARIES */}
+      {/* Kinetic Double-Word Ribbon: Cross-Industry Theme */}
+      <KineticWordRibbon theme="dark" initialMovement="stepped-pause" />
+
+      {/* OFFICIAL DIGNITARY HIERARCHY (TIERS 1 - 4) */}
+      <div id="dignitaries">
+        <OfficialDignitariesSection 
+          onRegisterClick={() => handleNavigate('register')}
+        />
+      </div>
+
+      {/* 7. SPEAKERS & DIGNITARIES DIRECTORY */}
       <div id="speakers">
         <Speakers 
           speakers={speakers} 
@@ -302,13 +380,13 @@ export default function App() {
         />
       </div>
 
-      {/* Government & Special Guests Plenary */}
-      <GovernmentLeaders />
-
       {/* EXPANDED SUMMIT INVITATION & STAKEHOLDER ENGINE (24+ SECTORS) */}
       <div id="stakeholders">
         <StakeholderSection />
       </div>
+
+      {/* Dynamic Flow Ticker Stream 2: Radar Telemetry & Sectors */}
+      <DynamicFlowTicker variant="radar" initialMotionMode="slow-glide" />
 
       {/* 8. INDUSTRY PARTICIPANTS / 33+ COMPANIES */}
       <div id="industry">
@@ -354,6 +432,14 @@ export default function App() {
         />
       </div>
 
+      {/* 11.B THE DYING LIBRARY & ICAO / PSC POLICY WHITE PAPER */}
+      <div id="dying-library">
+        <DyingLibraryPolicy onNavigateToMemoir={() => handleNavigate('challenge')} />
+      </div>
+
+      {/* Dynamic Flow Ticker Stream 3: Faith & Book Launch Spotlight */}
+      <DynamicFlowTicker variant="navy" initialMotionMode="breathing-cadence" />
+
       {/* 12. SAFETY INVESTMENT ("MAKE SAFETY EASIER") */}
       <SafetyInvestment 
         investment={investment} 
@@ -369,6 +455,9 @@ export default function App() {
       {/* 14. SAFETY VS ACCIDENT ("INVEST IN SAFETY" vs "PAY THE PRICE OF A MISHAP") */}
       <SafetyVsAccident />
 
+      {/* Kinetic Ribbon: Aviation Pride & Celebration */}
+      <KineticWordRibbon theme="gold" />
+
       {/* 15. SKY PARTY (THE SKY PARTY) */}
       <div id="sky-party">
         <SkyParty />
@@ -383,7 +472,9 @@ export default function App() {
       </section>
 
       {/* DOMISLINK BOOKSTORE & PUBLISHING ENGINE */}
-      <DomisLinkBookstore />
+      <div id="domislink-bookstore">
+        <DomisLinkBookstore />
+      </div>
       <SpeakerHandbookEngine />
       <HandbookGenerator />
       <SpeakerKnowledgeHub />
@@ -448,14 +539,14 @@ export default function App() {
                     <Mail className="h-4 w-4 text-[#D4AF37] mt-0.5 shrink-0" />
                     <div>
                       <p className="text-[#8A99AD] uppercase tracking-wider text-[9px] font-bold">Official Email:</p>
-                      <p className="text-white font-sans mt-0.5">domislinkint@gmail.com</p>
+                      <p className="text-white font-sans mt-0.5">INFO@DOMISLINK.COM<br/>domislinkint@gmail.com</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3.5">
                     <Phone className="h-4 w-4 text-[#D4AF37] mt-0.5 shrink-0" />
                     <div>
                       <p className="text-[#8A99AD] uppercase tracking-wider text-[9px] font-bold">Inquiries & Desk:</p>
-                      <p className="text-white font-sans mt-0.5">+234 (0) 803 300 0000</p>
+                      <p className="text-white font-sans mt-0.5">+234 (0) 904 983 7474<br/>+234 (0) 7066117100</p>
                     </div>
                   </div>
                 </div>
@@ -540,6 +631,12 @@ export default function App() {
               <p className="text-[11px] text-[#8A99AD] font-light leading-relaxed max-w-sm">
                 Organised by DOMISLINK INTERNATIONAL SERVICES LTD. Unifying aviation safety technologies, flight simulation, sovereign safety policies, and 33+ participating industry sectors.
               </p>
+              <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono text-gray-400">
+                <span className="px-2 py-0.5 bg-white/5 border border-[#D4AF37]/30 rounded text-[#D4AF37] font-semibold">
+                  RC - 9266988
+                </span>
+                <span>TIN: 2622441967501</span>
+              </div>
               <p className="text-[10px] text-gray-400 font-mono">
                 Venue: Marriott Hotel, Ikeja, Lagos, Nigeria • 17 November 2026
               </p>
@@ -610,16 +707,41 @@ export default function App() {
           <div className="text-[11px] text-[#8A99AD] leading-normal font-light">
             <p className="font-bold text-[#D4AF37] uppercase tracking-wider text-[9px] font-mono">CMS Panel Online</p>
             <p>Database content is fully editable live in-browser.</p>
-            <button
-              onClick={() => setIsAdminOpen(true)}
-              className="mt-1.5 text-xs text-white font-bold underline hover:text-[#D4AF37]"
-            >
-              OPEN DATABASE SYSTEM
-            </button>
+            <div className="mt-2 flex items-center space-x-2">
+              <button
+                onClick={() => setIsAdminOpen(true)}
+                className="text-xs text-white font-bold underline hover:text-[#D4AF37]"
+              >
+                OPEN DATABASE SYSTEM
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setIsAdminMode(!isAdminMode)}
+                  className="text-xs px-2 py-0.5 bg-[#D4AF37]/20 border border-[#D4AF37]/50 rounded text-[#D4AF37] hover:bg-[#D4AF37]/40 transition-colors uppercase font-mono ml-2"
+                >
+                  {isAdminMode ? 'Disable Inline Edit' : 'Enable Inline Edit'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Floating Gemini Live Voice Assistant Trigger Pill */}
+      <div className="fixed bottom-6 left-6 z-40">
+        <button
+          onClick={() => setIsVoiceModalOpen(true)}
+          className="px-4 py-3 bg-gradient-to-r from-[#0A192F] via-[#132545] to-[#0A192F] border-2 border-[#D4AF37] text-[#FFD700] hover:text-white rounded-2xl shadow-[0_0_25px_rgba(212,175,55,0.4)] flex items-center space-x-2.5 font-serif font-bold text-xs tracking-wider uppercase hover:scale-105 transition-all duration-300"
+        >
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#D4AF37]"></span>
+          </span>
+          <span>Gemini Live Voice</span>
+        </button>
+      </div>
+
+      {/* Database/CMS Admin Panel Modal */}
       {/* Database/CMS Admin Panel Modal */}
       <AdminPanel 
         registrations={registrations} 
@@ -628,6 +750,12 @@ export default function App() {
         onUpdateRegistrationStatus={handleUpdateRegistrationStatus}
         isOpen={isAdminOpen} 
         onClose={() => setIsAdminOpen(false)} 
+      />
+
+      {/* Gemini Live Voice Modal */}
+      <GeminiLiveVoiceModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
       />
 
     </div>

@@ -62,6 +62,8 @@ export interface Speaker {
   position: string;
   organisation: string;
   category: 'Special Guest' | 'Keynote Speaker' | 'Guest of Honour' | 'Panelist' | 'Industry Leader' | 'Speaker' | 'Moderator';
+  specialRole?: 'Opening Prayer' | 'Interfaith Safety Prayer' | 'Closing Prayer' | string;
+  publicVisibility?: 'PUBLIC' | 'INTERNAL_ONLY';
   topic: string;
   isTopicOfficial?: boolean;
   suggestedTopics?: string[];
@@ -120,7 +122,12 @@ export type ProgrammeSessionType =
   | 'Networking' 
   | 'Sky Party' 
   | 'Investment'
-  | 'Other';
+  | 'Other'
+  | 'Plenary Session'
+  | 'Challenge Session'
+  | 'Investment Panel'
+  | 'Technical Masterclass'
+  | 'Networking Reception';
 
 export type SessionStatus = 'CONFIRMED' | 'PROVISIONAL' | 'INVITED' | 'TO_BE_CONFIRMED' | 'COMPLETED';
 
@@ -218,12 +225,19 @@ export interface BookInfo {
   id: string;
   title: string;
   author: string;
-  authorPhotoUrl?: string;
+  subtitle?: string;
   description: string;
   coverImagePlaceholder: string;
+  coverImageUrl?: string;
+  authorPhotoUrl?: string;
+  authorCredentials?: string[];
+  authorBio?: string;
   launchTime?: string;
   purchaseLink?: string; // Internal or external
   hasSigning?: boolean;
+  publisher?: string;
+  format?: string;
+  isbn?: string;
 }
 
 export interface SkyPartyInfo {
@@ -346,7 +360,8 @@ export interface SponsorshipPackage {
 
 export interface BookingItem {
   id: string;
-  positionId: string;
+  positionId?: string;
+  packageId?: string;
   name: string;
   category: MarketCategory;
   quantity: number;
@@ -381,6 +396,8 @@ export interface ArtworkFile {
 
 export interface ProofOfDisplayRecord {
   id: string;
+  companyName?: string;
+  orderNumber?: string;
   title: string;
   location: string;
   date: string;
@@ -497,7 +514,8 @@ export interface RevenueMetrics {
 export type StakeholderCategoryKey =
   | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H'
   | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P'
-  | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X';
+  | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X'
+  | 'Y' | 'Z';
 
 export type StakeholderCategory =
   | 'AVIATION'
@@ -516,6 +534,8 @@ export type StakeholderCategory =
   | 'HEALTHCARE'
   | 'ACADEMIA'
   | 'FAITH_AND_COMMUNITY'
+  | 'CHRISTIAN_LEADERS'
+  | 'MUSLIM_LEADERS'
   | 'MEDIA'
   | 'INVESTORS'
   | 'TRAVEL_AND_TOURISM'
@@ -523,25 +543,39 @@ export type StakeholderCategory =
   | 'SECURITY'
   | 'TRANSPORT'
   | 'PASSENGERS_AND_ADVOCACY'
+  | 'YOUTH_AND_FUTURE_AVIATORS'
+  | 'FAMILIES_AND_PUBLIC'
   | 'OTHER';
 
 export type InvitationStatus =
+  | 'PROPOSED'
+  | 'INVITATION TO BE SENT'
+  | 'INVITED'
+  | 'PENDING RESPONSE'
+  | 'ACCEPTED'
+  | 'DECLINED'
+  | 'CONFIRMED'
+  | 'WITHDRAWN'
   | 'RESEARCH CANDIDATE'
   | 'PROPOSED INVITEE'
-  | 'INVITATION TO BE SENT'
   | 'INVITATION SENT'
   | 'ACKNOWLEDGED'
   | 'INTERESTED'
-  | 'ACCEPTED'
-  | 'CONFIRMED'
-  | 'DECLINED'
   | 'NO RESPONSE'
   | 'ARCHIVED';
 
 export type StakeholderStatus = InvitationStatus;
 
 export type SummitEventRole =
+  | 'OPENING PRAYER'
+  | 'CLOSING PRAYER'
+  | 'INTERFAITH SAFETY PRAYER'
+  | 'GOODWILL MESSAGE'
   | 'SPECIAL GUEST'
+  | 'PATRON'
+  | 'ADVISER'
+  | 'SAFETY ADVOCATE'
+  | 'INVITED GUEST'
   | 'GUEST OF HONOUR'
   | 'KEYNOTE SPEAKER'
   | 'PANELIST'
@@ -563,6 +597,7 @@ export interface StakeholderCategoryMeta {
   iconName: string;
   whyCorporateBelongs: string;
   defaultDiscussionArea: string;
+  description?: string;
 }
 
 export interface StakeholderInvitee {
@@ -625,6 +660,8 @@ export interface InvitationLetter {
   callToActionText: string;
   signatureBlock: string;
   fullHtmlContent: string;
+  gmailDraftUrl?: string;
+  mailtoUrl?: string;
   status: 'DRAFT' | 'APPROVED' | 'SENT' | 'GMAIL_DRAFTED';
   sentAt?: string;
   followUpDueAt?: string;

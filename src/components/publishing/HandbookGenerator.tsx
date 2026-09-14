@@ -91,7 +91,13 @@ export default function HandbookGenerator() {
           <div className="space-y-6">
             <div className="bg-[#071324] border border-white/15 rounded-2xl p-6 space-y-6 shadow-xl">
               <div className="flex items-center space-x-4">
-                <img src={currentRecord.photographUrl} alt={currentRecord.speakerName} className="w-16 h-16 rounded-xl object-cover border-2 border-[#D4AF37]/50 shadow-md" />
+                {currentRecord.photographUrl ? (
+                  <img src={currentRecord.photographUrl} alt={currentRecord.speakerName} className="w-16 h-16 rounded-xl object-cover border-2 border-[#D4AF37]/50 shadow-md" />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-[#050B1A] border-2 border-[#D4AF37]/50 flex items-center justify-center font-serif font-bold text-base text-[#FFD700] shadow-md shrink-0">
+                    {currentRecord.speakerName.split(' ').filter(Boolean).slice(-2).map(p => p[0]).join('').toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <h3 className="font-serif font-bold text-white text-base">{currentRecord.speakerName}</h3>
                   <p className="text-xs text-[#D4AF37] font-mono mt-0.5">{currentRecord.organisation}</p>
