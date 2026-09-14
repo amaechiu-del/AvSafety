@@ -1,0 +1,351 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
+      CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+
+      CLOUDFLARE_KV_NAMESPACE_ID: ${{ vars.CLOUDFLARE_KV_NAMESPACE_ID }}
+      CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID: ${{ vars.CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID }}
+
+      ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+
+    steps:
+      # ---------------------------------------------------------
+      # 1. CHECKOUT
+      # ---------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------
+      # 2. NODE
+      # ---------------------------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # ---------------------------------------------------------
+      # 3. INSTALL
+      # ---------------------------------------------------------
+      - name: Install dependencies
+        run: npm ci
+
+      # ---------------------------------------------------------
+      # 4. VERIFY REQUIRED CLOUDFLARE CONFIGURATION
+      # ---------------------------------------------------------
+      - name: Validate Cloudflare configuration
+        shell: bash
+        run: |
+          set -e
+
+          required_vars=(
+            CLOUDFLARE_ACCOUNT_ID
+            CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_PAGES_PROJECT_NAME
+            CLOUDFLARE_WORKER_NAME
+          )
+
+          for variable in "${required_vars[@]}"; do
+            if [ -z "${!variable}" ]; then
+              echo "::error::$variable is not configured."
+              exit 1
+            fi
+          done
+
+          echo "Cloudflare configuration detected."
+
+      # ---------------------------------------------------------
+      # 5. VERIFY PROJECT SCRIPTS
+      # ---------------------------------------------------------
+      - name: Verify package scripts
+        shell: bash
+        run: |
+          set -e
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const scripts = pkg.scripts || {};
+
+          const required = ["build", "worker:build"];
+
+          for (const script of required) {
+            if (!scripts[script]) {
+              console.error(`Missing required npm script: ${script}`);
+              process.exit(1);
+            }
+          }
+
+          console.log("Required build scripts are present.");
+
+          if (scripts.lint) {
+            console.log("Lint script detected.");
+          } else {
+            console.log("No lint script detected; lint step will be skipped.");
+          }
+          NODE
+
+      # ---------------------------------------------------------
+      # 6. LINT (ONLY IF AVAILABLE)
+      # ---------------------------------------------------------
+      - name: Lint repository
+        if: ${{ hashFiles('package.json') != '' }}
+        shell: bash
+        run: |
+          if npm run | grep -qE '^[[:space:]]+lint'; then
+            npm run lint
+          else
+            echo "No lint script configured. Skipping lint."
+          fi
+
+      # ---------------------------------------------------------
+      # 7. BUILD FRONTEND
+      # ---------------------------------------------------------
+      - name: Build frontend
+        run: npm run build
+
+      # ---------------------------------------------------------
+      # 8. VERIFY FRONTEND OUTPUT
+      # ---------------------------------------------------------
+      - name: Verify frontend build
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -d "dist" ]; then
+            echo "::error::dist directory was not created."
+            exit 1
+          fi
+
+          if [ -z "$(find dist -type f -print -quit)" ]; then
+            echo "::error::dist directory is empty."
+            exit 1
+          fi
+
+          echo "Frontend build verified."
+
+      # ---------------------------------------------------------
+      # 9. BUILD WORKER
+      # ---------------------------------------------------------
+      - name: Build Worker
+        run: npm run worker:build
+
+      # ---------------------------------------------------------
+      # 10. VERIFY WRANGLER CONFIGURATION
+      # ---------------------------------------------------------
+      - name: Verify Wrangler configuration
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -f "wrangler.toml" ] && [ ! -f "wrangler.json" ] && [ ! -f "wrangler.jsonc" ]; then
+            echo "::error::No Wrangler configuration file found."
+            exit 1
+          fi
+
+          echo "Wrangler configuration detected."
+
+      # =========================================================
+      # PULL REQUEST PREVIEW
+      # =========================================================
+
+      # ---------------------------------------------------------
+      # 11. DEPLOY PAGES PREVIEW
+      # ---------------------------------------------------------
+      - name: Deploy Cloudflare Pages preview
+        if: >
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork == false
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: >
+            pages deploy dist
+            --project-name ${{ env.CLOUDFLARE_PAGES_PROJECT_NAME }}
+            --branch pr-${{ github.event.pull_request.number }}
+
+      # ---------------------------------------------------------
+      # 12. PREVIEW WORKER SECRETS
+      # ---------------------------------------------------------
+      - name: Sync Worker preview secrets
+        if: >
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork == false &&
+          env.CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID != ''
+        shell: bash
+        run: |
+          set -e
+
+          put_secret() {
+            local name="$1"
+            local value="$2"
+
+            if [ -n "$value" ]; then
+              printf '%s' "$value" |
+                npx wrangler secret put "$name" --env preview >/dev/null
+
+              echo "Updated preview secret: $name"
+            fi
+          }
+
+          put_secret ADMIN_API_TOKEN "$ADMIN_API_TOKEN"
+          put_secret GEMINI_API_KEY "$GEMINI_API_KEY"
+          put_secret PAYSTACK_SECRET_KEY "$PAYSTACK_SECRET_KEY"
+
+      # ---------------------------------------------------------
+      # 13. DEPLOY PREVIEW WORKER
+      # ---------------------------------------------------------
+      - name: Deploy Cloudflare Worker preview
+        if: >
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork == false &&
+          env.CLOUDFLARE_KV_PREVIEW_NAMESPACE_ID != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env preview --keep-vars
+
+      # =========================================================
+      # PRODUCTION
+      # =========================================================
+
+      # ---------------------------------------------------------
+      # 14. DEPLOY PAGES PRODUCTION
+      # ---------------------------------------------------------
+      - name: Deploy Cloudflare Pages production
+        if: github.event_name != 'pull_request'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: >
+            pages deploy dist
+            --project-name ${{ env.CLOUDFLARE_PAGES_PROJECT_NAME }}
+            --branch main
+
+      # ---------------------------------------------------------
+      # 15. PRODUCTION WORKER SECRETS
+      # ---------------------------------------------------------
+      - name: Sync Worker production secrets
+        if: >
+          github.event_name != 'pull_request' &&
+          env.CLOUDFLARE_KV_NAMESPACE_ID != ''
+        shell: bash
+        run: |
+          set -e
+
+          put_secret() {
+            local name="$1"
+            local value="$2"
+
+            if [ -n "$value" ]; then
+              printf '%s' "$value" |
+                npx wrangler secret put "$name" >/dev/null
+
+              echo "Updated production secret: $name"
+            fi
+          }
+
+          put_secret ADMIN_API_TOKEN "$ADMIN_API_TOKEN"
+          put_secret GEMINI_API_KEY "$GEMINI_API_KEY"
+          put_secret PAYSTACK_SECRET_KEY "$PAYSTACK_SECRET_KEY"
+
+      # ---------------------------------------------------------
+      # 16. DEPLOY PRODUCTION WORKER
+      # ---------------------------------------------------------
+      - name: Deploy Cloudflare Worker production
+        if: >
+          github.event_name != 'pull_request' &&
+          env.CLOUDFLARE_KV_NAMESPACE_ID != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --keep-vars
+
+      # ---------------------------------------------------------
+      # 17. DEPLOYMENT SUMMARY
+      # ---------------------------------------------------------
+      - name: Publish deployment summary
+        shell: bash
+        run: |
+          {
+            echo "## Cloudflare Deployment"
+            echo ""
+            echo "| Item | Value |"
+            echo "|---|---|"
+            echo "| Event | ${{ github.event_name }} |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Pages Project | \`${CLOUDFLARE_PAGES_PROJECT_NAME}\` |"
+            echo "| Worker | \`${CLOUDFLARE_WORKER_NAME}\` |"
+            echo "| Production | https://summit.domislink.com |"
+            echo "| API Health | https://summit.domislink.com/api/health |"
+
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "| Preview Branch | \`pr-${{ github.event.pull_request.number }}\` |"
+              echo "| Preview Worker | \`preview\` |"
+            fi
+
+            echo ""
+            echo "Deployment completed successfully."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ---------------------------------------------------------
+      # 18. PR COMMENT
+      # ---------------------------------------------------------
+      - name: Comment deployment status
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const number = context.payload.pull_request.number;
+
+            const body = [
+              "## Cloudflare deployment completed",
+              "",
+              `- Pages preview branch: \`pr-${number}\``,
+              "- Worker environment: `preview`",
+              "- Build: passed",
+              "- Cloudflare deployment: passed",
+              "",
+              "Review the workflow Summary tab for deployment details."
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              body
+            });

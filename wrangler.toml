@@ -1,0 +1,44 @@
+name = "avsafety-api"
+main = "worker.ts"
+compatibility_date = "2026-09-13"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+minify = true
+logpush = true
+
+[observability]
+enabled = true
+
+[vars]
+APP_URL = "https://summit.domislink.com"
+CORS_ORIGIN = "https://summit.domislink.com"
+API_ORIGIN = ""
+NODE_ENV = "production"
+
+[[kv_namespaces]]
+binding = "AVSAFETY_KV"
+id = "11111111111111111111111111111111"
+preview_id = "22222222222222222222222222222222"
+
+[[routes]]
+pattern = "summit.domislink.com/api/*"
+zone_name = "domislink.com"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[env.preview]
+name = "avsafety-api-preview"
+workers_dev = true
+
+[env.preview.vars]
+APP_URL = "https://preview.summit.domislink.com"
+CORS_ORIGIN = "https://preview.summit.domislink.com,https://summit.domislink.com"
+API_ORIGIN = ""
+NODE_ENV = "preview"
+
+[[env.preview.kv_namespaces]]
+binding = "AVSAFETY_KV"
+id = "22222222222222222222222222222222"
+preview_id = "22222222222222222222222222222222"
