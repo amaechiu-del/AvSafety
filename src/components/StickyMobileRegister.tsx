@@ -28,7 +28,7 @@ export default function StickyMobileRegister({ onNavigate }: StickyMobileRegiste
             onClick={() => onNavigate('challenge')}
             className="px-2.5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-lg text-[10px] font-bold tracking-wider uppercase transition-colors"
           >
-            MEMO
+            MEMOIR
           </button>
           <button
             onClick={() => onNavigate('register')}

@@ -39,6 +39,11 @@
           if (shouldSuppress(args)) return;
           _info.apply(console, args);
         };
+        const _debug = console.debug;
+        console.debug = function(...args) {
+          if (shouldSuppress(args)) return;
+          _debug.apply(console, args);
+        };
         window.addEventListener('error', function(e) {
           if (e && (shouldSuppress([e.message]) || (e.filename && e.filename.includes('client.mjs')))) {
             e.stopImmediatePropagation();

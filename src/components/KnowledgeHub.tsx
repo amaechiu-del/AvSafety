@@ -12,7 +12,7 @@ export default function KnowledgeHub() {
   const categories = [
     { id: 'ALL', label: 'All Resources' },
     { id: 'articles', label: 'Safety Articles' },
-    { id: 'memos', label: 'Aviation Memos' },
+    { id: 'memos', label: 'Aviation Memoirs' },
     { id: 'presentations', label: 'Presentations' },
     { id: 'videos', label: 'Videos' },
     { id: 'reports', label: 'Technical Reports' },
@@ -24,7 +24,7 @@ export default function KnowledgeHub() {
 
   const futureItems = [
     { cat: 'articles', title: 'Safety Article', size: '2.4 MB' },
-    { cat: 'memos', title: 'Aviation Memo File', size: '1.1 MB' },
+    { cat: 'memos', title: 'Aviation Memoir File', size: '1.1 MB' },
     { cat: 'presentations', title: 'Technical Presentation', size: '8.7 MB' },
     { cat: 'videos', title: 'Summit Video Feed', size: '4K Stream' },
     { cat: 'reports', title: 'Safety Report', size: '12.4 MB' },

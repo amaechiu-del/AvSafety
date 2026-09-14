@@ -75,7 +75,7 @@ export const INITIAL_AD_POSITIONS: AdPosition[] = [
     name: 'Programme Session Title Sponsor',
     category: 'ONLINE',
     subcategory: 'Session Branding',
-    description: 'Exclusively sponsor a major summit session (e.g. Opening Plenary, Safety Investment, Simulation Masterclass, Memo Challenge).',
+    description: 'Exclusively sponsor a major summit session (e.g. Opening Plenary, Safety Investment, Simulation Masterclass, Memoir Challenge).',
     location: 'Interactive digital programme, session countdown, and digital display screens',
     sizeFormat: 'Banner 1200 x 628 px + Speaker backdrop acknowledgment badge',
     duration: 'Session duration + digital agenda listing',
@@ -697,7 +697,7 @@ export const INITIAL_AD_POSITIONS: AdPosition[] = [
   },
   {
     id: 'ad-book-bulk-sponsor',
-    name: 'Aviation Memo Memoir Project — 100 Copies Distribution Sponsor',
+    name: 'Aviation Memoir Project — 100 Copies Distribution Sponsor',
     category: 'BOOK_MEDIA',
     subcategory: 'Educational Distribution',
     description: 'Sponsor the purchase and distribution of 100 hardcover copies of the official summit publication to young pilots, cadet engineers, and NCAT aviation students.',
@@ -868,16 +868,16 @@ export const INITIAL_SPONSORSHIP_PACKAGES: SponsorshipPackage[] = [
   {
     id: 'pkg-memo-partner',
     tier: 'MEMO',
-    name: 'Aviation Memo Challenge Official Partner',
+    name: 'Aviation Memoir Challenge Official Partner',
     tagline: 'Championing Flight-Deck Transparency: "Aviators Must Not Die With Their Experience"',
     description: 'Directly support the confidential near-miss reporting initiative, safety research archives, and the annual recognition award for aviators who shared vital operational wisdom.',
     priceNGN: 6000000,
     priceUSD: 4100,
     isCustomPrice: false,
     benefits: [
-      'Official Co-Branding on the Aviation Memo Challenge portal and physical dropboxes',
+      'Official Co-Branding on the Aviation Memoir Challenge portal and physical dropboxes',
       'Onstage presentation of the Annual Flight Safety Memoir Awards',
-      'Full-Page Ad in the published Memo Compendium',
+      'Full-Page Ad in the published Memoir Compendium',
       '4 All-Access Delegate Passes'
     ],
     slotsTotal: 2,

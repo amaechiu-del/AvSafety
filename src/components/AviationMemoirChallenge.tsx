@@ -12,14 +12,14 @@ import {
 } from 'lucide-react';
 import { MemoSubmission } from '../types';
 
-interface MemoProps {
+interface MemoirProps {
   memos: MemoSubmission[];
   onSubmitMemo: (memo: Omit<MemoSubmission, 'id' | 'submittedAt'>) => Promise<boolean>;
   onUpdateMemos?: (updated: MemoSubmission[]) => void;
   isAdmin?: boolean;
 }
 
-export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMemos, isAdmin }: MemoProps) {
+export default function AviationMemoirChallenge({ memos, onSubmitMemo, onUpdateMemos, isAdmin }: MemoirProps) {
   const [activeTab, setActiveTab] = useState<'about' | 'submit' | 'archive' | 'guidelines' | 'faq'>('about');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   
@@ -45,7 +45,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
   const [editForm, setEditForm] = useState<MemoSubmission | null>(null);
 
   const workflowSteps = [
-    { label: 'WRITE', desc: 'Author raw safety memo' },
+    { label: 'WRITE', desc: 'Author raw safety memoir' },
     { label: 'SUBMIT', desc: 'Secure digital transmission' },
     { label: 'REVIEW', desc: 'Triage by safety board' },
     { label: 'ANONYMISE', desc: 'Strip identifiers' },
@@ -132,7 +132,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
 
   const deleteMemo = (id: string) => {
     if (!onUpdateMemos) return;
-    if (confirm('Are you sure you want to permanently delete this safety memo from the archive?')) {
+    if (confirm('Are you sure you want to permanently delete this safety memoir from the archive?')) {
       const updated = memos.filter(m => m.id !== id);
       onUpdateMemos(updated);
     }
@@ -172,7 +172,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-black tracking-tight leading-tight uppercase">
-              Aviation Memo Challenge
+              Aviation Memoir Challenge
             </h1>
 
             <div className="space-y-2">
@@ -284,7 +284,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
                     About the Challenge
                   </h3>
                   <p className="text-xs sm:text-sm text-[#5A6E85] leading-relaxed font-light">
-                    The <strong>Aviation Memo Challenge</strong> is a national collaborative project spearheaded by Domislink International Services Ltd in partnership with regulatory directors, airspace traffic controllers, and airline operators. Its core objective is to pull down siloed knowledge and prevent critical flight safety incidents from slipping into history.
+                    The <strong>Aviation Memoir Challenge</strong> is a national collaborative project spearheaded by Domislink International Services Ltd in partnership with regulatory directors, airspace traffic controllers, and airline operators. Its core objective is to pull down siloed knowledge and prevent critical flight safety incidents from slipping into history.
                   </p>
                   <p className="text-xs sm:text-sm text-[#5A6E85] leading-relaxed font-light">
                     Safety culture relies entirely on transparent feedback. When crew members, captains, mechanics, or controllers encounter near-misses or structural process discrepancies, they often lack a low-friction, legal-safe, and professional environment to register these findings. This interactive dashboard bridges that gap by offering a streamlined submission terminal coupled with inline editorial and sanitization controls.
@@ -392,7 +392,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
                 <h3 className="text-base font-serif font-black uppercase tracking-wider">CONFIDENTIALITY & REGULATORY OBLIGATIONS</h3>
               </div>
               <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-light">
-                The Aviation Memo Challenge is structured to enforce global voluntary reporting guidelines (Aviation Safety Action Program / ASAP models). Submissions are voluntary, educational, and safety-oriented. All active crew members and controllers must respect their regulatory, employer, and state parameters:
+                The Aviation Memoir Challenge is structured to enforce global voluntary reporting guidelines (Aviation Safety Action Program / ASAP models). Submissions are voluntary, educational, and safety-oriented. All active crew members and controllers must respect their regulatory, employer, and state parameters:
               </p>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
@@ -450,15 +450,15 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
                 <ul className="space-y-2 text-xs text-gray-600 font-light">
                   <li className="flex items-start gap-1.5">
                     <span className="text-[#D4AF37] font-bold">•</span>
-                    <span><strong>No Automatic Publication</strong>: Domislink safety board reviews every submission. We do not promise indexation of every memo.</span>
+                    <span><strong>No Automatic Publication</strong>: Domislink safety board reviews every submission. We do not promise indexation of every memoir.</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="text-[#D4AF37] font-bold">•</span>
-                    <span><strong>Rigorous Sanitisation</strong>: If a memo is approved but contains identifiers (such as tail numbers or individual names), our team will strip them out.</span>
+                    <span><strong>Rigorous Sanitisation</strong>: If a memoir is approved but contains identifiers (such as tail numbers or individual names), our team will strip them out.</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="text-[#D4AF37] font-bold">•</span>
-                    <span><strong>Voluntary Withdrawal</strong>: Authors can request the deletion or redaction of their logged memos at any time using our secret registry keys.</span>
+                    <span><strong>Voluntary Withdrawal</strong>: Authors can request the deletion or redaction of their logged memoirs at any time using our secret registry keys.</span>
                   </li>
                 </ul>
               </div>
@@ -484,7 +484,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
                 <div className="h-14 w-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
                   <Check className="h-8 w-8" />
                 </div>
-                <h4 className="text-lg font-serif font-bold text-[#0A192F]">Memo Successfully Logged</h4>
+                <h4 className="text-lg font-serif font-bold text-[#0A192F]">Memoir Successfully Logged</h4>
                 <p className="text-xs sm:text-sm text-[#5A6E85] leading-relaxed max-w-md mx-auto">
                   Your safety report has been transmitted to our central queue. It will now go through triage, redaction, and optional anonymisation before being committed to the public ledger.
                 </p>
@@ -586,7 +586,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
 
                 {/* Description */}
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-mono tracking-wider text-gray-500 uppercase">The Safety Memo / Incident Narrative *</label>
+                  <label className="block text-[10px] font-mono tracking-wider text-gray-500 uppercase">The Safety Memoir / Incident Narrative *</label>
                   <textarea 
                     rows={4}
                     required
@@ -679,7 +679,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
                     disabled={submitting}
                     className="px-6 py-3 bg-[#0A192F] hover:bg-[#1E293B] text-white font-bold rounded-lg text-xs tracking-widest uppercase transition-all flex items-center space-x-2 shadow-md"
                   >
-                    <span>{submitting ? 'COMMITTING RECORDFILE...' : 'TRANSMIT SAFETY MEMO'}</span>
+                    <span>{submitting ? 'COMMITTING RECORDFILE...' : 'TRANSMIT SAFETY MEMOIR'}</span>
                     <Send className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -800,7 +800,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
                         </div>
 
                         <div>
-                          <label className="block text-[8px] font-mono tracking-wider text-gray-500 uppercase">Narrative Narrative</label>
+                          <label className="block text-[8px] font-mono tracking-wider text-gray-500 uppercase">Memoir Narrative</label>
                           <textarea 
                             rows={3}
                             className="w-full text-xs p-1.5 bg-[#FCFBF7] border border-gray-300 rounded focus:ring-1 focus:ring-[#D4AF37] text-gray-800"
@@ -947,7 +947,7 @@ export default function AviationMemoChallenge({ memos, onSubmitMemo, onUpdateMem
                 a: "Absolutely not. You are under strict legal and professional obligation to withhold active state secrets, active defense codes, and data currently under FAA/NCAA active litigation. Doing so violates standard aviation code."
               },
               {
-                q: "Is every single memo guaranteed to be published?",
+                q: "Is every single memoir guaranteed to be published?",
                 a: "No. The safety committee triages every report. Submissions that lack educational lessons, comprise purely commercial complaints, or contain severe identifier leaks that cannot be cleanly redacted are rejected."
               }
             ].map((item, index) => {

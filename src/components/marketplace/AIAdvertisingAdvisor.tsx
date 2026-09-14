@@ -211,7 +211,7 @@ export default function AIAdvertisingAdvisor({
               <option>Product / Hardware Showcase (Booth)</option>
               <option>100% Attendee Touchpoint (Water/Badges)</option>
               <option>Thought Leadership & Stage Keynote</option>
-              <option>Aviation Memo Safety Contribution</option>
+              <option>Aviation Memoir Safety Contribution</option>
               <option>Gala Sky Party Hospitality</option>
             </select>
           </div>

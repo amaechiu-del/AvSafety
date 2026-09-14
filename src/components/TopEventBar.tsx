@@ -51,7 +51,7 @@ export default function TopEventBar({ onNavigate }: TopEventBarProps) {
             onClick={() => onNavigate('challenge')}
             className="text-[#8A99AD] hover:text-[#D4AF37] transition-colors hidden sm:inline"
           >
-            Aviation Memo Challenge
+            Aviation Memoir Challenge
           </button>
           <button
             onClick={() => onNavigate('register')}

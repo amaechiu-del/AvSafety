@@ -26,11 +26,11 @@ export default function SummitGlance({ onNavigate }: SummitGlanceProps) {
     },
     {
       id: 'challenge',
-      title: 'AVIATION MEMO CHALLENGE',
+      title: 'AVIATION MEMOIR CHALLENGE',
       subtitle: 'Shared Experience Platform',
       desc: 'Documenting unreported near-misses and operational insights so aviators do not die with their invaluable professional lessons.',
       icon: <MessageSquare className="h-5 w-5 text-[#D4AF37]" />,
-      action: 'Submit Safety Memo'
+      action: 'Submit Safety Memoir'
     },
     {
       id: 'investment',

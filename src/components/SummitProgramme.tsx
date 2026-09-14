@@ -31,7 +31,7 @@ export default function SummitProgramme({ sessions, onUpdateSessions, isAdmin, o
 
   const filters: (ProgrammeSessionType | 'ALL')[] = [
     'ALL', 'Keynote', 'Panel', 'Workshop', 'Training', 'Simulation', 
-    'Memo Challenge', 'Book Launch', 'Exhibition', 'Networking', 'Sky Party', 'Other'
+    'Memoir Challenge', 'Book Launch', 'Exhibition', 'Networking', 'Sky Party', 'Other'
   ];
 
   // Normalized

@@ -287,7 +287,7 @@ const defaultDb = {
     {
       id: 'ses-3',
       time: '[TIME TO BE CONFIRMED]',
-      title: 'Aviation Memo Challenge Session',
+      title: 'Aviation Memoir Challenge Session',
       type: 'Challenge Session',
       speaker: '[SPEAKER TO BE CONFIRMED]',
       organisation: 'Domislink International / Aviation Memoir Project',
@@ -2403,6 +2403,7 @@ async function start() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
+        hmr: process.env.DISABLE_HMR === 'true' ? false : undefined,
       },
       appType: 'spa',
     });

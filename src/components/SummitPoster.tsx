@@ -239,7 +239,7 @@ export default function SummitPoster({ onNavigate }: SummitPosterProps) {
                   </div>
                   <div className="p-3 bg-white/5 border border-white/10 rounded-lg text-white">
                     <p className="text-[#D4AF37] font-mono text-[9px] uppercase">CHALLENGE</p>
-                    <p className="mt-1">MEMO CHALLENGE</p>
+                    <p className="mt-1">MEMOIR CHALLENGE</p>
                   </div>
                   <div className="p-3 bg-white/5 border border-white/10 rounded-lg text-white">
                     <p className="text-[#D4AF37] font-mono text-[9px] uppercase">FINANCE</p>
@@ -316,7 +316,7 @@ export default function SummitPoster({ onNavigate }: SummitPosterProps) {
                 <ul className="space-y-2 text-xs text-[#E2E8F0]">
                   <li>• <strong>Aviation Safety Summit Plenary:</strong> Executive addresses by government, regulators, and airline chairmen.</li>
                   <li>• <strong>Book Launch:</strong> Official aviation safety publication unveiling.</li>
-                  <li>• <strong>Aviation Memo Challenge:</strong> Safe reporting mechanism for pilots, engineers, and controllers.</li>
+                  <li>• <strong>Aviation Memoir Challenge:</strong> Safe reporting mechanism for pilots, engineers, and controllers.</li>
                   <li>• <strong>Safety Investment Session:</strong> "Make Safety Easier" funding discussion.</li>
                   <li>• <strong>Simulation & Training:</strong> "SIM SAVES FUEL. SIM SAVES DOLLARS. SIM SAVES LIVES."</li>
                   <li>• <strong>Sky Party:</strong> VIP gala dinner, networking, and safety recognition.</li>

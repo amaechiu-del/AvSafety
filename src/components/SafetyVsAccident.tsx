@@ -14,7 +14,7 @@ export default function SafetyVsAccident() {
     { title: 'Training & Practice', desc: 'Rigorous recurring flight deck, cabin crew, and ground team preparation.' },
     { title: 'Full Flight Simulation', desc: 'Safe rehearsal of compounding catastrophic failures without risking aircraft or passengers.' },
     { title: 'Airworthiness & Maintenance', desc: 'Strict pre-flight checks, genuine OEM spare parts, and zero-defect dispatch criteria.' },
-    { title: 'Non-Punitive Reporting', desc: 'Safe reporting of near-misses through the Aviation Memo Challenge.' },
+    { title: 'Non-Punitive Reporting', desc: 'Safe reporting of near-misses through the Aviation Memoir Challenge.' },
     { title: 'Professional Competence', desc: 'Continuous skills assessment and human factors / CRM mastery.' },
     { title: 'Predictive Technology', desc: 'Real-time telemetry, avionics upgrades, and satellite weather monitoring.' },
     { title: 'Total Preparedness', desc: 'Rapid airport rescue teams, clear checklists, and emergency plans.' }

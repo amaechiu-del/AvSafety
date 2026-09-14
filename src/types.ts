@@ -113,6 +113,7 @@ export type ProgrammeSessionType =
   | 'Workshop' 
   | 'Training' 
   | 'Simulation' 
+  | 'Memoir Challenge'
   | 'Memo Challenge' 
   | 'Book Launch' 
   | 'Exhibition' 
@@ -210,6 +211,8 @@ export interface MemoSubmission {
   consent: boolean;
   submittedAt: string;
 }
+
+export type MemoirSubmission = MemoSubmission;
 
 export interface BookInfo {
   id: string;

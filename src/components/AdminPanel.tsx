@@ -232,7 +232,7 @@ export default function AdminPanel({
               >
                 <div className="flex items-center space-x-2.5">
                   <ShieldAlert className="h-4 w-4" />
-                  <span>Safety Memos</span>
+                  <span>Safety Memoirs</span>
                 </div>
                 <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 font-bold rounded text-[10px]">
                   {memos.length}
@@ -497,7 +497,7 @@ export default function AdminPanel({
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                   <h3 className="text-sm font-serif font-extrabold text-[#0A192F] uppercase tracking-wider">
-                    SAFETY MEMO SUBMISSIONS REVIEW
+                    SAFETY MEMOIR SUBMISSIONS REVIEW
                   </h3>
                   <span className="text-[9px] font-mono text-gray-400">UNAPPROVED CASE ARCHIVE</span>
                 </div>
@@ -538,7 +538,7 @@ export default function AdminPanel({
 
                   {memos.length === 0 && (
                     <div className="text-center py-12 text-gray-400 font-light bg-white border border-gray-200 rounded-xl">
-                      No de-classified safety memos have been logged on the database.
+                      No de-classified safety memoirs have been logged on the database.
                     </div>
                   )}
                 </div>
@@ -562,7 +562,7 @@ export default function AdminPanel({
                   <div className="space-y-2.5">
                     <h4 className="text-xs font-bold text-red-800 uppercase">Resynchronize Database back to defaults</h4>
                     <p className="text-xs text-gray-600 leading-relaxed font-light">
-                      This command will drop any custom delegate records, partnership sponsorships, custom session descriptions, registered delegates, and safety memo logs, restoring the system strictly back to default configurations.
+                      This command will drop any custom delegate records, partnership sponsorships, custom session descriptions, registered delegates, and safety memoir logs, restoring the system strictly back to default configurations.
                     </p>
                     <button
                       onClick={handleReset}

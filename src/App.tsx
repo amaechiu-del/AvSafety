@@ -24,7 +24,7 @@ import IndustryParticipants from './components/IndustryParticipants';
 import StakeholderSection from './components/stakeholders/StakeholderSection';
 import SummitProgramme from './components/SummitProgramme';
 import GoogleWorkspaceHub from './components/GoogleWorkspaceHub';
-import AviationMemoChallenge from './components/AviationMemoChallenge';
+import AviationMemoirChallenge from './components/AviationMemoirChallenge';
 import BookLaunch from './components/BookLaunch';
 import SafetyInvestment from './components/SafetyInvestment';
 import SimulationTraining from './components/SimulationTraining';
@@ -335,9 +335,9 @@ export default function App() {
       {/* Official Google Workspace Hub (Docs, Gmail, Calendar, Slides) */}
       <GoogleWorkspaceHub />
 
-      {/* 10. AVIATION MEMO CHALLENGE */}
+      {/* 10. AVIATION MEMOIR CHALLENGE */}
       <div id="challenge">
-        <AviationMemoChallenge 
+        <AviationMemoirChallenge 
           memos={memos} 
           onSubmitMemo={handleAddMemo} 
           onUpdateMemos={handleUpdateMemos}
@@ -563,7 +563,7 @@ export default function App() {
                 <ul className="space-y-2">
                   <li><button onClick={() => handleNavigate('programme')} className="hover:text-white transition-colors">Programme</button></li>
                   <li><button onClick={() => handleNavigate('speakers')} className="hover:text-white transition-colors">Speakers Hub</button></li>
-                  <li><button onClick={() => handleNavigate('challenge')} className="hover:text-white transition-colors">Memo Challenge</button></li>
+                  <li><button onClick={() => handleNavigate('challenge')} className="hover:text-white transition-colors">Memoir Challenge</button></li>
                   <li><button onClick={() => handleNavigate('book')} className="hover:text-white transition-colors">Book Launch</button></li>
                   <li><button onClick={() => handleNavigate('simulation')} className="hover:text-white transition-colors">Simulation</button></li>
                 </ul>

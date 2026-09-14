@@ -37,7 +37,7 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
     { id: 'industry', label: '33+ Sectors' },
     { id: 'programme', label: 'Programme' },
     { id: 'google-docs', label: 'Google Docs' },
-    { id: 'challenge', label: 'Memo Challenge' },
+    { id: 'challenge', label: 'Memoir Challenge' },
     { id: 'book', label: 'Book Launch' },
     { id: 'investment', label: 'Safety Investment' },
     { id: 'simulation', label: 'Simulation & Training' },
