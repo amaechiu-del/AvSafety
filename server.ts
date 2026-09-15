@@ -2320,10 +2320,1570 @@ app.post('/api/stakeholders/dispatch-letter', (req, res) => {
   });
 });
 
+// ============================================================
+// RSVP & ATTENDANCE CONFIRMATION ENGINE ENDPOINTS
+// Public API Boundary (Safe Public Summit Gateway)
+// ============================================================
 
+// In-memory sliding rate-limiter for public RSVP submissions (Anti-abuse)
+const rsvpSubmissionRateMap = new Map<string, { count: number; resetAt: number }>();
+function checkRsvpRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const windowMs = 10 * 60 * 1000; // 10 minutes
+  const maxRequests = 20;
 
+  const current = rsvpSubmissionRateMap.get(ip);
+  if (!current || now > current.resetAt) {
+    rsvpSubmissionRateMap.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
 
-// Setup Vite Dev server or production build static routes
+  if (current.count >= maxRequests) {
+    return false;
+  }
+
+  current.count += 1;
+  return true;
+}
+
+// In-memory anti-duplicate submission debounce cache (prevents rapid double clicks / network retries)
+const rsvpSubmissionMutex = new Map<string, { timestamp: number; payloadSummary: string; rsvp: any }>();
+
+// Strict Email format validator
+function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim();
+  if (trimmed.length < 5 || trimmed.length > 254) return false;
+  // RFC 5322 standard-compliant email regex
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!emailRegex.test(trimmed)) return false;
+  // Domain must contain a valid TLD
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) return false;
+  const domain = parts[1];
+  if (!domain.includes('.') || domain.startsWith('.') || domain.endsWith('.')) return false;
+  return true;
+}
+
+// Phone format validator (supports Nigerian & International numbers)
+function isValidPhone(phone: string): { valid: boolean; error?: string } {
+  if (!phone || typeof phone !== 'string') {
+    return { valid: false, error: 'Contact phone number is required.' };
+  }
+  const trimmed = phone.trim();
+  if (trimmed.length < 7) {
+    return { valid: false, error: 'Phone number is too short. Please include at least 7 digits.' };
+  }
+  // Allow leading +, digits, spaces, parentheses, hyphens, and dots
+  const phonePattern = /^\+?[0-9\s\-\(\)\.]{7,25}$/;
+  if (!phonePattern.test(trimmed)) {
+    return { valid: false, error: 'Phone number contains invalid characters. Please use numbers and optional + country code.' };
+  }
+  // Extract only digits to ensure numeric length
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  if (digitsOnly.length < 7 || digitsOnly.length > 16) {
+    return { valid: false, error: 'Please provide a valid phone number with 7 to 16 digits (e.g. +234 803 123 4567 or 08031234567).' };
+  }
+  return { valid: true };
+}
+
+// Invitation Number / Reference validator
+function isValidInvitationNumber(invNumber: string): boolean {
+  if (!invNumber || typeof invNumber !== 'string') return false;
+  const trimmed = invNumber.trim();
+  // Must be at least 3 characters and contain valid identifier characters
+  return trimmed.length >= 3 && /^[A-Za-z0-9\/\-_\.]+$/.test(trimmed);
+}
+
+// 1. GET /api/rsvp/lookup (Disabled for security compliance and reference enumeration prevention)
+app.get('/api/rsvp/lookup', (req, res) => {
+  return res.status(403).json({
+    success: false,
+    found: false,
+    error: 'Public invitation lookup is disabled for security compliance and enumeration protection.'
+  });
+});
+
+// 2. POST /api/rsvp (Public RSVP Submission with robust server-side validation and deduplication)
+app.post('/api/rsvp', (req, res) => {
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  if (!checkRsvpRateLimit(clientIp)) {
+    return res.status(429).json({ 
+      success: false,
+      error: 'Submission rate limit exceeded. Please wait a few moments before trying again.' 
+    });
+  }
+
+  const {
+    invitationNumber,
+    invitationRef,
+    title,
+    firstName,
+    middleName,
+    lastName,
+    fullName,
+    organisation,
+    position,
+    designation,
+    email,
+    phone,
+    attendanceOption,
+    representative,
+    accessibilityRequirement,
+    dietary,
+    consentConfirmed
+  } = req.body;
+
+  const errors: Record<string, string> = {};
+
+  // Clean strings
+  const resolvedInvNumber = (invitationNumber || invitationRef || '').trim();
+  const computedFirstName = (firstName || '').trim();
+  const computedLastName = (lastName || '').trim();
+  const computedMiddleName = (middleName || '').trim();
+  let resolvedFullName = (fullName || '').trim();
+
+  if (!resolvedFullName && (computedFirstName || computedLastName)) {
+    resolvedFullName = [title, computedFirstName, computedMiddleName, computedLastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+  }
+
+  const resolvedDesignation = (designation || position || '').trim();
+  const resolvedOrg = (organisation || '').trim();
+  const resolvedEmail = (email || '').trim().toLowerCase();
+  const resolvedPhone = (phone || '').trim();
+
+  // 1. Validate Invitation Number
+  if (!resolvedInvNumber) {
+    errors.invitationNumber = 'Official Invitation Number is required (e.g., ASS/INV/2026/0001 or invitation reference code).';
+  } else if (!isValidInvitationNumber(resolvedInvNumber)) {
+    errors.invitationNumber = 'Please provide a valid invitation number format (alphanumeric reference from your invitation).';
+  }
+
+  // 2. Validate Name Fields
+  if (!computedFirstName && !resolvedFullName) {
+    errors.firstName = 'First Name is required.';
+  } else if (computedFirstName && computedFirstName.length < 2) {
+    errors.firstName = 'First Name must be at least 2 characters.';
+  }
+
+  if (!computedLastName && !resolvedFullName) {
+    errors.lastName = 'Last Name / Surname is required.';
+  } else if (computedLastName && computedLastName.length < 2) {
+    errors.lastName = 'Last Name must be at least 2 characters.';
+  }
+
+  if (!resolvedFullName || resolvedFullName.length < 3) {
+    errors.fullName = 'Full Name is required.';
+  }
+
+  // 3. Validate Organisation & Designation
+  if (!resolvedOrg) {
+    errors.organisation = 'Organisation / Airline / Agency name is required.';
+  } else if (resolvedOrg.length < 2) {
+    errors.organisation = 'Organisation name must be at least 2 characters.';
+  }
+
+  if (!resolvedDesignation) {
+    errors.designation = 'Official Designation / Position Title is required.';
+  } else if (resolvedDesignation.length < 2) {
+    errors.designation = 'Designation must be at least 2 characters.';
+  }
+
+  // 4. Validate Email Format
+  if (!resolvedEmail) {
+    errors.email = 'Official Email address is required.';
+  } else if (!isValidEmail(resolvedEmail)) {
+    errors.email = 'Please provide a valid official email address (e.g. name@organisation.com).';
+  }
+
+  // 5. Validate Phone Format
+  const phoneValidation = isValidPhone(resolvedPhone);
+  if (!phoneValidation.valid) {
+    errors.phone = phoneValidation.error || 'Please provide a valid telephone number.';
+  }
+
+  // 6. Validate Attendance Option
+  const optUpper = String(attendanceOption || '').toUpperCase();
+  let standardizedOption: 'I_WILL_ATTEND' | 'I_WILL_ATTEND_WITH_REPRESENTATIVE' | 'I_AM_TENTATIVE' | 'I_AM_UNABLE_TO_ATTEND' = 'I_WILL_ATTEND';
+  let rsvpStatus: 'CONFIRMED' | 'REPRESENTATIVE_NOMINATED' | 'TENTATIVE' | 'DECLINED' = 'CONFIRMED';
+
+  if (optUpper.includes('REPRESENTATIVE') || optUpper === 'SEND_REPRESENTATIVE' || optUpper === 'I WILL ATTEND WITH REPRESENTATIVE') {
+    standardizedOption = 'I_WILL_ATTEND_WITH_REPRESENTATIVE';
+    rsvpStatus = 'REPRESENTATIVE_NOMINATED';
+  } else if (optUpper.includes('TENTATIVE') || optUpper === 'NEED_MORE_INFO' || optUpper === 'I AM TENTATIVE') {
+    standardizedOption = 'I_AM_TENTATIVE';
+    rsvpStatus = 'TENTATIVE';
+  } else if (optUpper.includes('UNABLE') || optUpper.includes('CANNOT') || optUpper === 'CANNOT_ATTEND' || optUpper === 'I AM UNABLE TO ATTEND' || optUpper === 'DECLINED') {
+    standardizedOption = 'I_AM_UNABLE_TO_ATTEND';
+    rsvpStatus = 'DECLINED';
+  } else {
+    standardizedOption = 'I_WILL_ATTEND';
+    rsvpStatus = 'CONFIRMED';
+  }
+
+  // 7. Validate Representative Details if attending with representative
+  if (standardizedOption === 'I_WILL_ATTEND_WITH_REPRESENTATIVE') {
+    const repName = representative?.fullName ? String(representative.fullName).trim() : '';
+    const repDesig = representative?.designation || representative?.position ? String(representative.designation || representative.position).trim() : '';
+    const repOrg = representative?.organisation ? String(representative.organisation).trim() : '';
+    const repMail = representative?.email ? String(representative.email).trim().toLowerCase() : '';
+    const repTel = representative?.phone ? String(representative.phone).trim() : '';
+
+    if (!repName || repName.length < 2) {
+      errors.repFullName = 'Representative Full Name is required.';
+    }
+    if (!repDesig || repDesig.length < 2) {
+      errors.repDesignation = 'Representative Designation / Title is required.';
+    }
+    if (!repOrg || repOrg.length < 2) {
+      errors.repOrganisation = 'Representative Organisation is required.';
+    }
+    if (!repMail) {
+      errors.repEmail = 'Representative Official Email is required.';
+    } else if (!isValidEmail(repMail)) {
+      errors.repEmail = 'Please provide a valid official email address for your representative.';
+    }
+    const repPhoneVal = isValidPhone(repTel);
+    if (!repPhoneVal.valid) {
+      errors.repPhone = repPhoneVal.error ? `Representative ${repPhoneVal.error.toLowerCase()}` : 'Representative contact phone is required.';
+    }
+  }
+
+  // 8. Validate Consent Confirmation
+  if (consentConfirmed !== true && consentConfirmed !== 'true') {
+    errors.consentConfirmed = 'You must confirm that the supplied details are accurate and accept the official attendance agreement.';
+  }
+
+  // Return formatted validation errors if any failed
+  if (Object.keys(errors).length > 0) {
+    const firstErrorMessage = Object.values(errors)[0];
+    return res.status(400).json({
+      success: false,
+      error: firstErrorMessage,
+      message: 'Please review and correct the highlighted fields in your submission.',
+      errors
+    });
+  }
+
+  // 9. ACCIDENTAL DUPLICATE SUBMISSION DETECTION & IDEMPOTENCY
+  // Rapid debounce check: If the same email or invitation submitted within the last 30 seconds
+  const debounceKey = `${resolvedEmail}::${resolvedInvNumber.toLowerCase()}`;
+  const now = Date.now();
+  const existingMutex = rsvpSubmissionMutex.get(debounceKey);
+
+  if (existingMutex && (now - existingMutex.timestamp) < 30000) {
+    // Return existing confirmation pass immediately (prevents duplicate db writes from double clicking)
+    return res.json({
+      success: true,
+      isDuplicate: true,
+      rsvp: existingMutex.rsvp,
+      message: `Your RSVP was just received and confirmed with reference ${existingMutex.rsvp.confirmationRef}. Here is your attendance pass.`
+    });
+  }
+
+  const data = readDb();
+  if (!data.rsvps) data.rsvps = [];
+  const stakeholders = data.stakeholders || [];
+
+  // Match existing stakeholder record if available
+  const matchedStakeholder = stakeholders.find((s: any) => 
+    (resolvedInvNumber && (
+      s.id?.toLowerCase() === resolvedInvNumber.toLowerCase() || 
+      s.invitationNumber?.toLowerCase() === resolvedInvNumber.toLowerCase() || 
+      s.invitationRef?.toLowerCase() === resolvedInvNumber.toLowerCase()
+    )) ||
+    (s.email && s.email.toLowerCase() === resolvedEmail) ||
+    (s.name?.trim().toLowerCase() === resolvedFullName.toLowerCase() && s.organisation?.trim().toLowerCase() === resolvedOrg.toLowerCase())
+  );
+
+  if (matchedStakeholder) {
+    if (standardizedOption === 'I_WILL_ATTEND') {
+      matchedStakeholder.status = 'CONFIRMED';
+      matchedStakeholder.isConfirmed = true;
+      matchedStakeholder.responseNotes = `Confirmed attendance via official public RSVP portal on ${new Date().toLocaleDateString('en-GB')}.`;
+    } else if (standardizedOption === 'I_AM_UNABLE_TO_ATTEND') {
+      matchedStakeholder.status = 'DECLINED';
+      matchedStakeholder.responseNotes = `Declined attendance via RSVP portal on ${new Date().toLocaleDateString('en-GB')}.`;
+    } else if (standardizedOption === 'I_WILL_ATTEND_WITH_REPRESENTATIVE') {
+      matchedStakeholder.status = 'ACCEPTED';
+      matchedStakeholder.responseNotes = `Attending with nominated representative: ${representative?.fullName} (${representative?.designation || representative?.position || 'Representative'}) via RSVP portal on ${new Date().toLocaleDateString('en-GB')}.`;
+    } else if (standardizedOption === 'I_AM_TENTATIVE') {
+      matchedStakeholder.status = 'INTERESTED';
+      matchedStakeholder.responseNotes = `Marked tentative / schedule review via RSVP portal on ${new Date().toLocaleDateString('en-GB')}.`;
+    }
+    matchedStakeholder.updatedAt = new Date().toISOString();
+  }
+
+  // Deduplication check in saved RSVPs by email OR invitationNumber
+  const existingRsvpIndex = data.rsvps.findIndex((r: any) => 
+    (r.email && r.email.toLowerCase() === resolvedEmail) ||
+    (resolvedInvNumber && (
+      (r.invitationNumber && r.invitationNumber.toLowerCase() === resolvedInvNumber.toLowerCase()) ||
+      (r.invitationRef && r.invitationRef.toLowerCase() === resolvedInvNumber.toLowerCase())
+    ))
+  );
+
+  // Generate official, non-sequential confirmation reference
+  const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+  const confirmationRef = existingRsvpIndex >= 0 
+    ? data.rsvps[existingRsvpIndex].confirmationRef 
+    : `ASS-RSVP-2026-${randomSuffix}`;
+
+  const isExistingUpdate = existingRsvpIndex >= 0;
+  const previousOption = isExistingUpdate ? data.rsvps[existingRsvpIndex].attendanceOption : null;
+
+  const newRsvpRecord = {
+    id: isExistingUpdate ? data.rsvps[existingRsvpIndex].id : `rsvp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    confirmationRef,
+    invitationNumber: resolvedInvNumber || (matchedStakeholder ? (matchedStakeholder.invitationNumber || matchedStakeholder.id) : undefined),
+    invitationRef: resolvedInvNumber || (matchedStakeholder ? matchedStakeholder.id : undefined),
+    inviteeId: matchedStakeholder ? matchedStakeholder.id : undefined,
+    title: title ? String(title).trim() : undefined,
+    firstName: computedFirstName || undefined,
+    middleName: computedMiddleName || undefined,
+    lastName: computedLastName || undefined,
+    fullName: resolvedFullName,
+    organisation: resolvedOrg,
+    position: resolvedDesignation,
+    designation: resolvedDesignation,
+    email: resolvedEmail,
+    phone: resolvedPhone,
+    attendanceOption: standardizedOption,
+    rsvpStatus,
+    representative: standardizedOption === 'I_WILL_ATTEND_WITH_REPRESENTATIVE' ? {
+      fullName: String(representative.fullName).trim(),
+      designation: String(representative.designation || representative.position || 'Representative').trim(),
+      position: String(representative.designation || representative.position || 'Representative').trim(),
+      organisation: String(representative.organisation || resolvedOrg).trim(),
+      email: String(representative.email).trim().toLowerCase(),
+      phone: String(representative.phone || '').trim()
+    } : undefined,
+    accessibilityRequirement: accessibilityRequirement ? String(accessibilityRequirement).trim() : undefined,
+    dietary: dietary ? String(dietary).trim() : undefined,
+    consentConfirmed: true,
+    submittedAt: isExistingUpdate ? data.rsvps[existingRsvpIndex].submittedAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    emailDeliveryStatus: 'NOT_CONFIGURED_STORED'
+  };
+
+  if (isExistingUpdate) {
+    data.rsvps[existingRsvpIndex] = newRsvpRecord;
+  } else {
+    data.rsvps.unshift(newRsvpRecord);
+  }
+
+  data.stakeholders = stakeholders;
+  writeDb(data);
+
+  const publicRsvpResponse = {
+    confirmationRef: newRsvpRecord.confirmationRef,
+    fullName: newRsvpRecord.fullName,
+    organisation: newRsvpRecord.organisation,
+    position: newRsvpRecord.position,
+    email: newRsvpRecord.email,
+    phone: newRsvpRecord.phone,
+    invitationNumber: newRsvpRecord.invitationNumber,
+    attendanceOption: newRsvpRecord.attendanceOption,
+    rsvpStatus: newRsvpRecord.rsvpStatus,
+    submittedAt: newRsvpRecord.submittedAt,
+    representative: newRsvpRecord.representative
+  };
+
+  // Cache in debounce mutex
+  rsvpSubmissionMutex.set(debounceKey, {
+    timestamp: now,
+    payloadSummary: `${resolvedFullName}-${standardizedOption}`,
+    rsvp: publicRsvpResponse
+  });
+
+  // Clean old debounce entries (keep memory bounded)
+  if (rsvpSubmissionMutex.size > 200) {
+    for (const [key, val] of rsvpSubmissionMutex.entries()) {
+      if (now - val.timestamp > 60000) {
+        rsvpSubmissionMutex.delete(key);
+      }
+    }
+  }
+
+  let userFriendlyMessage = 'Attendance response successfully registered with the DomisLink Aviation Safety Summit Organising Committee.';
+  if (isExistingUpdate) {
+    if (previousOption === standardizedOption) {
+      userFriendlyMessage = `Your attendance confirmation (Ref: ${confirmationRef}) is on file and verified.`;
+    } else {
+      userFriendlyMessage = `Your RSVP attendance status has been updated to: ${rsvpStatus.replace('_', ' ')}.`;
+    }
+  }
+
+  // Return clean, safe response to the public user
+  res.json({
+    success: true,
+    isUpdate: isExistingUpdate,
+    rsvp: publicRsvpResponse,
+    message: userFriendlyMessage
+  });
+});
+
+// 3. GET /api/admin/rsvps (Admin: Fetch all RSVPs)
+app.get('/api/admin/rsvps', (req, res) => {
+  const data = readDb();
+  const rsvps = data.rsvps || [];
+  res.json({
+    success: true,
+    rsvps,
+    total: rsvps.length
+  });
+});
+
+// 4. PUT /api/admin/rsvps/:id/status (Admin: Update status e.g. ATTENDED, NO_SHOW, etc.)
+app.put('/api/admin/rsvps/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { rsvpStatus } = req.body;
+
+  if (!rsvpStatus) {
+    return res.status(400).json({ error: 'Status is required' });
+  }
+
+  const data = readDb();
+  if (!data.rsvps) data.rsvps = [];
+  const index = data.rsvps.findIndex((r: any) => r.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'RSVP record not found' });
+  }
+
+  data.rsvps[index].rsvpStatus = rsvpStatus;
+  data.rsvps[index].updatedAt = new Date().toISOString();
+  writeDb(data);
+
+  res.json({
+    success: true,
+    rsvp: data.rsvps[index]
+  });
+});
+
+// ============================================================
+// SECRETARIAT — INVITATION & STAKEHOLDER MASTER RECORD API ROUTES
+// ============================================================
+
+function recordAuditLog(data: any, entry: { action: string; entityType: string; recordId: string; referenceNumber?: string; oldValue?: any; newValue?: any; performedBy?: string }) {
+  if (!data.audit_logs) data.audit_logs = [];
+  const logEntry = {
+    id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    ...entry,
+    performedBy: entry.performedBy || 'Secretariat Administrator',
+    timestamp: new Date().toISOString()
+  };
+  data.audit_logs.unshift(logEntry);
+  if (data.audit_logs.length > 1000) data.audit_logs.pop();
+}
+
+function generateInvitationNumber(data: any): string {
+  if (!data.invitations) data.invitations = [];
+  const count = data.invitations.length + 1;
+  const paddedNum = String(count).padStart(6, '0');
+  const invNumber = `ASS/INV/2026/${paddedNum}`;
+  const exists = data.invitations.some((i: any) => i.invitationNumber === invNumber);
+  if (exists) {
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    return `ASS/INV/2026/${String(count + randomSuffix).padStart(6, '0')}`;
+  }
+  return invNumber;
+}
+
+function checkStakeholderDuplicate(data: any, payload: { email?: string; phone?: string; firstName?: string; lastName?: string; organisation?: string }) {
+  const persons = data.stakeholders_master || data.stakeholders || [];
+  const matches = [];
+  for (const p of persons) {
+    const emailMatch = payload.email && p.email && p.email.toLowerCase() === payload.email.toLowerCase();
+    const phoneMatch = payload.phone && p.phone && p.phone.replace(/[^0-9]/g, '') === payload.phone.replace(/[^0-9]/g, '');
+    const nameMatch = payload.firstName && payload.lastName && p.firstName && p.lastName &&
+      p.firstName.toLowerCase() === payload.firstName.toLowerCase() &&
+      p.lastName.toLowerCase() === payload.lastName.toLowerCase() &&
+      p.organisation && payload.organisation && p.organisation.toLowerCase() === payload.organisation.toLowerCase();
+    
+    if (emailMatch || phoneMatch || nameMatch) {
+      matches.push({
+        id: p.id,
+        name: `${p.title || ''} ${p.firstName} ${p.lastName}`.trim(),
+        organisation: p.organisation,
+        email: p.email,
+        phone: p.phone,
+        matchType: emailMatch ? 'EMAIL' : phoneMatch ? 'PHONE' : 'NAME_AND_ORG'
+      });
+    }
+  }
+  return matches;
+}
+
+// 1. GET /api/secretariat/stakeholders-master
+app.get('/api/secretariat/stakeholders-master', (req, res) => {
+  const data = readDb();
+  if (!data.stakeholders_master) {
+    data.stakeholders_master = data.stakeholders || [];
+    writeDb(data);
+  }
+  res.json({
+    success: true,
+    stakeholders: data.stakeholders_master,
+    total: data.stakeholders_master.length
+  });
+});
+
+// 2. POST /api/secretariat/stakeholders-master (Create stakeholder with duplicate detection)
+app.post('/api/secretariat/stakeholders-master', (req, res) => {
+  const {
+    title,
+    firstName,
+    middleName,
+    lastName,
+    preferredName,
+    designation,
+    organisation,
+    department,
+    email,
+    phone,
+    altPhone,
+    country,
+    state,
+    city,
+    sector,
+    category,
+    subcategory,
+    notes,
+    forceCreate
+  } = req.body;
+
+  if (!firstName || !lastName || !organisation || !email || !sector || !category) {
+    return res.status(400).json({ error: 'Required fields: firstName, lastName, organisation, email, sector, category' });
+  }
+
+  const data = readDb();
+  if (!data.stakeholders_master) data.stakeholders_master = [];
+
+  // Check duplicates unless forceCreate is true
+  if (!forceCreate) {
+    const duplicates = checkStakeholderDuplicate(data, { email, phone, firstName, lastName, organisation });
+    if (duplicates.length > 0) {
+      return res.status(409).json({
+        success: false,
+        warning: 'Potential duplicate stakeholder record detected.',
+        duplicates
+      });
+    }
+  }
+
+  const now = new Date().toISOString();
+  const personId = `stk-m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const referenceNumber = `ASS/STK/2026/${Math.floor(10000 + Math.random() * 90000)}`;
+
+  const newStakeholder = {
+    id: personId,
+    referenceNumber,
+    title: title || 'Mr.',
+    firstName: firstName.trim(),
+    middleName: middleName ? middleName.trim() : undefined,
+    lastName: lastName.trim(),
+    preferredName: preferredName ? preferredName.trim() : undefined,
+    designation: designation || 'Executive',
+    organisation: organisation.trim(),
+    department: department ? department.trim() : undefined,
+    email: email.trim().toLowerCase(),
+    phone: phone.trim(),
+    altPhone: altPhone ? altPhone.trim() : undefined,
+    country: country || 'Nigeria',
+    state: state ? state.trim() : undefined,
+    city: city ? city.trim() : undefined,
+    sector,
+    category,
+    subcategory: subcategory ? subcategory.trim() : undefined,
+    notes: notes ? notes.trim() : undefined,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: 'Secretariat Administrator'
+  };
+
+  data.stakeholders_master.push(newStakeholder);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'STAKEHOLDER',
+    recordId: personId,
+    referenceNumber,
+    newValue: newStakeholder
+  });
+  writeDb(data);
+
+  res.json({
+    success: true,
+    stakeholder: newStakeholder,
+    message: 'Stakeholder master record created successfully.'
+  });
+});
+
+// 3. PUT /api/secretariat/stakeholders-master/:id
+app.put('/api/secretariat/stakeholders-master/:id', (req, res) => {
+  const { id } = req.params;
+  const data = readDb();
+  if (!data.stakeholders_master) data.stakeholders_master = [];
+  const index = data.stakeholders_master.findIndex((s: any) => s.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Stakeholder record not found' });
+  }
+
+  const oldValue = { ...data.stakeholders_master[index] };
+  const updated = {
+    ...oldValue,
+    ...req.body,
+    id,
+    referenceNumber: oldValue.referenceNumber,
+    updatedAt: new Date().toISOString(),
+    updatedBy: 'Secretariat Administrator'
+  };
+
+  data.stakeholders_master[index] = updated;
+  recordAuditLog(data, {
+    action: 'EDIT',
+    entityType: 'STAKEHOLDER',
+    recordId: id,
+    referenceNumber: updated.referenceNumber,
+    oldValue,
+    newValue: updated
+  });
+  writeDb(data);
+
+  res.json({
+    success: true,
+    stakeholder: updated,
+    message: 'Stakeholder record updated successfully.'
+  });
+});
+
+// 4. GET /api/secretariat/organisations-master
+app.get('/api/secretariat/organisations-master', (req, res) => {
+  const data = readDb();
+  if (!data.organisations_master) {
+    data.organisations_master = data.organisations || [];
+    writeDb(data);
+  }
+  res.json({
+    success: true,
+    organisations: data.organisations_master,
+    total: data.organisations_master.length
+  });
+});
+
+// 5. POST /api/secretariat/organisations-master
+app.post('/api/secretariat/organisations-master', (req, res) => {
+  const { name, type, sector, country, state, city, address, website, email, phone, contactPerson } = req.body;
+  if (!name || !sector) {
+    return res.status(400).json({ error: 'Organisation name and sector are required' });
+  }
+
+  const data = readDb();
+  if (!data.organisations_master) data.organisations_master = [];
+
+  // Check duplicate org name
+  const existing = data.organisations_master.find((o: any) => o.name.toLowerCase() === name.trim().toLowerCase());
+  if (existing) {
+    return res.status(409).json({ success: false, error: 'Organisation with this name already exists in Master Records.', organisation: existing });
+  }
+
+  const now = new Date().toISOString();
+  const orgId = `org-m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const newOrg = {
+    id: orgId,
+    name: name.trim(),
+    type: type || 'Corporate',
+    sector,
+    country: country || 'Nigeria',
+    state: state ? state.trim() : undefined,
+    city: city ? city.trim() : undefined,
+    address: address ? address.trim() : undefined,
+    website: website ? website.trim() : undefined,
+    email: email ? email.trim().toLowerCase() : undefined,
+    phone: phone ? phone.trim() : undefined,
+    contactPerson: contactPerson ? contactPerson.trim() : undefined,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  data.organisations_master.push(newOrg);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'ORGANISATION',
+    recordId: orgId,
+    newValue: newOrg
+  });
+  writeDb(data);
+
+  res.json({
+    success: true,
+    organisation: newOrg,
+    message: 'Organisation master record created successfully.'
+  });
+});
+
+// 6. GET /api/secretariat/invitations
+app.get('/api/secretariat/invitations', (req, res) => {
+  const data = readDb();
+  if (!data.invitations) data.invitations = [];
+  res.json({
+    success: true,
+    invitations: data.invitations,
+    total: data.invitations.length
+  });
+});
+
+// 7. POST /api/secretariat/invitations (Create private invitation with server-generated inv number)
+app.post('/api/secretariat/invitations', (req, res) => {
+  const { personId, orgId, sector, category, invitationType, invitationPurpose } = req.body;
+
+  if (!personId || !sector || !category || !invitationType || !invitationPurpose) {
+    return res.status(400).json({ error: 'Required fields: personId, sector, category, invitationType, invitationPurpose' });
+  }
+
+  const data = readDb();
+  if (!data.invitations) data.invitations = [];
+
+  const invitationNumber = generateInvitationNumber(data);
+  const now = new Date().toISOString();
+  const invitationId = `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  const newInvitation = {
+    id: invitationId,
+    invitationNumber,
+    personId,
+    orgId: orgId || 'org-unspecified',
+    sector,
+    category,
+    invitationType,
+    invitationPurpose,
+    invitationDate: now.slice(0, 10),
+    eventDate: '2026-11-17',
+    invitationStatus: 'DRAFT',
+    createdAt: now,
+    updatedAt: now,
+    createdBy: 'Secretariat Administrator'
+  };
+
+  data.invitations.push(newInvitation);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'INVITATION',
+    recordId: invitationId,
+    referenceNumber: invitationNumber,
+    newValue: newInvitation
+  });
+  writeDb(data);
+
+  res.json({
+    success: true,
+    invitation: newInvitation,
+    message: `Private invitation ${invitationNumber} generated successfully.`
+  });
+});
+
+// 8. PUT /api/secretariat/invitations/:id/status (Status change & approval with zero self-approval safety)
+app.put('/api/secretariat/invitations/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { invitationStatus, userEmail } = req.body;
+
+  if (!invitationStatus) {
+    return res.status(400).json({ error: 'New invitationStatus is required' });
+  }
+
+  const data = readDb();
+  if (!data.invitations) data.invitations = [];
+  const index = data.invitations.findIndex((i: any) => i.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Invitation record not found' });
+  }
+
+  const inviteRecord = data.invitations[index];
+  const oldValue = { ...inviteRecord };
+
+  // Zero self-approval check if trying to approve own created invitation
+  if (invitationStatus === 'APPROVED' && inviteRecord.createdBy && userEmail && inviteRecord.createdBy.toLowerCase() === userEmail.toLowerCase()) {
+    return res.status(403).json({
+      success: false,
+      error: 'Governance Safety Rule Violation: Zero self-approval principle prevents users from approving invitations they created themselves.'
+    });
+  }
+
+  inviteRecord.invitationStatus = invitationStatus;
+  inviteRecord.updatedAt = new Date().toISOString();
+  inviteRecord.updatedBy = userEmail || 'Secretariat Administrator';
+
+  if (invitationStatus === 'APPROVED') {
+    inviteRecord.approvedBy = userEmail || 'Secretariat Senior Official';
+    inviteRecord.approvedAt = new Date().toISOString();
+  }
+
+  recordAuditLog(data, {
+    action: invitationStatus === 'APPROVED' ? 'APPROVE' : 'STATUS_CHANGE',
+    entityType: 'INVITATION',
+    recordId: id,
+    referenceNumber: inviteRecord.invitationNumber,
+    oldValue,
+    newValue: inviteRecord,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    invitation: inviteRecord,
+    message: `Invitation status updated to ${invitationStatus}.`
+  });
+});
+
+// 9. GET /api/secretariat/audit-logs
+app.get('/api/secretariat/audit-logs', (req, res) => {
+  const data = readDb();
+  if (!data.audit_logs) data.audit_logs = [];
+  res.json({
+    success: true,
+    auditLogs: data.audit_logs,
+    total: data.audit_logs.length
+  });
+});
+
+// ============================================================
+// OFFICIAL CORRESPONDENCE & LETTERHEAD SYSTEM API ROUTES
+// ============================================================
+
+// Helper to seed initial letterhead profiles, signatories, and templates if missing
+function ensureCorrespondenceDefaults(data: any) {
+  if (!data.letterhead_profiles) {
+    data.letterhead_profiles = [
+      {
+        id: 'profile-domislink-corp',
+        name: 'DOMISLINK INTERNATIONAL SERVICES LTD',
+        purpose: 'Default Corporate Letterhead',
+        legalOrganisationName: 'DOMISLINK INTERNATIONAL SERVICES LTD',
+        displayName: 'DOMISLINK INTERNATIONAL SERVICES',
+        rcNumber: 'RC 9266988',
+        rcNumberX: 29.4,
+        rcNumberY: 28.1,
+        tagline: 'THE DIGITAL EMPIRE',
+        address: 'Plot 124, Ahmadu Bello Way, Central Business District, Abuja, Nigeria',
+        telephone: '+234 9 290 0000',
+        mobile: '+234 803 000 0000',
+        email: 'secretariat@domislink.com',
+        website: 'https://domislink.com',
+        headerText: 'OFFICE OF THE SECRETARY-GENERAL',
+        footerText: 'Domislink International Services Ltd — RC 9266988 — The Digital Empire',
+        referencePrefix: 'DIS/CORR/2026',
+        referenceFormat: 'DIS/CORR/2026/0001',
+        dateFormat: 'DD/MM/YYYY',
+        defaultSignatoryId: 'sig-sec-gen',
+        pageSize: 'A4',
+        orientation: 'portrait',
+        margins: '20mm',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'profile-summit-2026',
+        name: 'AVIATION SAFETY SUMMIT 2026',
+        purpose: 'Summit Correspondence Letterhead',
+        legalOrganisationName: 'AVIATION SAFETY SUMMIT 2026 ORGANISING COMMITTEE',
+        displayName: 'AVIATION SAFETY SUMMIT 2026',
+        rcNumber: 'RC 9266988',
+        rcNumberX: 29.4,
+        rcNumberY: 28.1,
+        tagline: 'SAFE SKIES, SECURE FUTURES',
+        address: 'Transcorp Hilton Abuja & Nnamdi Azikiwe International Airport, Abuja',
+        telephone: '+234 9 290 2026',
+        mobile: '+234 803 2026 2026',
+        email: 'summit@sec.domislink.com',
+        website: 'https://summit.domislink.com',
+        headerText: 'OFFICE OF THE SUMMIT SECRETARIAT & EXECUTIVE DIRECTORATE',
+        footerText: 'Aviation Safety Summit 2026 — Official Secretariat Correspondence',
+        referencePrefix: 'ASS/CORR/2026',
+        referenceFormat: 'ASS/CORR/2026/0001',
+        dateFormat: 'DD/MM/YYYY',
+        defaultSignatoryId: 'sig-exec-dir',
+        pageSize: 'A4',
+        orientation: 'portrait',
+        margins: '20mm',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+  }
+
+  if (!data.correspondence_signatories) {
+    data.correspondence_signatories = [
+      {
+        id: 'sig-sec-gen',
+        name: 'Dr. Aliyu Mohammed, CON',
+        title: 'Secretary-General',
+        organisation: 'Domislink International Services Ltd',
+        isActive: true,
+        isDefault: true,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'sig-exec-dir',
+        name: 'Capt. Nkechi Adebayo',
+        title: 'Executive Director, Summit Operations',
+        organisation: 'Aviation Safety Summit 2026',
+        isActive: true,
+        isDefault: false,
+        createdAt: new Date().toISOString()
+      }
+    ];
+  }
+
+  if (!data.correspondence_templates) {
+    data.correspondence_templates = [
+      {
+        id: 'tmpl-official-invite',
+        title: 'Official Summit Invitation Letter',
+        correspondenceType: 'Official Invitation Letter',
+        subjectTemplate: 'OFFICIAL INVITATION: AVIATION SAFETY SUMMIT 2026 (17-19 NOV 2026, ABUJA)',
+        salutationTemplate: 'Dear {{recipientName}},',
+        bodyTemplate: 'It is with great distinction and professional privilege that we formally invite you to participate as a distinguished guest and delegate at the upcoming Aviation Safety Summit 2026, convening under the high patronage of federal aviation authorities.\n\nThe Summit theme focuses on advancing robust continental air safety frameworks, regulatory alignment, and technological modernization across African airspace.\n\nYour esteemed expertise and leadership representation at {{recipientOrganisation}} will add immense value to high-level plenary sessions and ministerial roundtables.',
+        closingTemplate: 'Please accept our highest considerations of professional esteem.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'tmpl-general-corp',
+        title: 'General Corporate Notice',
+        correspondenceType: 'General Corporate Correspondence',
+        subjectTemplate: 'CORRESPONDENCE REGARDING: {{subject}}',
+        salutationTemplate: 'Dear {{recipientName}},',
+        bodyTemplate: 'We write to formally communicate official determinations and administrative notices regarding ongoing collaborative initiatives between Domislink International Services Ltd and {{recipientOrganisation}}.\n\nKindly review the attached briefing notes and revert to the Secretariat within five (5) working days.',
+        closingTemplate: 'Yours faithfully,',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+  }
+
+  if (!data.correspondence_documents) {
+    data.correspondence_documents = [];
+  }
+}
+
+// GET /api/secretariat/correspondence/profiles
+app.get('/api/secretariat/correspondence/profiles', (req, res) => {
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+  writeDb(data);
+  res.json({ success: true, profiles: data.letterhead_profiles });
+});
+
+// POST /api/secretariat/correspondence/profiles
+app.post('/api/secretariat/correspondence/profiles', (req, res) => {
+  const {
+    name, purpose, legalOrganisationName, displayName, rcNumber, rcNumberX, rcNumberY,
+    tagline, address, telephone, mobile, email, website, headerText, footerText,
+    referencePrefix, pageSize, orientation, margins
+  } = req.body;
+
+  if (!name || !legalOrganisationName || !rcNumber) {
+    return res.status(400).json({ error: 'Name, legal organisation name, and RC number are required.' });
+  }
+
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+
+  const profileId = `profile-${Date.now()}`;
+  const newProfile = {
+    id: profileId,
+    name: name.trim(),
+    purpose: purpose || 'Corporate Letterhead',
+    legalOrganisationName: legalOrganisationName.trim(),
+    displayName: displayName || name.trim(),
+    rcNumber: rcNumber.trim(),
+    rcNumberX: typeof rcNumberX === 'number' ? rcNumberX : 29.4,
+    rcNumberY: typeof rcNumberY === 'number' ? rcNumberY : 28.1,
+    tagline: tagline || '',
+    address: address || '',
+    telephone: telephone || '',
+    mobile: mobile || '',
+    email: email || '',
+    website: website || '',
+    headerText: headerText || 'OFFICIAL SECRETARIAT CORRESPONDENCE',
+    footerText: footerText || `${legalOrganisationName} — ${rcNumber}`,
+    referencePrefix: referencePrefix || 'DIS/CORR/2026',
+    referenceFormat: `${referencePrefix || 'DIS/CORR/2026'}/0001`,
+    dateFormat: 'DD/MM/YYYY',
+    pageSize: pageSize || 'A4',
+    orientation: orientation || 'portrait',
+    margins: margins || '20mm',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  data.letterhead_profiles.push(newProfile);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'LETTERHEAD_PROFILE',
+    recordId: profileId,
+    referenceNumber: rcNumber,
+    newValue: newProfile
+  });
+  writeDb(data);
+
+  res.json({ success: true, profile: newProfile, message: 'Letterhead profile created successfully.' });
+});
+
+// PUT /api/secretariat/correspondence/profiles/:id
+app.put('/api/secretariat/correspondence/profiles/:id', (req, res) => {
+  const { id } = req.params;
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+
+  const idx = data.letterhead_profiles.findIndex((p: any) => p.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Letterhead profile not found.' });
+  }
+
+  const oldVal = { ...data.letterhead_profiles[idx] };
+  const updated = {
+    ...oldVal,
+    ...req.body,
+    id,
+    updatedAt: new Date().toISOString()
+  };
+
+  data.letterhead_profiles[idx] = updated;
+  recordAuditLog(data, {
+    action: 'EDIT',
+    entityType: 'LETTERHEAD_PROFILE',
+    recordId: id,
+    referenceNumber: updated.rcNumber,
+    oldValue: oldVal,
+    newValue: updated
+  });
+  writeDb(data);
+
+  res.json({ success: true, profile: updated, message: 'Letterhead profile updated successfully.' });
+});
+
+// GET /api/secretariat/correspondence/signatories
+app.get('/api/secretariat/correspondence/signatories', (req, res) => {
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+  writeDb(data);
+  res.json({ success: true, signatories: data.correspondence_signatories });
+});
+
+// POST /api/secretariat/correspondence/signatories
+app.post('/api/secretariat/correspondence/signatories', (req, res) => {
+  const { name, title, organisation, isDefault } = req.body;
+  if (!name || !title || !organisation) {
+    return res.status(400).json({ error: 'Name, title, and organisation are required.' });
+  }
+
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+
+  if (isDefault) {
+    data.correspondence_signatories.forEach((s: any) => { s.isDefault = false; });
+  }
+
+  const sigId = `sig-${Date.now()}`;
+  const newSig = {
+    id: sigId,
+    name: name.trim(),
+    title: title.trim(),
+    organisation: organisation.trim(),
+    isActive: true,
+    isDefault: !!isDefault,
+    createdAt: new Date().toISOString()
+  };
+
+  data.correspondence_signatories.push(newSig);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'CORRESPONDENCE_SIGNATORY',
+    recordId: sigId,
+    newValue: newSig
+  });
+  writeDb(data);
+
+  res.json({ success: true, signatory: newSig, message: 'Signatory added successfully.' });
+});
+
+// GET /api/secretariat/correspondence/templates
+app.get('/api/secretariat/correspondence/templates', (req, res) => {
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+  writeDb(data);
+  res.json({ success: true, templates: data.correspondence_templates });
+});
+
+// POST /api/secretariat/correspondence/templates
+app.post('/api/secretariat/correspondence/templates', (req, res) => {
+  const { title, correspondenceType, subjectTemplate, bodyTemplate, salutationTemplate, closingTemplate } = req.body;
+  if (!title || !correspondenceType || !bodyTemplate) {
+    return res.status(400).json({ error: 'Title, correspondenceType, and bodyTemplate are required.' });
+  }
+
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+
+  const tmplId = `tmpl-${Date.now()}`;
+  const newTmpl = {
+    id: tmplId,
+    title: title.trim(),
+    correspondenceType,
+    subjectTemplate: subjectTemplate || '',
+    bodyTemplate: bodyTemplate.trim(),
+    salutationTemplate: salutationTemplate || 'Dear {{recipientName}},',
+    closingTemplate: closingTemplate || 'Yours faithfully,',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  data.correspondence_templates.push(newTmpl);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'CORRESPONDENCE_TEMPLATE',
+    recordId: tmplId,
+    newValue: newTmpl
+  });
+  writeDb(data);
+
+  res.json({ success: true, template: newTmpl, message: 'Template created successfully.' });
+});
+
+// GET /api/secretariat/correspondence/documents
+app.get('/api/secretariat/correspondence/documents', (req, res) => {
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+  writeDb(data);
+  res.json({ success: true, documents: data.correspondence_documents });
+});
+
+// POST /api/secretariat/correspondence/documents (Composer create)
+app.post('/api/secretariat/correspondence/documents', (req, res) => {
+  const {
+    profileId, correspondenceType, templateId, reference, date, recipientName,
+    recipientOrganisation, recipientAddress, attention, subject, salutation,
+    body, closing, signatoryId, attachments, cc, userEmail
+  } = req.body;
+
+  if (!profileId || !correspondenceType || !recipientName || !subject || !body || !signatoryId) {
+    return res.status(400).json({ error: 'Required fields missing for correspondence document.' });
+  }
+
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+
+  const docCount = data.correspondence_documents.length + 1;
+  const docNumber = `DIS-DOC-2026-${String(docCount).padStart(4, '0')}`;
+  const docId = `doc-${Date.now()}`;
+  const now = new Date().toISOString();
+
+  const newDoc = {
+    id: docId,
+    documentNumber: docNumber,
+    profileId,
+    correspondenceType,
+    templateId: templateId || undefined,
+    reference: reference || `REF/${Math.floor(1000 + Math.random() * 9000)}/2026`,
+    date: date || now.slice(0, 10),
+    recipientName: recipientName.trim(),
+    recipientOrganisation: recipientOrganisation.trim(),
+    recipientAddress: recipientAddress.trim(),
+    attention: attention ? attention.trim() : undefined,
+    subject: subject.trim(),
+    salutation: salutation || 'Dear Sir/Madam,',
+    body: body.trim(),
+    closing: closing || 'Yours faithfully,',
+    signatoryId,
+    attachments: attachments ? attachments.trim() : undefined,
+    cc: cc ? cc.trim() : undefined,
+    status: 'DRAFT',
+    currentVersion: 1,
+    versions: [
+      {
+        versionNumber: 1,
+        subject: subject.trim(),
+        body: body.trim(),
+        updatedAt: now,
+        updatedBy: userEmail || 'Secretariat Administrator',
+        changeReason: 'Initial composition'
+      }
+    ],
+    createdAt: now,
+    updatedAt: now,
+    createdBy: userEmail || 'Secretariat Administrator'
+  };
+
+  data.correspondence_documents.push(newDoc);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'CORRESPONDENCE_DOCUMENT',
+    recordId: docId,
+    referenceNumber: docNumber,
+    newValue: newDoc,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+  writeDb(data);
+
+  res.json({ success: true, document: newDoc, message: 'Correspondence document drafted successfully.' });
+});
+
+// PUT /api/secretariat/correspondence/documents/:id/status (Workflow transitions & Zero self-approval)
+app.put('/api/secretariat/correspondence/documents/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status, userEmail, approvalComment } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: 'Target status is required.' });
+  }
+
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+
+  const idx = data.correspondence_documents.findIndex((d: any) => d.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Correspondence document not found.' });
+  }
+
+  const doc = data.correspondence_documents[idx];
+  const oldVal = { ...doc };
+
+  // Zero self-approval check
+  if (status === 'APPROVED' && doc.createdBy && userEmail && doc.createdBy.toLowerCase() === userEmail.toLowerCase()) {
+    return res.status(403).json({
+      success: false,
+      error: 'Governance Safety Rule Violation: Zero self-approval principle prevents document creators from approving their own correspondence.'
+    });
+  }
+
+  doc.status = status;
+  doc.updatedAt = new Date().toISOString();
+  doc.updatedBy = userEmail || 'Secretariat Administrator';
+
+  if (status === 'APPROVED') {
+    doc.approvedBy = userEmail || 'Secretariat Approver';
+    doc.approvedAt = new Date().toISOString();
+    doc.approvalComment = approvalComment || 'Approved in accordance with Secretariat governance standards.';
+  }
+
+  recordAuditLog(data, {
+    action: status === 'APPROVED' ? 'APPROVE' : 'STATUS_CHANGE',
+    entityType: 'CORRESPONDENCE_DOCUMENT',
+    recordId: id,
+    referenceNumber: doc.documentNumber,
+    oldValue: oldVal,
+    newValue: doc,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+
+  writeDb(data);
+
+  res.json({ success: true, document: doc, message: `Correspondence document status updated to ${status}.` });
+});
+
+// PUT /api/secretariat/correspondence/documents/:id/edit (Versioning on edit)
+app.put('/api/secretariat/correspondence/documents/:id/edit', (req, res) => {
+  const { id } = req.params;
+  const { subject, body, changeReason, userEmail } = req.body;
+
+  const data = readDb();
+  ensureCorrespondenceDefaults(data);
+
+  const idx = data.correspondence_documents.findIndex((d: any) => d.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Correspondence document not found.' });
+  }
+
+  const doc = data.correspondence_documents[idx];
+  const oldVal = { ...doc };
+
+  const newVersionNum = doc.currentVersion + 1;
+  const now = new Date().toISOString();
+
+  doc.subject = subject || doc.subject;
+  doc.body = body || doc.body;
+  doc.currentVersion = newVersionNum;
+  doc.status = 'DRAFT'; // Material edit requires re-review/approval
+  doc.updatedAt = now;
+  doc.updatedBy = userEmail || 'Secretariat Administrator';
+
+  if (!doc.versions) doc.versions = [];
+  doc.versions.push({
+    versionNumber: newVersionNum,
+    subject: doc.subject,
+    body: doc.body,
+    updatedAt: now,
+    updatedBy: userEmail || 'Secretariat Administrator',
+    changeReason: changeReason || 'Material update requiring re-review'
+  });
+
+  recordAuditLog(data, {
+    action: 'EDIT_VERSION',
+    entityType: 'CORRESPONDENCE_DOCUMENT',
+    recordId: id,
+    referenceNumber: doc.documentNumber,
+    oldValue: oldVal,
+    newValue: doc,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+
+  writeDb(data);
+
+  res.json({ success: true, document: doc, message: `Correspondence document updated to version ${newVersionNum} and returned to DRAFT for review.` });
+});
+
+// ============================================================
+// COMMITTEE OPERATIONS & MEMBERSHIP MANAGEMENT API ROUTES
+// ============================================================
+
+function ensureCommitteeDefaults(data: any) {
+  if (!data.committees) {
+    data.committees = [
+      {
+        id: 'comm-safety-2026',
+        name: 'Main Aviation Safety Committee 2026',
+        reference: 'ASS-COMM-2026-001',
+        committeeType: 'Aviation Safety Committee',
+        description: 'Principal advisory and operational committee overseeing continental aviation safety protocols, regulatory alignment, and risk mitigation strategies.',
+        purpose: 'Establish unified safety compliance standards across African airspace.',
+        chairpersonId: '',
+        secretaryId: '',
+        secretariatLiaison: 'Dr. Aliyu Mohammed',
+        startDate: '2026-01-15',
+        endDate: '2026-11-20',
+        isActive: true,
+        status: 'ACTIVE',
+        notes: 'Primary oversight committee.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'comm-protocol-2026',
+        name: 'Protocol & VVIP Reception Committee',
+        reference: 'ASS-COMM-2026-002',
+        committeeType: 'Protocol Committee',
+        description: 'Managing high-level diplomatic delegations, ministerial arrivals, and VVIP security coordination.',
+        purpose: 'Ensure seamless protocol execution for all visiting dignitaries.',
+        chairpersonId: '',
+        secretaryId: '',
+        secretariatLiaison: 'Capt. Nkechi Adebayo',
+        startDate: '2026-02-01',
+        endDate: '2026-11-20',
+        isActive: true,
+        status: 'ACTIVE',
+        notes: 'Coordinates with airport liaison.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+  }
+  if (!data.committee_memberships) {
+    data.committee_memberships = [];
+  }
+}
+
+app.get('/api/secretariat/committees', (req, res) => {
+  const data = readDb();
+  ensureCommitteeDefaults(data);
+  writeDb(data);
+  res.json({ success: true, committees: data.committees });
+});
+
+app.post('/api/secretariat/committees', (req, res) => {
+  const { name, committeeType, description, purpose, parentCommitteeId, chairpersonId, viceChairpersonId, secretaryId, secretariatLiaison, startDate, endDate, status, notes, userEmail } = req.body;
+  if (!name || !committeeType) {
+    return res.status(400).json({ error: 'Committee name and type are required.' });
+  }
+
+  const data = readDb();
+  ensureCommitteeDefaults(data);
+
+  const commId = `comm-${Date.now()}`;
+  const refNum = `ASS-COMM-2026-${String(data.committees.length + 1).padStart(3, '0')}`;
+  const now = new Date().toISOString();
+
+  const newComm = {
+    id: commId,
+    name: name.trim(),
+    reference: refNum,
+    committeeType,
+    description: description ? description.trim() : '',
+    purpose: purpose ? purpose.trim() : '',
+    parentCommitteeId: parentCommitteeId || undefined,
+    chairpersonId: chairpersonId || undefined,
+    viceChairpersonId: viceChairpersonId || undefined,
+    secretaryId: secretaryId || undefined,
+    secretariatLiaison: secretariatLiaison ? secretariatLiaison.trim() : '',
+    startDate: startDate || now.slice(0, 10),
+    endDate: endDate || undefined,
+    isActive: true,
+    status: status || 'ACTIVE',
+    notes: notes ? notes.trim() : '',
+    createdAt: now,
+    updatedAt: now
+  };
+
+  data.committees.push(newComm);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'COMMITTEE',
+    recordId: commId,
+    referenceNumber: refNum,
+    newValue: newComm,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+  writeDb(data);
+
+  res.json({ success: true, committee: newComm, message: 'Committee created successfully.' });
+});
+
+app.put('/api/secretariat/committees/:id', (req, res) => {
+  const { id } = req.params;
+  const { userEmail, ...updates } = req.body;
+  const data = readDb();
+  ensureCommitteeDefaults(data);
+
+  const idx = data.committees.findIndex((c: any) => c.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Committee not found.' });
+  }
+
+  const oldVal = { ...data.committees[idx] };
+  const updated = {
+    ...oldVal,
+    ...updates,
+    id,
+    updatedAt: new Date().toISOString()
+  };
+
+  data.committees[idx] = updated;
+  recordAuditLog(data, {
+    action: 'EDIT',
+    entityType: 'COMMITTEE',
+    recordId: id,
+    referenceNumber: updated.reference,
+    oldValue: oldVal,
+    newValue: updated,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+  writeDb(data);
+
+  res.json({ success: true, committee: updated, message: 'Committee updated successfully.' });
+});
+
+app.get('/api/secretariat/committee-memberships', (req, res) => {
+  const data = readDb();
+  ensureCommitteeDefaults(data);
+  writeDb(data);
+  res.json({ success: true, memberships: data.committee_memberships });
+});
+
+app.post('/api/secretariat/committee-memberships', (req, res) => {
+  const { committeeId, personId, role, startDate, endDate, status, appointmentReference, assignedResponsibilities, notes, userEmail } = req.body;
+  if (!committeeId || !personId || !role) {
+    return res.status(400).json({ error: 'Committee ID, Person ID, and Role are required.' });
+  }
+
+  const data = readDb();
+  ensureCommitteeDefaults(data);
+
+  const membId = `memb-${Date.now()}`;
+  const membRef = `ASS-MEMB-2026-${String(data.committee_memberships.length + 1).padStart(4, '0')}`;
+  const now = new Date().toISOString();
+
+  const newMemb = {
+    id: membId,
+    committeeId,
+    personId,
+    membershipReference: membRef,
+    role,
+    startDate: startDate || now.slice(0, 10),
+    endDate: endDate || undefined,
+    status: status || 'ACTIVE',
+    appointmentReference: appointmentReference ? appointmentReference.trim() : `APT-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+    assignedResponsibilities: assignedResponsibilities || [],
+    notes: notes ? notes.trim() : '',
+    createdBy: userEmail || 'Secretariat Administrator',
+    createdAt: now,
+    updatedAt: now
+  };
+
+  data.committee_memberships.push(newMemb);
+  recordAuditLog(data, {
+    action: 'CREATE',
+    entityType: 'COMMITTEE_MEMBERSHIP',
+    recordId: membId,
+    referenceNumber: membRef,
+    newValue: newMemb,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+  writeDb(data);
+
+  res.json({ success: true, membership: newMemb, message: 'Committee membership assigned successfully.' });
+});
+
+app.put('/api/secretariat/committee-memberships/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status, userEmail } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: 'Status is required.' });
+  }
+
+  const data = readDb();
+  ensureCommitteeDefaults(data);
+
+  const idx = data.committee_memberships.findIndex((m: any) => m.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Membership not found.' });
+  }
+
+  const memb = data.committee_memberships[idx];
+  const oldVal = { ...memb };
+
+  // Zero self-approval enforcement check
+  if (status === 'APPROVED' && memb.createdBy && userEmail && memb.createdBy.toLowerCase() === userEmail.toLowerCase()) {
+    return res.status(403).json({
+      success: false,
+      error: 'Governance Safety Rule Violation: Zero self-approval principle prevents membership creators from approving their own committee appointment.'
+    });
+  }
+
+  memb.status = status;
+  memb.updatedAt = new Date().toISOString();
+  if (status === 'APPROVED' || status === 'ACTIVE') {
+    memb.approvedBy = userEmail || 'Secretariat Approver';
+    memb.approvedAt = new Date().toISOString();
+  }
+
+  recordAuditLog(data, {
+    action: status === 'APPROVED' ? 'APPROVE' : 'STATUS_CHANGE',
+    entityType: 'COMMITTEE_MEMBERSHIP',
+    recordId: id,
+    referenceNumber: memb.membershipReference,
+    oldValue: oldVal,
+    newValue: memb,
+    performedBy: userEmail || 'Secretariat Administrator'
+  });
+
+  writeDb(data);
+
+  res.json({ success: true, membership: memb, message: `Membership status updated to ${status}.` });
+});
+
 async function start() {
   const publicPath = path.join(process.cwd(), 'public');
   if (fs.existsSync(publicPath)) {

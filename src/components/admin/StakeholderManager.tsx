@@ -20,6 +20,7 @@ import {
   InvitationLetter
 } from '../../types';
 import { STAKEHOLDER_CATEGORIES } from '../../data/stakeholdersData';
+import RSVPQRCode from '../rsvp/RSVPQRCode';
 
 interface StakeholderManagerProps {
   onClose?: () => void;
@@ -863,6 +864,39 @@ export default function StakeholderManager({ onClose }: StakeholderManagerProps)
                   <p>{letterData.sectorRelevanceText}</p>
                   <p>{letterData.proposedRoleText}</p>
                   <p>{letterData.callToActionText}</p>
+
+                  {/* Official RSVP Protocol & QR Section */}
+                  <div className="my-4 p-4 bg-slate-50 border-2 border-[#D4AF37]/60 rounded-xl text-center font-sans space-y-2">
+                    <p className="text-xs font-bold font-serif uppercase text-[#0A192F] tracking-wider">
+                      RSVP / ATTENDANCE CONFIRMATION
+                    </p>
+                    <p className="text-xs text-slate-700">
+                      Kindly confirm your attendance by visiting:
+                    </p>
+                    <a 
+                      href={`https://summit.domislink.com/rsvp?ref=${selectedStakeholder?.id || 'AVS26'}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block font-mono text-xs font-bold text-[#0A192F] bg-[#D4AF37]/20 px-3 py-1 rounded border border-[#D4AF37] hover:underline"
+                    >
+                      https://summit.domislink.com/rsvp?ref={selectedStakeholder?.id || 'AVS26'}
+                    </a>
+                    <p className="text-[11px] text-slate-600">
+                      You may also scan the QR code provided below to confirm your attendance.
+                    </p>
+                    <div className="flex justify-center pt-1">
+                      <RSVPQRCode 
+                        reference={selectedStakeholder?.id || 'AVS26'}
+                        size={120}
+                        showTitle={false}
+                        showLinkAction={false}
+                        showDownload={false}
+                        darkTheme={false}
+                        className="p-2 border-0 shadow-none bg-transparent"
+                      />
+                    </div>
+                  </div>
+
                   <div className="pt-3 border-t text-xs font-sans text-slate-600 whitespace-pre-line">
                     {letterData.signatureBlock}
                   </div>

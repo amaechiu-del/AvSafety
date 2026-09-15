@@ -26,17 +26,17 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
   }, []);
 
   const navItems = [
-    { id: 'home', label: 'Home' },
-    { id: 'dignitaries', label: 'Dignitaries' },
-    { id: 'theme', label: 'Theme' },
-    { id: 'speakers', label: 'Speakers' },
-    { id: 'stakeholders', label: '24+ Stakeholders' },
+    { id: 'about', label: 'Summit' },
     { id: 'programme', label: 'Programme' },
+    { id: 'dignitaries', label: 'Dignitaries' },
+    { id: 'speakers', label: 'Speakers' },
+    { id: 'everybody-involved', label: 'Aviation Safety' },
+    { id: 'safety-library', label: 'Safety Library' },
+    { id: 'challenge', label: 'Memo Challenge' },
     { id: 'domislink-bookstore', label: 'Bookstore' },
-    { id: 'challenge', label: 'Memoir Challenge' },
-    { id: 'marketplace', label: 'Advertise & Sponsor' },
-    { id: 'investment', label: 'Safety Investment' },
-    { id: 'simulation', label: 'Simulation & Training' },
+    { id: 'podcast', label: 'Podcast' },
+    { id: 'marketplace', label: 'Sponsor' },
+    { id: 'rsvp', label: 'RSVP' },
     { id: 'register', label: 'Register' },
     { id: 'contact', label: 'Contact' }
   ];

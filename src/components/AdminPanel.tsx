@@ -8,11 +8,15 @@ import {
   Users, ShieldAlert, Key, Database, RefreshCw, 
   Trash2, Award, Calendar, HelpCircle, Check, MapPin, 
   Download, Search, Filter, ShieldCheck, Mail, Phone, 
-  Building, User, Tag, CheckCircle2, AlertCircle, Eye,
-  Clock, X, UserPlus
+  Building, Building2, User, Tag, CheckCircle2, AlertCircle, Eye,
+  Clock, X, UserPlus, CheckSquare, Crown, FileText
 } from 'lucide-react';
 import { Registration, MemoSubmission } from '../types';
 import StakeholderManager from './admin/StakeholderManager';
+import InvitationMasterManager from './admin/InvitationMasterManager';
+import CorrespondenceManager from './admin/CorrespondenceManager';
+import CommitteeOperationsManager from './admin/CommitteeOperationsManager';
+import RSVPManager from './admin/RSVPManager';
 import { AdminProtectedView } from './AdminAuthWrapper';
 
 interface AdminProps {
@@ -22,7 +26,7 @@ interface AdminProps {
   onUpdateRegistrationStatus?: (id: string, status: Registration['status']) => void;
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'STAKEHOLDERS' | 'REGS' | 'MEMOS' | 'SYSTEM';
+  initialTab?: 'STAKEHOLDERS' | 'CORRESPONDENCE' | 'COMMITTEES' | 'RSVP' | 'REGS' | 'MEMOS' | 'SYSTEM';
 }
 
 export default function AdminPanel({ 
@@ -34,7 +38,7 @@ export default function AdminPanel({
   onClose,
   initialTab = 'STAKEHOLDERS'
 }: AdminProps) {
-  const [activeTab, setActiveTab] = useState<'STAKEHOLDERS' | 'REGS' | 'MEMOS' | 'SYSTEM'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'STAKEHOLDERS' | 'CORRESPONDENCE' | 'COMMITTEES' | 'RSVP' | 'REGS' | 'MEMOS' | 'SYSTEM'>(initialTab);
   const [dbResetting, setDbResetting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONFIRMED' | 'CHECKED_IN' | 'PENDING_REVIEW' | 'CANCELLED'>('ALL');
@@ -206,6 +210,57 @@ export default function AdminPanel({
                   24+ Sectors
                 </span>
               </button>
+
+              <button
+                onClick={() => setActiveTab('CORRESPONDENCE')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors text-left ${
+                  activeTab === 'CORRESPONDENCE'
+                    ? 'bg-[#0A192F] text-[#FFD700] shadow border border-[#D4AF37]/50'
+                    : 'text-gray-700 hover:bg-[#F3E5AB]/20 hover:text-[#0A192F]'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
+                  <FileText className="h-4 w-4 text-[#D4AF37]" />
+                  <span>Correspondence & Letterhead</span>
+                </div>
+                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-900 font-bold rounded text-[10px] border border-blue-400/40">
+                  A4 Profiles
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('COMMITTEES')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors text-left ${
+                  activeTab === 'COMMITTEES'
+                    ? 'bg-[#0A192F] text-[#FFD700] shadow border border-[#D4AF37]/50'
+                    : 'text-gray-700 hover:bg-[#F3E5AB]/20 hover:text-[#0A192F]'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Building2 className="h-4 w-4 text-[#D4AF37]" />
+                  <span>Committee Operations</span>
+                </div>
+                <span className="px-2 py-0.5 bg-purple-500/20 text-purple-900 font-bold rounded text-[10px] border border-purple-400/40">
+                  Directorate
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('RSVP')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors text-left ${
+                  activeTab === 'RSVP'
+                    ? 'bg-[#0A192F] text-[#FFD700] shadow border border-[#D4AF37]/50'
+                    : 'text-gray-700 hover:bg-[#F3E5AB]/20 hover:text-[#0A192F]'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Crown className="h-4 w-4 text-[#D4AF37]" />
+                  <span>RSVP & Attendance</span>
+                </div>
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-800 font-bold rounded text-[10px] border border-emerald-400/40">
+                  Live Desk
+                </span>
+              </button>
               
               <button
                 onClick={() => setActiveTab('REGS')}
@@ -274,7 +329,28 @@ export default function AdminPanel({
             {/* ------------------------------------------------------------- */}
             {activeTab === 'STAKEHOLDERS' && (
               <div className="space-y-4">
-                <StakeholderManager />
+                <InvitationMasterManager />
+              </div>
+            )}
+
+            {activeTab === 'CORRESPONDENCE' && (
+              <div className="space-y-4">
+                <CorrespondenceManager />
+              </div>
+            )}
+
+            {activeTab === 'COMMITTEES' && (
+              <div className="space-y-4">
+                <CommitteeOperationsManager />
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------- */}
+            {/* RSVP & ATTENDANCE CONFIRMATION ENGINE TAB */}
+            {/* ------------------------------------------------------------- */}
+            {activeTab === 'RSVP' && (
+              <div className="h-full">
+                <RSVPManager />
               </div>
             )}
 

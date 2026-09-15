@@ -8,7 +8,8 @@ import {
   Users, Shield, Sparkles, Building2, ChevronRight, 
   MapPin, CheckCircle2, AlertCircle, Search, Filter, 
   UserPlus, Award, Send, Check, HeartHandshake,
-  DollarSign, Globe, ExternalLink, ArrowRight, X
+  DollarSign, Globe, ExternalLink, ArrowRight, X,
+  BookOpen, Zap
 } from 'lucide-react';
 import { StakeholderInvitee, StakeholderCategory } from '../../types';
 import { STAKEHOLDER_CATEGORIES } from '../../data/stakeholdersData';
@@ -350,22 +351,38 @@ export default function StakeholderSection({ onOpenNominateModal }: StakeholderS
                         </div>
                       </div>
 
-                      {/* Proposed Topic */}
-                      {(person.proposedTopic || person.proposedDiscussionArea) && (
-                        <div className="pt-2 border-t border-slate-800/80 text-xs">
-                          <div className="flex items-center space-x-1.5 text-indigo-300 font-mono text-[10px] mb-0.5">
-                            <span>PROPOSED TOPIC:</span>
-                            <span className="text-slate-500">(Subject to Formal Acceptance)</span>
+                      {/* Assigned & Proposed Topic */}
+                      {(person.assignedTopic || person.proposedTopic || person.proposedDiscussionArea) && (
+                        <div className="pt-2 border-t border-slate-800/80 text-xs space-y-1">
+                          <div className="flex items-center space-x-1.5 text-[#D4AF37] font-mono text-[10px]">
+                            <BookOpen className="h-3 w-3 text-amber-400" />
+                            <span>ASSIGNED SAFETY TOPIC:</span>
+                            {!person.isTopicOfficial && (
+                              <span className="text-slate-500 text-[9px]">(Proposed Protocol Mandate)</span>
+                            )}
                           </div>
-                          <p className="text-slate-300 font-serif italic">
-                            "{person.proposedTopic || person.proposedDiscussionArea}"
+                          <p className="text-slate-200 font-serif italic text-xs leading-relaxed">
+                            "{person.assignedTopic || person.proposedTopic || person.proposedDiscussionArea}"
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Assigned Summit Assignment */}
+                      {person.assignedAssignment && (
+                        <div className="p-2.5 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-lg text-xs space-y-0.5">
+                          <div className="flex items-center space-x-1.5 text-amber-300 font-mono text-[9px] font-bold uppercase tracking-wider">
+                            <Zap className="h-3 w-3 text-[#FFD700]" />
+                            <span>OFFICIAL SUMMIT ASSIGNMENT:</span>
+                          </div>
+                          <p className="text-white text-xs font-medium">
+                            {person.assignedAssignment}
                           </p>
                         </div>
                       )}
 
                       {/* Verified Role Tag */}
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 font-mono">
-                        <span>Role: {person.eventRole}</span>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 font-mono">
+                        <span className="text-slate-300">Designated Role: <strong className="text-amber-300">{person.eventRole}</strong></span>
                         <span className="flex items-center space-x-1 text-emerald-400">
                           <CheckCircle2 className="h-3 w-3" />
                           <span>Audited by Summit Protocol</span>

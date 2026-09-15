@@ -611,6 +611,8 @@ export interface StakeholderInvitee {
   status: InvitationStatus;
   eventRole: SummitEventRole;
   proposedTopic?: string;
+  assignedTopic?: string;
+  assignedAssignment?: string;
   isTopicOfficial?: boolean;
   whySectorMatters: string;
   proposedDiscussionArea: string;
@@ -683,5 +685,362 @@ export interface StakeholderStats {
   speakerInterestCount: number;
   exhibitorInterestCount: number;
   byCategory: Record<string, number>;
+}
+
+// ============================================================
+// RSVP & ATTENDANCE CONFIRMATION ENGINE TYPES
+// ============================================================
+
+export type RSVPStatus =
+  | 'INVITED'
+  | 'LETTER_SENT'
+  | 'RSVP_PENDING'
+  | 'CONFIRMED'
+  | 'DECLINED'
+  | 'TENTATIVE'
+  | 'REPRESENTATIVE_NOMINATED'
+  | 'NEEDS_INFORMATION'
+  | 'ATTENDED'
+  | 'NO_SHOW';
+
+export type AttendanceOption =
+  | 'I_WILL_ATTEND'
+  | 'I_WILL_ATTEND_WITH_REPRESENTATIVE'
+  | 'I_AM_TENTATIVE'
+  | 'I_AM_UNABLE_TO_ATTEND'
+  | 'WILL_ATTEND'
+  | 'SEND_REPRESENTATIVE'
+  | 'CANNOT_ATTEND'
+  | 'NEED_MORE_INFO';
+
+export interface RepresentativeDetails {
+  fullName: string;
+  position?: string;
+  designation?: string;
+  organisation?: string;
+  email: string;
+  phone: string;
+}
+
+export interface RSVPRecord {
+  id: string;
+  confirmationRef: string;
+  invitationRef?: string;
+  invitationNumber?: string;
+  inviteeId?: string;
+  title?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  fullName: string;
+  organisation: string;
+  position: string;
+  designation?: string;
+  email: string;
+  phone: string;
+  attendanceOption: AttendanceOption;
+  rsvpStatus: RSVPStatus;
+  representative?: RepresentativeDetails;
+  accessibilityRequirement?: string;
+  specialRequirements?: string;
+  dietary?: string;
+  protocolNotes?: string;
+  additionalNotes?: string;
+  consentConfirmed: boolean;
+  submittedAt: string;
+  emailDeliveryStatus: 'NOT_CONFIGURED_STORED' | 'QUEUED' | 'SENT' | 'FAILED';
+  updatedAt?: string;
+  adminNotes?: string;
+  category?: StakeholderCategory | string;
+  protocolTier?: string;
+}
+
+export type SummitSector =
+  | 'Aviation'
+  | 'Government'
+  | 'Regulatory'
+  | 'Airports'
+  | 'Airlines'
+  | 'Air Traffic Management'
+  | 'Aviation Training'
+  | 'Security'
+  | 'Emergency Services'
+  | 'Road Safety'
+  | 'Transport'
+  | 'Oil & Gas'
+  | 'Banking & Finance'
+  | 'Insurance'
+  | 'Telecommunications'
+  | 'Technology'
+  | 'Manufacturing'
+  | 'Logistics'
+  | 'Healthcare'
+  | 'Education'
+  | 'Religious Organisations'
+  | 'Media'
+  | 'Legal'
+  | 'Professional Bodies'
+  | 'Investors'
+  | 'Hospitality'
+  | 'Tourism'
+  | 'State Government'
+  | 'Local Government'
+  | 'International Organisations'
+  | 'NGOs'
+  | 'Community Organisations'
+  | 'Other';
+
+export type SummitCategory =
+  | 'Government Official'
+  | 'Regulator'
+  | 'Airline Executive'
+  | 'Airport Executive'
+  | 'ATC / ATM Professional'
+  | 'Aviation Safety Professional'
+  | 'Pilot'
+  | 'Engineer'
+  | 'Cabin Crew'
+  | 'Dispatcher'
+  | 'Aviation Trainer'
+  | 'Security Organisation'
+  | 'Emergency Service'
+  | 'Business Leader'
+  | 'Investor'
+  | 'Academic'
+  | 'Media'
+  | 'Religious Leader'
+  | 'Traditional / Community Leader'
+  | 'Professional Association'
+  | 'NGO Representative'
+  | 'Technology Leader'
+  | 'Legal Professional'
+  | 'Healthcare Professional'
+  | 'Logistics Professional'
+  | 'Hospitality Representative'
+  | 'Student / Young Professional'
+  | 'Other';
+
+export type InvitationType =
+  | 'VIP'
+  | 'VVIP'
+  | 'Official'
+  | 'Speaker'
+  | 'Panellist'
+  | 'Moderator'
+  | 'Sponsor'
+  | 'Partner'
+  | 'Exhibitor'
+  | 'Media'
+  | 'Guest'
+  | 'Observer'
+  | 'Delegate'
+  | 'Institutional'
+  | 'Special Invite'
+  | 'Other';
+
+export type MasterInvitationStatus =
+  | 'DRAFT'
+  | 'APPROVED'
+  | 'READY TO SEND'
+  | 'SENT'
+  | 'DELIVERED'
+  | 'VIEWED'
+  | 'ACCEPTED'
+  | 'DECLINED'
+  | 'TENTATIVE'
+  | 'CONFIRMED'
+  | 'ATTENDED'
+  | 'CANCELLED';
+
+export type InvitationPurpose =
+  | 'Summit Delegate'
+  | 'Keynote / Speaker'
+  | 'Panel Participation'
+  | 'Government Representation'
+  | 'Regulatory Representation'
+  | 'Strategic Partner'
+  | 'Sponsor'
+  | 'Media'
+  | 'Industry Stakeholder'
+  | 'Community Stakeholder'
+  | 'Special Guest'
+  | 'Other';
+
+export interface MasterPerson {
+  id: string;
+  referenceNumber: string;
+  title: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  preferredName?: string;
+  designation: string;
+  organisation: string;
+  department?: string;
+  email: string;
+  phone: string;
+  altPhone?: string;
+  country: string;
+  state?: string;
+  city?: string;
+  sector: SummitSector;
+  category: SummitCategory;
+  subcategory?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+export interface MasterOrganisation {
+  id: string;
+  name: string;
+  type: string;
+  sector: SummitSector;
+  country: string;
+  state?: string;
+  city?: string;
+  address?: string;
+  website?: string;
+  email?: string;
+  phone?: string;
+  contactPerson?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MasterInvitation {
+  id: string;
+  invitationNumber: string;
+  personId: string;
+  orgId: string;
+  sector: SummitSector;
+  category: SummitCategory;
+  invitationType: InvitationType;
+  invitationPurpose: InvitationPurpose;
+  invitationDate: string;
+  eventDate: string;
+  invitationStatus: MasterInvitationStatus;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+export type CorrespondenceType =
+  | 'General Corporate Correspondence'
+  | 'Aviation Safety Summit Correspondence'
+  | 'Official Invitation Letter'
+  | 'Appointment Letter'
+  | 'Committee Letter'
+  | 'Government / Regulatory Letter'
+  | 'Vendor / Partner Letter'
+  | 'Official Notice'
+  | 'General Secretariat Letter';
+
+export type CorrespondenceStatus =
+  | 'DRAFT'
+  | 'REVIEW'
+  | 'APPROVED'
+  | 'PRINT_READY'
+  | 'ARCHIVED'
+  | 'CANCELLED';
+
+export interface LetterheadProfile {
+  id: string;
+  name: string;
+  purpose: string;
+  legalOrganisationName: string;
+  displayName: string;
+  rcNumber: string;
+  rcNumberX: number; // default 29.4
+  rcNumberY: number; // default 28.1
+  tagline: string;
+  address: string;
+  telephone: string;
+  mobile: string;
+  email: string;
+  website: string;
+  logoUrl?: string;
+  headerText: string;
+  footerText: string;
+  referencePrefix: string;
+  referenceFormat: string;
+  dateFormat: string;
+  defaultSignatoryId?: string;
+  pageSize: 'A4' | 'Letter';
+  orientation: 'portrait' | 'landscape';
+  margins: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CorrespondenceTemplate {
+  id: string;
+  title: string;
+  correspondenceType: CorrespondenceType;
+  subjectTemplate: string;
+  bodyTemplate: string;
+  salutationTemplate: string;
+  closingTemplate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CorrespondenceDocumentVersion {
+  versionNumber: number;
+  subject: string;
+  body: string;
+  updatedAt: string;
+  updatedBy: string;
+  changeReason?: string;
+}
+
+export interface CorrespondenceDocument {
+  id: string;
+  documentNumber: string;
+  profileId: string;
+  correspondenceType: CorrespondenceType;
+  templateId?: string;
+  reference: string;
+  date: string;
+  recipientName: string;
+  recipientOrganisation: string;
+  recipientAddress: string;
+  attention?: string;
+  subject: string;
+  salutation: string;
+  body: string;
+  closing: string;
+  signatoryId: string;
+  attachments?: string;
+  cc?: string;
+  status: CorrespondenceStatus;
+  currentVersion: number;
+  versions: CorrespondenceDocumentVersion[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  approvalComment?: string;
+}
+
+export interface CorrespondenceSignatory {
+  id: string;
+  name: string;
+  title: string;
+  organisation: string;
+  signatureUrl?: string;
+  isActive: boolean;
+  isDefault: boolean;
+  createdAt: string;
 }
 

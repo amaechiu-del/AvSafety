@@ -123,25 +123,37 @@ export default function Hero({ onNavigate, eventDate, venue }: HeroProps) {
           </div>
 
           {/* Call To Actions */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 max-w-2xl pt-2">
+          <div className="flex flex-wrap items-center gap-3 max-w-3xl pt-2">
             <button
               onClick={() => onNavigate('register')}
-              className="px-6 py-3.5 bg-gradient-to-r from-[#D4AF37] to-[#B89025] hover:from-[#B89025] hover:to-[#9E781C] text-[#0A192F] font-bold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-150 text-sm tracking-wider uppercase flex items-center justify-center space-x-2"
+              className="px-6 py-3.5 bg-gradient-to-r from-[#D4AF37] to-[#B89025] hover:from-[#B89025] hover:to-[#9E781C] text-[#0A192F] font-bold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-150 text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center space-x-2"
             >
-              <span>REGISTER DELEGATE</span>
+              <span>REGISTER</span>
               <ArrowRight className="h-4 w-4" />
             </button>
             <button
-              onClick={() => onNavigate('marketplace')}
-              className="px-6 py-3.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 font-bold rounded-lg transition-all duration-150 text-sm tracking-wider uppercase text-center flex items-center justify-center space-x-1.5"
+              onClick={() => onNavigate('programme')}
+              className="px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:border-[#D4AF37]/50 transition-all duration-150 text-xs sm:text-sm tracking-wider uppercase text-center"
             >
-              <span>ADVERTISE & SPONSOR</span>
+              VIEW PROGRAMME
             </button>
             <button
-              onClick={() => onNavigate('programme')}
-              className="px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:border-[#D4AF37]/50 transition-all duration-150 text-sm tracking-wider uppercase text-center"
+              onClick={() => onNavigate('speakers')}
+              className="px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/20 text-slate-200 font-semibold rounded-lg hover:border-[#D4AF37]/50 transition-all duration-150 text-xs sm:text-sm tracking-wider uppercase text-center"
             >
-              PROGRAMME
+              MEET THE SPEAKERS
+            </button>
+            <button
+              onClick={() => onNavigate('safety-library')}
+              className="px-5 py-3.5 bg-white/5 hover:bg-white/10 border border-[#D4AF37]/40 text-[#D4AF37] font-semibold rounded-lg hover:bg-[#D4AF37]/10 transition-all duration-150 text-xs sm:text-sm tracking-wider uppercase text-center"
+            >
+              EXPLORE SAFETY LIBRARY
+            </button>
+            <button
+              onClick={() => onNavigate('marketplace')}
+              className="px-5 py-3.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 font-bold rounded-lg transition-all duration-150 text-xs sm:text-sm tracking-wider uppercase text-center flex items-center justify-center space-x-1.5"
+            >
+              <span>SPONSOR & ADVERTISE</span>
             </button>
           </div>
 

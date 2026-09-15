@@ -25,6 +25,7 @@ import Speakers from './components/Speakers';
 import GovernmentLeaders from './components/GovernmentLeaders';
 import IndustryParticipants from './components/IndustryParticipants';
 import StakeholderSection from './components/stakeholders/StakeholderSection';
+import EverybodyIsInvolvedNetwork from './components/stakeholders/EverybodyIsInvolvedNetwork';
 import SummitProgramme from './components/SummitProgramme';
 import GoogleWorkspaceHub from './components/GoogleWorkspaceHub';
 import AviationMemoirChallenge from './components/AviationMemoirChallenge';
@@ -54,6 +55,7 @@ import QRConnector from './components/publishing/QRConnector';
 import { PWAInstallButton } from './components/pwa/PWAInstallButton';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import GeminiLiveVoiceModal from './components/GeminiLiveVoiceModal';
+import RSVPPage from './components/rsvp/RSVPPage';
 
 import { 
   Speaker, Organisation, Session, Registration, 
@@ -73,6 +75,19 @@ export default function App() {
   useEffect(() => {
     if (!isAdmin) setIsAdminMode(false);
   }, [isAdmin]);
+
+  useEffect(() => {
+    // Check if user entered via /rsvp or #rsvp or query parameter ?ref=
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    const search = window.location.search;
+    if (path.includes('/rsvp') || hash === '#rsvp' || search.includes('ref=')) {
+      setTimeout(() => {
+        handleNavigate('rsvp');
+      }, 400);
+    }
+  }, []);
+
   const [showIntro, setShowIntro] = useState(() => {
     return !sessionStorage.getItem('domislink_intro_viewed');
   });
@@ -380,6 +395,11 @@ export default function App() {
         />
       </div>
 
+      {/* DYNAMIC EVERYBODY IS INVOLVED VISUAL NETWORK (16 SECTORS CONVERGING ON AVIATION SAFETY) */}
+      <div id="everybody-involved">
+        <EverybodyIsInvolvedNetwork />
+      </div>
+
       {/* EXPANDED SUMMIT INVITATION & STAKEHOLDER ENGINE (24+ SECTORS) */}
       <div id="stakeholders">
         <StakeholderSection />
@@ -463,8 +483,10 @@ export default function App() {
         <SkyParty />
       </div>
 
-      {/* Safety Knowledge Hub */}
-      <KnowledgeHub />
+      {/* Safety Knowledge Hub / Library */}
+      <div id="safety-library">
+        <KnowledgeHub />
+      </div>
 
       {/* 16. COMMERCIAL ADVERTISING & SPONSORSHIP MARKETPLACE */}
       <section id="marketplace" className="py-8 bg-[#071324] border-y border-[#D4AF37]/30">
@@ -479,7 +501,9 @@ export default function App() {
       <HandbookGenerator />
       <SpeakerKnowledgeHub />
       <SpeakerApprovalDashboard />
-      <PodcastEngineHub />
+      <div id="podcast">
+        <PodcastEngineHub />
+      </div>
       <QRConnector />
 
       {/* 17. PARTNERS */}
@@ -491,7 +515,15 @@ export default function App() {
         />
       </div>
 
-      {/* 17. REGISTRATION */}
+      {/* 17.B OFFICIAL RSVP & ATTENDANCE CONFIRMATION ENGINE */}
+      <div id="rsvp">
+        <RSVPPage 
+          onBackToSummit={() => handleNavigate('hero')}
+          onNavigateToRegister={() => handleNavigate('register')} 
+        />
+      </div>
+
+      {/* 18. REGISTRATION */}
       <div id="register">
         <RegistrationForm onRegister={handleRegisterDelegate} />
       </div>
@@ -669,6 +701,7 @@ export default function App() {
               <div className="space-y-3">
                 <p className="text-[9px] font-mono text-[#D4AF37] uppercase tracking-widest font-bold">ACTION</p>
                 <ul className="space-y-2">
+                  <li><button onClick={() => handleNavigate('rsvp')} className="hover:text-white transition-colors font-bold text-[#FFD700]">RSVP Confirmation</button></li>
                   <li><button onClick={() => handleNavigate('sky-party')} className="hover:text-white transition-colors">Sky Party</button></li>
                   <li><button onClick={() => handleNavigate('register')} className="hover:text-white transition-colors font-bold text-[#D4AF37]">Register Delegate</button></li>
                   <li><button onClick={() => handleNavigate('partners')} className="hover:text-white transition-colors">Partnership</button></li>

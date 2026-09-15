@@ -61,6 +61,12 @@ export default function TopEventBar({ onNavigate }: TopEventBarProps) {
               <span>Book Launch</span>
             </button>
             <button
+              onClick={() => onNavigate('rsvp')}
+              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 border border-[#D4AF37]/50 text-[#FFD700] font-mono font-bold rounded text-[10px] tracking-wider uppercase transition-all"
+            >
+              RSVP
+            </button>
+            <button
               onClick={() => onNavigate('register')}
               className="px-3 py-1 bg-gradient-to-r from-[#D4AF37] to-[#B89025] hover:from-[#B89025] hover:to-[#9E781C] text-[#0A192F] font-bold rounded text-[10px] tracking-widest uppercase transition-all shadow-sm flex items-center space-x-1"
             >
