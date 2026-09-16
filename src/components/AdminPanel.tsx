@@ -17,6 +17,8 @@ import InvitationMasterManager from './admin/InvitationMasterManager';
 import CorrespondenceManager from './admin/CorrespondenceManager';
 import CommitteeOperationsManager from './admin/CommitteeOperationsManager';
 import RSVPManager from './admin/RSVPManager';
+import VolunteerApplicationsManager from './admin/VolunteerApplicationsManager';
+import VolunteerPerformanceManager from './admin/VolunteerPerformanceManager';
 import { AdminProtectedView } from './AdminAuthWrapper';
 
 interface AdminProps {
@@ -26,7 +28,7 @@ interface AdminProps {
   onUpdateRegistrationStatus?: (id: string, status: Registration['status']) => void;
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'STAKEHOLDERS' | 'CORRESPONDENCE' | 'COMMITTEES' | 'RSVP' | 'REGS' | 'MEMOS' | 'SYSTEM';
+  initialTab?: 'STAKEHOLDERS' | 'CORRESPONDENCE' | 'COMMITTEES' | 'RSVP' | 'VOLUNTEERS' | 'VOLUNTEER_PERFORMANCE' | 'REGS' | 'MEMOS' | 'SYSTEM';
 }
 
 export default function AdminPanel({ 
@@ -38,7 +40,7 @@ export default function AdminPanel({
   onClose,
   initialTab = 'STAKEHOLDERS'
 }: AdminProps) {
-  const [activeTab, setActiveTab] = useState<'STAKEHOLDERS' | 'CORRESPONDENCE' | 'COMMITTEES' | 'RSVP' | 'REGS' | 'MEMOS' | 'SYSTEM'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'STAKEHOLDERS' | 'CORRESPONDENCE' | 'COMMITTEES' | 'RSVP' | 'VOLUNTEERS' | 'VOLUNTEER_PERFORMANCE' | 'REGS' | 'MEMOS' | 'SYSTEM'>(initialTab);
   const [dbResetting, setDbResetting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONFIRMED' | 'CHECKED_IN' | 'PENDING_REVIEW' | 'CANCELLED'>('ALL');
@@ -261,6 +263,40 @@ export default function AdminPanel({
                   Live Desk
                 </span>
               </button>
+
+              <button
+                onClick={() => setActiveTab('VOLUNTEERS')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors text-left ${
+                  activeTab === 'VOLUNTEERS'
+                    ? 'bg-[#0A192F] text-[#FFD700] shadow border border-[#D4AF37]/50'
+                    : 'text-gray-700 hover:bg-[#F3E5AB]/20 hover:text-[#0A192F]'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Users className="h-4 w-4 text-[#D4AF37]" />
+                  <span>Volunteer Intake</span>
+                </div>
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-800 font-bold rounded text-[10px] border border-amber-400/40">
+                  Intake
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('VOLUNTEER_PERFORMANCE')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors text-left ${
+                  activeTab === 'VOLUNTEER_PERFORMANCE'
+                    ? 'bg-[#0A192F] text-[#D4AF37] shadow border border-[#D4AF37]/50'
+                    : 'text-gray-700 hover:bg-[#F3E5AB]/20 hover:text-[#0A192F]'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Award className="h-4 w-4 text-[#D4AF37]" />
+                  <span>Volunteer Performance</span>
+                </div>
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-800 font-bold rounded text-[10px] border border-emerald-400/40">
+                  A+ & Certs
+                </span>
+              </button>
               
               <button
                 onClick={() => setActiveTab('REGS')}
@@ -351,6 +387,24 @@ export default function AdminPanel({
             {activeTab === 'RSVP' && (
               <div className="h-full">
                 <RSVPManager />
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------- */}
+            {/* VOLUNTEER INTAKE REGISTRY TAB */}
+            {/* ------------------------------------------------------------- */}
+            {activeTab === 'VOLUNTEERS' && (
+              <div className="h-full">
+                <VolunteerApplicationsManager />
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------- */}
+            {/* VOLUNTEER PERFORMANCE, GRADING & CERTIFICATION TAB */}
+            {/* ------------------------------------------------------------- */}
+            {activeTab === 'VOLUNTEER_PERFORMANCE' && (
+              <div className="h-full">
+                <VolunteerPerformanceManager />
               </div>
             )}
 

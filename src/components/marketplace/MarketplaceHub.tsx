@@ -67,16 +67,21 @@ export default function MarketplaceHub({ onBackToMain }: MarketplaceHubProps) {
     fetchInventory();
   }, []);
 
-  const fetchInventory = async () => {
+  const fetchInventory = async (retries = 3, delay = 800) => {
     try {
       const res = await fetch('/api/marketplace/inventory');
       if (res.ok) {
         const data = await res.json();
         if (data.positions) setPositions(data.positions);
         if (data.packages) setPackages(data.packages);
+        return;
       }
     } catch (err) {
-      console.error('Failed to load inventory from API:', err);
+      if (retries > 0) {
+        setTimeout(() => fetchInventory(retries - 1, delay * 1.5), delay);
+        return;
+      }
+      console.warn('Marketplace inventory served from local cached inventory schema:', err);
     }
   };
 

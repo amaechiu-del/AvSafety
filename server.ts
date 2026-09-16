@@ -3,12 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Clean up tsx runtime leakage where global.__dirname is set to '.' which breaks vite-plugin-pwa and Vite config loader
+if (typeof (globalThis as any).__dirname === 'string' && (globalThis as any).__dirname === '.') {
+  delete (globalThis as any).__dirname;
+}
+if (typeof (global as any).__dirname === 'string' && (global as any).__dirname === '.') {
+  delete (global as any).__dirname;
+}
+
 import express from 'express';
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { INITIAL_AD_POSITIONS, INITIAL_SPONSORSHIP_PACKAGES } from './src/data/marketplaceData';
 import { INITIAL_VERIFIED_SPEAKERS } from './src/data/speakersData';
 import { INITIAL_STAKEHOLDERS, STAKEHOLDER_CATEGORIES } from './src/data/stakeholdersData';
@@ -541,7 +549,9 @@ app.get('/api/db', (req, res) => {
     const sanitized = { 
       ...data,
       registrations: [], // Hide personal information from public visitors
-      registrationCount: (data.registrations || []).length
+      registrationCount: (data.registrations || []).length,
+      volunteer_applications: [], // Hide volunteer personal information from public visitors
+      volunteerCount: (data.volunteer_applications || []).length
     };
     return res.json(sanitized);
   }
@@ -749,7 +759,7 @@ Customer Specific Request / Question: "${message || 'Recommend the most effectiv
 Currency: ${currency}`;
 
         const result = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           contents: `${systemPrompt}\n\n${userPrompt}`,
           config: {
             responseMimeType: 'application/json'
@@ -1338,7 +1348,7 @@ Call to Action: "Explore Safety Solutions at Aviation Safety Summit 2026 — Mar
       try {
         const ai = new GoogleGenAI({ apiKey });
         const result = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           contents: `Create 2 distinct high-impact advertising concepts for an aviation company attending Aviation Safety Summit 2026 (Marriott Hotel, Ikeja, Lagos, Nigeria).
 Company Name: ${companyName}
 Target Audience: ${targetAudience}
@@ -1509,6 +1519,223 @@ ${sessionsData}
   } catch (error: any) {
     console.error('Gemini API Error:', error);
     res.status(500).json({ error: error.message || 'Error communicating with AI assistant' });
+  }
+});
+
+// Helper for resilient text generation with model fallback on 503/404
+async function generateGeminiTextWithFallback(
+  ai: GoogleGenAI,
+  contents: any,
+  systemInstruction?: string,
+  temperature = 0.3
+): Promise<string> {
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
+  let lastError: any = null;
+
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction,
+          temperature,
+        }
+      });
+      if (response.text) {
+        return response.text;
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Model ${model} failed, attempting next candidate:`, err.message?.substring(0, 100));
+    }
+  }
+
+  throw lastError || new Error('All Gemini models failed');
+}
+
+// ============================================================
+// GEMINI LIVE VOICE ASSISTANT (MICROPHONE & REAL-TIME SPEECH API)
+// ============================================================
+app.post('/api/gemini/voice-live', async (req, res) => {
+  const ai = getAiClient();
+  if (!ai) {
+    return res.status(500).json({ error: 'Gemini API not configured' });
+  }
+
+  try {
+    const { message, audioBase64, mimeType, history, voice } = req.body;
+    let userPrompt = (message || '').trim();
+
+    // If audio is uploaded without text, transcribe it using Gemini
+    if (!userPrompt && audioBase64) {
+      try {
+        const transcribeText = await generateGeminiTextWithFallback(
+          ai,
+          {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimeType || 'audio/wav',
+                  data: audioBase64
+                }
+              },
+              {
+                text: 'Transcribe the user voice query verbatim. If silent or unintelligible noise, reply with "[UNCLEAR]". Do not add commentary.'
+              }
+            ]
+          },
+          undefined,
+          0.1
+        );
+        const transcribed = (transcribeText || '').trim();
+        if (transcribed && transcribed !== '[UNCLEAR]') {
+          userPrompt = transcribed;
+        } else {
+          userPrompt = 'Hello, can you help me with information on the Aviation Safety Summit?';
+        }
+      } catch (transcribeErr) {
+        console.warn('Audio transcription failed, using fallback:', transcribeErr);
+        userPrompt = 'Hello, I am speaking to the Aviation Safety Summit assistant.';
+      }
+    }
+
+    if (!userPrompt) {
+      return res.status(400).json({ error: 'No speech or text message provided' });
+    }
+
+    const currentDb = readDb();
+    const eventTheme = currentDb.event?.theme || 'EVERYBODY IS INVOLVED IN AVIATION SAFETY';
+    const bookTitle = currentDb.book?.title || 'CLEARED FOR TAKEOFF';
+    const authorName = currentDb.book?.author || 'AMAECHI UBADIKE';
+
+    const systemInstruction = `You are the Official Gemini Live Voice Assistant for the DOMISLINK AVIATION SAFETY SUMMIT 2026.
+You are interacting with summit attendees, commercial pilots, air traffic controllers, safety regulators, sponsors, and dignitaries through a real-time live voice microphone interface.
+
+SUMMIT VITAL IDENTITY & CORE FACTS:
+- Theme: "${eventTheme}"
+- Date: Tuesday, 17 November 2026
+- Venue: Lagos Marriott Hotel, Ikeja, Lagos, Nigeria
+- Organiser: DomisLink International Services Ltd / The Digital Empire
+- Principal Author & Convener: ${authorName} (Commercial Pilot, Air Traffic Controller, Civil Aviation Safety Inspector - PEL, with over 25 years operational command across West African airspace)
+- Landmark Book Launch: "${bookTitle}: But Who Is Flying Nigeria's Aviation?" by ${authorName}
+- Statutory White Paper: "Dying Library Policy White Paper", addressing systemic accident prevention, institutional brain-drain, and regulatory oversight, submitted for legislative consideration to the 10th National Assembly Senate and House Aviation Committees
+- 24 Strategic Sectors: Commercial Pilots, Air Traffic Controllers, Licensed Aircraft Engineers, Scheduled Airlines, Ground Handling Agents, Into-Plane Fuel Suppliers, Aviation Insurers, Commercial Bankers, Emergency First Responders, Interfaith Spiritual Leaders, Traditional Rulers, and Regulatory Agencies (NCAA, NAMA, FAAN, NiMet, NSIB)
+- Simulation Training Mandate: "Sim Saves Fuel. Sim Saves Dollars. Sim Saves Lives."
+- Interfaith Safety Prayers: Christian and Muslim religious fathers joining hands to sanctify Nigerian airspace
+
+VOICE CONVERSATION INSTRUCTIONS:
+1. Speak in a clear, confident, polite, and authoritative aviation voice.
+2. Provide answers in 1 to 3 concise, impactful spoken sentences designed for audio playback through speakers or headsets.
+3. Always accurately cite AMAECHI UBADIKE as author and convener when discussing the book or summit leadership.
+4. Avoid markdown bullet points, asterisks, or formatting that sounds awkward when read aloud. Keep it natural, conversational, and spoken.`;
+
+    // Construct conversation history
+    const contents: any[] = [];
+    if (Array.isArray(history) && history.length > 0) {
+      for (const h of history.slice(-4)) {
+        contents.push({
+          role: h.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: h.text }]
+        });
+      }
+    }
+    contents.push({
+      role: 'user',
+      parts: [{ text: userPrompt }]
+    });
+
+    // 1. Generate text answer with fallback resilience
+    let replyText = '';
+    try {
+      replyText = await generateGeminiTextWithFallback(ai, contents, systemInstruction, 0.3);
+    } catch (genErr) {
+      console.warn('All Gemini models failed, using intelligent authoritative local response:', genErr);
+      const lower = userPrompt.toLowerCase();
+      if (lower.includes('author') || lower.includes('cleared for takeoff') || lower.includes('who wrote') || lower.includes('book')) {
+        replyText = `The landmark book "CLEARED FOR TAKEOFF: But Who Is Flying Nigeria's Aviation?" is authored by AMAECHI UBADIKE, veteran commercial pilot, air traffic controller, and civil aviation safety inspector.`;
+      } else if (lower.includes('theme')) {
+        replyText = `The official theme of the Aviation Safety Summit 2026 is "EVERYBODY IS INVOLVED IN AVIATION SAFETY," emphasizing collective accountability across all 24 industry sectors.`;
+      } else if (lower.includes('date') || lower.includes('when') || lower.includes('venue') || lower.includes('where')) {
+        replyText = `The DomisLink Aviation Safety Summit 2026 takes place on Tuesday, 17 November 2026 at the Lagos Marriott Hotel in Ikeja, Lagos, Nigeria.`;
+      } else if (lower.includes('dying library') || lower.includes('white paper')) {
+        replyText = `The Dying Library Policy White Paper addresses institutional memory loss and accident prevention, presented for legislative consideration to the 10th National Assembly.`;
+      } else {
+        replyText = `Welcome to the DomisLink Aviation Safety Summit 2026 convened by AMAECHI UBADIKE. Our theme is "EVERYBODY IS INVOLVED IN AVIATION SAFETY." How may I assist your inquiries today?`;
+      }
+    }
+
+    // 2. Generate spoken audio using Gemini TTS if requested or allowed
+    let ttsAudioBase64: string | null = null;
+    let ttsMimeType: string | null = null;
+
+    const shouldGenerateTTS = req.body.includeAudio !== false;
+    if (shouldGenerateTTS) {
+      try {
+        const chosenVoice = voice || 'Zephyr'; // 'Zephyr', 'Kore', 'Puck', 'Fenrir'
+        const ttsResponse = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-tts-preview',
+          contents: [{ parts: [{ text: replyText }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: chosenVoice }
+              }
+            }
+          }
+        });
+
+        const audioPart = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+        if (audioPart && audioPart.data) {
+          ttsAudioBase64 = audioPart.data;
+          ttsMimeType = audioPart.mimeType || 'audio/l16; rate=24000; channels=1';
+        }
+      } catch (ttsErr) {
+        console.warn('Gemini TTS audio generation failed (client will use Web Speech Synthesis fallback):', ttsErr);
+      }
+    }
+
+    return res.json({
+      userPrompt,
+      text: replyText,
+      audioBase64: ttsAudioBase64,
+      mimeType: ttsMimeType
+    });
+
+  } catch (err: any) {
+    console.error('Gemini Live Voice API Error:', err);
+    res.status(500).json({ error: err.message || 'Error processing live voice' });
+  }
+});
+
+// Dedicated standalone TTS endpoint
+app.post('/api/gemini/tts', async (req, res) => {
+  const ai = getAiClient();
+  if (!ai) return res.status(500).json({ error: 'Gemini API not configured' });
+  try {
+    const { text, voice } = req.body;
+    if (!text) return res.status(400).json({ error: 'Text is required' });
+    const chosenVoice = voice || 'Zephyr';
+    const ttsResponse = await ai.models.generateContent({
+      model: 'gemini-3.1-flash-tts-preview',
+      contents: [{ parts: [{ text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: chosenVoice }
+          }
+        }
+      }
+    });
+    const audioPart = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    res.json({
+      audioBase64: audioPart?.data || null,
+      mimeType: audioPart?.mimeType || 'audio/l16; rate=24000; channels=1'
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || 'TTS generation error' });
   }
 });
 
@@ -2773,7 +3000,7 @@ app.put('/api/admin/rsvps/:id/status', (req, res) => {
 // SECRETARIAT — INVITATION & STAKEHOLDER MASTER RECORD API ROUTES
 // ============================================================
 
-function recordAuditLog(data: any, entry: { action: string; entityType: string; recordId: string; referenceNumber?: string; oldValue?: any; newValue?: any; performedBy?: string }) {
+function recordAuditLog(data: any, entry: { action: string; entityType: string; recordId: string; referenceNumber?: string; oldValue?: any; newValue?: any; performedBy?: string; reason?: string }) {
   if (!data.audit_logs) data.audit_logs = [];
   const logEntry = {
     id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -2782,41 +3009,72 @@ function recordAuditLog(data: any, entry: { action: string; entityType: string; 
     timestamp: new Date().toISOString()
   };
   data.audit_logs.unshift(logEntry);
-  if (data.audit_logs.length > 1000) data.audit_logs.pop();
+  if (data.audit_logs.length > 2000) data.audit_logs.pop();
 }
 
 function generateInvitationNumber(data: any): string {
   if (!data.invitations) data.invitations = [];
   const count = data.invitations.length + 1;
-  const paddedNum = String(count).padStart(6, '0');
-  const invNumber = `ASS/INV/2026/${paddedNum}`;
-  const exists = data.invitations.some((i: any) => i.invitationNumber === invNumber);
+  const paddedNum = String(count).padStart(4, '0');
+  const invNumber = `ASS-INV-2026-${paddedNum}`;
+  const exists = data.invitations.some((i: any) => i.invitationNumber === invNumber || i.invitationReference === invNumber);
   if (exists) {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    return `ASS/INV/2026/${String(count + randomSuffix).padStart(6, '0')}`;
+    return `ASS-INV-2026-${String(count + randomSuffix).padStart(4, '0')}`;
   }
   return invNumber;
 }
 
-function checkStakeholderDuplicate(data: any, payload: { email?: string; phone?: string; firstName?: string; lastName?: string; organisation?: string }) {
+function checkStakeholderDuplicate(data: any, payload: { email?: string; phone?: string; firstName?: string; lastName?: string; organisation?: string; personId?: string }) {
   const persons = data.stakeholders_master || data.stakeholders || [];
   const matches = [];
   for (const p of persons) {
-    const emailMatch = payload.email && p.email && p.email.toLowerCase() === payload.email.toLowerCase();
-    const phoneMatch = payload.phone && p.phone && p.phone.replace(/[^0-9]/g, '') === payload.phone.replace(/[^0-9]/g, '');
+    const emailMatch = payload.email && p.email && p.email.toLowerCase().trim() === payload.email.toLowerCase().trim();
+    const phoneClean = payload.phone ? payload.phone.replace(/[^0-9]/g, '') : '';
+    const pPhoneClean = p.phone ? p.phone.replace(/[^0-9]/g, '') : '';
+    const phoneMatch = phoneClean.length >= 7 && pPhoneClean.length >= 7 && (phoneClean === pPhoneClean || pPhoneClean.endsWith(phoneClean) || phoneClean.endsWith(pPhoneClean));
     const nameMatch = payload.firstName && payload.lastName && p.firstName && p.lastName &&
-      p.firstName.toLowerCase() === payload.firstName.toLowerCase() &&
-      p.lastName.toLowerCase() === payload.lastName.toLowerCase() &&
-      p.organisation && payload.organisation && p.organisation.toLowerCase() === payload.organisation.toLowerCase();
+      p.firstName.toLowerCase().trim() === payload.firstName.toLowerCase().trim() &&
+      p.lastName.toLowerCase().trim() === payload.lastName.toLowerCase().trim() &&
+      p.organisation && payload.organisation && p.organisation.toLowerCase().trim() === payload.organisation.toLowerCase().trim();
+    const idMatch = payload.personId && (p.id === payload.personId || p.personId === payload.personId);
     
-    if (emailMatch || phoneMatch || nameMatch) {
+    if (emailMatch || phoneMatch || nameMatch || idMatch) {
       matches.push({
         id: p.id,
+        stakeholderId: p.stakeholderId || p.id,
+        referenceNumber: p.referenceNumber,
         name: `${p.title || ''} ${p.firstName} ${p.lastName}`.trim(),
-        organisation: p.organisation,
+        organisation: p.organisation || p.organisationName,
         email: p.email,
         phone: p.phone,
-        matchType: emailMatch ? 'EMAIL' : phoneMatch ? 'PHONE' : 'NAME_AND_ORG'
+        matchType: emailMatch ? 'EMAIL' : phoneMatch ? 'PHONE' : idMatch ? 'PERSON_ID' : 'NAME_AND_ORG',
+        matchReason: emailMatch ? `Email (${payload.email}) matches existing stakeholder` :
+                     phoneMatch ? `Phone (${payload.phone}) matches existing stakeholder` :
+                     idMatch ? `Person ID (${payload.personId}) matches existing record` :
+                     `Name (${payload.firstName} ${payload.lastName}) and Organisation (${payload.organisation}) match existing record`
+      });
+    }
+  }
+  return matches;
+}
+
+function checkInvitationDuplicate(data: any, payload: { personId: string; orgId?: string; sector?: string; category?: string; invitationType?: string }) {
+  const invitations = data.invitations || [];
+  const matches = [];
+  for (const inv of invitations) {
+    if (inv.personId === payload.personId && inv.invitationStatus !== 'CANCELLED') {
+      matches.push({
+        id: inv.id,
+        invitationNumber: inv.invitationNumber || inv.invitationReference,
+        personId: inv.personId,
+        sector: inv.sector,
+        category: inv.category,
+        invitationType: inv.invitationType,
+        invitationStatus: inv.invitationStatus,
+        createdAt: inv.createdAt,
+        matchType: 'PERSON_ACTIVE_INVITATION',
+        matchReason: `Stakeholder already has an active invitation (${inv.invitationNumber || inv.id}) with status ${inv.invitationStatus}`
       });
     }
   }
@@ -2837,7 +3095,7 @@ app.get('/api/secretariat/stakeholders-master', (req, res) => {
   });
 });
 
-// 2. POST /api/secretariat/stakeholders-master (Create stakeholder with duplicate detection)
+// 2. POST /api/secretariat/stakeholders-master (Create stakeholder with duplicate detection & override audit)
 app.post('/api/secretariat/stakeholders-master', (req, res) => {
   const {
     title,
@@ -2846,22 +3104,40 @@ app.post('/api/secretariat/stakeholders-master', (req, res) => {
     lastName,
     preferredName,
     designation,
+    position,
     organisation,
+    organisationName,
+    organisationType,
+    organisationId,
     department,
     email,
     phone,
     altPhone,
+    alternativePhone,
+    address,
     country,
     state,
     city,
     sector,
     category,
+    stakeholderCategory,
     subcategory,
+    preferredContactMethod,
+    relationshipClassification,
     notes,
-    forceCreate
+    forceCreate,
+    overrideReason,
+    actorEmail
   } = req.body;
 
-  if (!firstName || !lastName || !organisation || !email || !sector || !category) {
+  const actualOrg = (organisation || organisationName || '').trim();
+  const actualEmail = (email || '').trim().toLowerCase();
+  const actualCategory = category || stakeholderCategory;
+  const actualDesignation = designation || position || 'Executive';
+  const actualPhone = (phone || '').trim();
+  const actualAltPhone = altPhone || alternativePhone;
+
+  if (!firstName || !lastName || !actualOrg || !actualEmail || !sector || !actualCategory) {
     return res.status(400).json({ error: 'Required fields: firstName, lastName, organisation, email, sector, category' });
   }
 
@@ -2870,7 +3146,13 @@ app.post('/api/secretariat/stakeholders-master', (req, res) => {
 
   // Check duplicates unless forceCreate is true
   if (!forceCreate) {
-    const duplicates = checkStakeholderDuplicate(data, { email, phone, firstName, lastName, organisation });
+    const duplicates = checkStakeholderDuplicate(data, { 
+      email: actualEmail, 
+      phone: actualPhone, 
+      firstName: firstName.trim(), 
+      lastName: lastName.trim(), 
+      organisation: actualOrg 
+    });
     if (duplicates.length > 0) {
       return res.status(409).json({
         success: false,
@@ -2882,49 +3164,67 @@ app.post('/api/secretariat/stakeholders-master', (req, res) => {
 
   const now = new Date().toISOString();
   const personId = `stk-m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-  const referenceNumber = `ASS/STK/2026/${Math.floor(10000 + Math.random() * 90000)}`;
+  const count = data.stakeholders_master.length + 1;
+  const referenceNumber = `ASS-STK-2026-${String(count).padStart(4, '0')}`;
 
   const newStakeholder = {
     id: personId,
+    stakeholderId: personId,
+    personId,
+    organisationId: organisationId || undefined,
     referenceNumber,
+    fullName: `${title || 'Mr.'} ${firstName.trim()} ${lastName.trim()}`,
     title: title || 'Mr.',
     firstName: firstName.trim(),
     middleName: middleName ? middleName.trim() : undefined,
     lastName: lastName.trim(),
     preferredName: preferredName ? preferredName.trim() : undefined,
-    designation: designation || 'Executive',
-    organisation: organisation.trim(),
+    designation: actualDesignation,
+    position: actualDesignation,
+    organisation: actualOrg,
+    organisationName: actualOrg,
+    organisationType: organisationType || 'Corporate',
     department: department ? department.trim() : undefined,
-    email: email.trim().toLowerCase(),
-    phone: phone.trim(),
-    altPhone: altPhone ? altPhone.trim() : undefined,
+    email: actualEmail,
+    phone: actualPhone,
+    altPhone: actualAltPhone ? actualAltPhone.trim() : undefined,
+    alternativePhone: actualAltPhone ? actualAltPhone.trim() : undefined,
+    address: address ? address.trim() : undefined,
     country: country || 'Nigeria',
     state: state ? state.trim() : undefined,
     city: city ? city.trim() : undefined,
     sector,
-    category,
+    category: actualCategory,
+    stakeholderCategory: actualCategory,
     subcategory: subcategory ? subcategory.trim() : undefined,
+    preferredContactMethod: preferredContactMethod || 'EMAIL',
+    relationshipClassification: relationshipClassification || 'EXECUTIVE',
     notes: notes ? notes.trim() : undefined,
     isActive: true,
+    activeStatus: true,
     createdAt: now,
     updatedAt: now,
-    createdBy: 'Secretariat Administrator'
+    createdBy: actorEmail || 'Secretariat Administrator'
   };
 
   data.stakeholders_master.push(newStakeholder);
   recordAuditLog(data, {
-    action: 'CREATE',
+    action: forceCreate ? 'STAKEHOLDER_DUPLICATE_OVERRIDE' : 'STAKEHOLDER_CREATED',
     entityType: 'STAKEHOLDER',
     recordId: personId,
     referenceNumber,
-    newValue: newStakeholder
+    newValue: newStakeholder,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: forceCreate ? (overrideReason || 'Authorised duplicate override approved by officer') : undefined
   });
   writeDb(data);
 
   res.json({
     success: true,
     stakeholder: newStakeholder,
-    message: 'Stakeholder master record created successfully.'
+    message: forceCreate 
+      ? 'Stakeholder master record created via authorised duplicate override.'
+      : 'Stakeholder master record created successfully.'
   });
 });
 
@@ -2933,7 +3233,53 @@ app.put('/api/secretariat/stakeholders-master/:id', (req, res) => {
   const { id } = req.params;
   const data = readDb();
   if (!data.stakeholders_master) data.stakeholders_master = [];
-  const index = data.stakeholders_master.findIndex((s: any) => s.id === id);
+  const index = data.stakeholders_master.findIndex((s: any) => s.id === id || s.stakeholderId === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Stakeholder record not found' });
+  }
+
+  const oldValue = { ...data.stakeholders_master[index] };
+  const actor = req.body.actorEmail || req.body.updatedBy || 'Secretariat Administrator';
+  const isDeactivating = (req.body.isActive === false || req.body.activeStatus === false) && oldValue.isActive !== false;
+
+  const updated = {
+    ...oldValue,
+    ...req.body,
+    id: oldValue.id,
+    stakeholderId: oldValue.stakeholderId || oldValue.id,
+    referenceNumber: oldValue.referenceNumber,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor
+  };
+
+  data.stakeholders_master[index] = updated;
+  recordAuditLog(data, {
+    action: isDeactivating ? 'STAKEHOLDER_DEACTIVATED' : 'STAKEHOLDER_UPDATED',
+    entityType: 'STAKEHOLDER',
+    recordId: id,
+    referenceNumber: updated.referenceNumber,
+    oldValue,
+    newValue: updated,
+    performedBy: actor,
+    reason: req.body.reason || (isDeactivating ? 'Stakeholder deactivated by secretariat officer' : undefined)
+  });
+  writeDb(data);
+
+  res.json({
+    success: true,
+    stakeholder: updated,
+    message: isDeactivating ? 'Stakeholder record deactivated.' : 'Stakeholder record updated successfully.'
+  });
+});
+
+// 3b. PUT /api/secretariat/stakeholders-master/:id/deactivate
+app.put('/api/secretariat/stakeholders-master/:id/deactivate', (req, res) => {
+  const { id } = req.params;
+  const { actorEmail, reason } = req.body;
+  const data = readDb();
+  if (!data.stakeholders_master) data.stakeholders_master = [];
+  const index = data.stakeholders_master.findIndex((s: any) => s.id === id || s.stakeholderId === id);
 
   if (index === -1) {
     return res.status(404).json({ error: 'Stakeholder record not found' });
@@ -2942,28 +3288,29 @@ app.put('/api/secretariat/stakeholders-master/:id', (req, res) => {
   const oldValue = { ...data.stakeholders_master[index] };
   const updated = {
     ...oldValue,
-    ...req.body,
-    id,
-    referenceNumber: oldValue.referenceNumber,
+    isActive: false,
+    activeStatus: false,
     updatedAt: new Date().toISOString(),
-    updatedBy: 'Secretariat Administrator'
+    updatedBy: actorEmail || 'Secretariat Administrator'
   };
 
   data.stakeholders_master[index] = updated;
   recordAuditLog(data, {
-    action: 'EDIT',
+    action: 'STAKEHOLDER_DEACTIVATED',
     entityType: 'STAKEHOLDER',
     recordId: id,
     referenceNumber: updated.referenceNumber,
     oldValue,
-    newValue: updated
+    newValue: updated,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: reason || 'Authorised stakeholder record deactivation'
   });
   writeDb(data);
 
   res.json({
     success: true,
     stakeholder: updated,
-    message: 'Stakeholder record updated successfully.'
+    message: 'Stakeholder master record deactivated successfully.'
   });
 });
 
@@ -2983,7 +3330,7 @@ app.get('/api/secretariat/organisations-master', (req, res) => {
 
 // 5. POST /api/secretariat/organisations-master
 app.post('/api/secretariat/organisations-master', (req, res) => {
-  const { name, type, sector, country, state, city, address, website, email, phone, contactPerson } = req.body;
+  const { name, type, sector, country, state, city, address, website, email, phone, contactPerson, actorEmail } = req.body;
   if (!name || !sector) {
     return res.status(400).json({ error: 'Organisation name and sector are required' });
   }
@@ -2992,7 +3339,7 @@ app.post('/api/secretariat/organisations-master', (req, res) => {
   if (!data.organisations_master) data.organisations_master = [];
 
   // Check duplicate org name
-  const existing = data.organisations_master.find((o: any) => o.name.toLowerCase() === name.trim().toLowerCase());
+  const existing = data.organisations_master.find((o: any) => o.name.toLowerCase().trim() === name.trim().toLowerCase());
   if (existing) {
     return res.status(409).json({ success: false, error: 'Organisation with this name already exists in Master Records.', organisation: existing });
   }
@@ -3001,6 +3348,7 @@ app.post('/api/secretariat/organisations-master', (req, res) => {
   const orgId = `org-m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   const newOrg = {
     id: orgId,
+    organisationId: orgId,
     name: name.trim(),
     type: type || 'Corporate',
     sector,
@@ -3013,16 +3361,19 @@ app.post('/api/secretariat/organisations-master', (req, res) => {
     phone: phone ? phone.trim() : undefined,
     contactPerson: contactPerson ? contactPerson.trim() : undefined,
     isActive: true,
+    activeStatus: true,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    createdBy: actorEmail || 'Secretariat Administrator'
   };
 
   data.organisations_master.push(newOrg);
   recordAuditLog(data, {
-    action: 'CREATE',
+    action: 'ORGANISATION_CREATED',
     entityType: 'ORGANISATION',
     recordId: orgId,
-    newValue: newOrg
+    newValue: newOrg,
+    performedBy: actorEmail || 'Secretariat Administrator'
   });
   writeDb(data);
 
@@ -3044,16 +3395,45 @@ app.get('/api/secretariat/invitations', (req, res) => {
   });
 });
 
-// 7. POST /api/secretariat/invitations (Create private invitation with server-generated inv number)
+// 7. POST /api/secretariat/invitations (Create private invitation with duplicate check & override audit)
 app.post('/api/secretariat/invitations', (req, res) => {
-  const { personId, orgId, sector, category, invitationType, invitationPurpose } = req.body;
+  const { 
+    personId, 
+    stakeholderId,
+    orgId, 
+    organisationId,
+    sector, 
+    category, 
+    invitationType, 
+    invitationPurpose,
+    responsibleOfficer,
+    internalNotes,
+    forceCreate,
+    overrideReason,
+    actorEmail
+  } = req.body;
 
-  if (!personId || !sector || !category || !invitationType || !invitationPurpose) {
-    return res.status(400).json({ error: 'Required fields: personId, sector, category, invitationType, invitationPurpose' });
+  const targetPersonId = personId || stakeholderId;
+  const targetOrgId = orgId || organisationId || 'org-unspecified';
+
+  if (!targetPersonId || !sector || !category || !invitationType) {
+    return res.status(400).json({ error: 'Required fields: personId/stakeholderId, sector, category, invitationType' });
   }
 
   const data = readDb();
   if (!data.invitations) data.invitations = [];
+
+  // Check duplicates unless forceCreate is true
+  if (!forceCreate) {
+    const duplicates = checkInvitationDuplicate(data, { personId: targetPersonId, orgId: targetOrgId, sector, category, invitationType });
+    if (duplicates.length > 0) {
+      return res.status(409).json({
+        success: false,
+        warning: 'This stakeholder already has an active invitation record.',
+        duplicates
+      });
+    }
+  }
 
   const invitationNumber = generateInvitationNumber(data);
   const now = new Date().toISOString();
@@ -3061,50 +3441,63 @@ app.post('/api/secretariat/invitations', (req, res) => {
 
   const newInvitation = {
     id: invitationId,
+    invitationId,
     invitationNumber,
-    personId,
-    orgId: orgId || 'org-unspecified',
+    invitationReference: invitationNumber,
+    personId: targetPersonId,
+    stakeholderId: targetPersonId,
+    orgId: targetOrgId,
+    organisationId: targetOrgId,
     sector,
     category,
     invitationType,
-    invitationPurpose,
+    invitationPurpose: invitationPurpose || 'Summit Delegate',
+    responsibleOfficer: responsibleOfficer || actorEmail || 'Secretariat Officer',
     invitationDate: now.slice(0, 10),
     eventDate: '2026-11-17',
     invitationStatus: 'DRAFT',
+    currentStatus: 'DRAFT',
+    internalNotes: internalNotes ? internalNotes.trim() : undefined,
+    auditReference: `AUD-INV-${Date.now().toString(36).toUpperCase()}`,
     createdAt: now,
     updatedAt: now,
-    createdBy: 'Secretariat Administrator'
+    createdBy: actorEmail || 'Secretariat Administrator'
   };
 
   data.invitations.push(newInvitation);
   recordAuditLog(data, {
-    action: 'CREATE',
+    action: forceCreate ? 'INVITATION_DUPLICATE_OVERRIDE' : 'INVITATION_CREATED',
     entityType: 'INVITATION',
     recordId: invitationId,
     referenceNumber: invitationNumber,
-    newValue: newInvitation
+    newValue: newInvitation,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: forceCreate ? (overrideReason || 'Authorised invitation duplicate override') : undefined
   });
   writeDb(data);
 
   res.json({
     success: true,
     invitation: newInvitation,
-    message: `Private invitation ${invitationNumber} generated successfully.`
+    message: forceCreate
+      ? `Private invitation ${invitationNumber} created via duplicate override.`
+      : `Private invitation ${invitationNumber} generated successfully.`
   });
 });
 
 // 8. PUT /api/secretariat/invitations/:id/status (Status change & approval with zero self-approval safety)
 app.put('/api/secretariat/invitations/:id/status', (req, res) => {
   const { id } = req.params;
-  const { invitationStatus, userEmail } = req.body;
+  const { invitationStatus, currentStatus, userEmail, internalNotes, reason } = req.body;
+  const newStatus = invitationStatus || currentStatus;
 
-  if (!invitationStatus) {
+  if (!newStatus) {
     return res.status(400).json({ error: 'New invitationStatus is required' });
   }
 
   const data = readDb();
   if (!data.invitations) data.invitations = [];
-  const index = data.invitations.findIndex((i: any) => i.id === id);
+  const index = data.invitations.findIndex((i: any) => i.id === id || i.invitationId === id);
 
   if (index === -1) {
     return res.status(404).json({ error: 'Invitation record not found' });
@@ -3114,30 +3507,37 @@ app.put('/api/secretariat/invitations/:id/status', (req, res) => {
   const oldValue = { ...inviteRecord };
 
   // Zero self-approval check if trying to approve own created invitation
-  if (invitationStatus === 'APPROVED' && inviteRecord.createdBy && userEmail && inviteRecord.createdBy.toLowerCase() === userEmail.toLowerCase()) {
+  if (newStatus === 'APPROVED' && inviteRecord.createdBy && userEmail && inviteRecord.createdBy.toLowerCase() === userEmail.toLowerCase()) {
     return res.status(403).json({
       success: false,
       error: 'Governance Safety Rule Violation: Zero self-approval principle prevents users from approving invitations they created themselves.'
     });
   }
 
-  inviteRecord.invitationStatus = invitationStatus;
+  inviteRecord.invitationStatus = newStatus;
+  inviteRecord.currentStatus = newStatus;
   inviteRecord.updatedAt = new Date().toISOString();
   inviteRecord.updatedBy = userEmail || 'Secretariat Administrator';
+  if (internalNotes) inviteRecord.internalNotes = internalNotes;
 
-  if (invitationStatus === 'APPROVED') {
+  if (newStatus === 'APPROVED') {
     inviteRecord.approvedBy = userEmail || 'Secretariat Senior Official';
     inviteRecord.approvedAt = new Date().toISOString();
   }
 
+  let auditAction = 'INVITATION_UPDATED';
+  if (newStatus === 'APPROVED') auditAction = 'INVITATION_APPROVED';
+  else if (newStatus === 'CANCELLED') auditAction = 'INVITATION_CANCELLED';
+
   recordAuditLog(data, {
-    action: invitationStatus === 'APPROVED' ? 'APPROVE' : 'STATUS_CHANGE',
+    action: auditAction,
     entityType: 'INVITATION',
     recordId: id,
-    referenceNumber: inviteRecord.invitationNumber,
+    referenceNumber: inviteRecord.invitationNumber || inviteRecord.invitationReference,
     oldValue,
     newValue: inviteRecord,
-    performedBy: userEmail || 'Secretariat Administrator'
+    performedBy: userEmail || 'Secretariat Administrator',
+    reason: reason || (newStatus === 'CANCELLED' ? 'Invitation cancelled by secretariat officer' : undefined)
   });
 
   writeDb(data);
@@ -3145,8 +3545,23 @@ app.put('/api/secretariat/invitations/:id/status', (req, res) => {
   res.json({
     success: true,
     invitation: inviteRecord,
-    message: `Invitation status updated to ${invitationStatus}.`
+    message: `Invitation status updated to ${newStatus}.`
   });
+});
+
+// 8b. POST /api/secretariat/audit-logs/export (Log master data export)
+app.post('/api/secretariat/audit-logs/export', (req, res) => {
+  const { exportType, recordsCount, actorEmail, filterSummary } = req.body;
+  const data = readDb();
+  recordAuditLog(data, {
+    action: 'MASTER_DATA_EXPORTED',
+    entityType: exportType || 'STAKEHOLDER_INVITATION_MASTER',
+    recordId: `exp-${Date.now()}`,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    newValue: { exportType, recordsCount, filterSummary }
+  });
+  writeDb(data);
+  res.json({ success: true, message: 'Export audit event recorded.' });
 });
 
 // 9. GET /api/secretariat/audit-logs
@@ -3889,19 +4304,2116 @@ app.put('/api/secretariat/committee-memberships/:id/status', (req, res) => {
   res.json({ success: true, membership: memb, message: `Membership status updated to ${status}.` });
 });
 
+// ==========================================
+// VOLUNTEER APPLICATION MODULE (PUBLIC INTAKE)
+// ==========================================
+
+function ensureVolunteerDefaults(data: any) {
+  if (!data.volunteer_applications) {
+    data.volunteer_applications = [];
+  }
+}
+
+// Public Volunteer Application Submission
+app.post('/api/volunteers', (req, res) => {
+  try {
+    const data = readDb();
+    ensureVolunteerDefaults(data);
+
+    const {
+      applicantType,
+      firstName,
+      middleName,
+      lastName,
+      preferredName,
+      dobOrAgeGroup,
+      gender,
+      country,
+      state,
+      city,
+      email,
+      phone,
+      altPhone,
+      address,
+      occupation,
+      organisation,
+      profession,
+      educationStatus,
+      qualifications,
+      skills,
+      sponsoringOrgName,
+      sponsoringOrgType,
+      sponsoringOrgSector,
+      sponsoringOrgAddress,
+      sponsoringOrgEmail,
+      sponsoringOrgPhone,
+      orgContactPersonName,
+      orgContactPersonPosition,
+      orgContactPersonEmail,
+      orgContactPersonPhone,
+      natureOfSupport,
+      sponsoredVolunteersCount,
+      supportDescription,
+      corporateMessage,
+      specialRequirements,
+      preferredDepartment,
+      secondaryDepartment,
+      experience,
+      aviationExperience,
+      languages,
+      specialSkills,
+      availability,
+      preferredPeriod,
+      preferredShift,
+      motivation,
+      additionalInfo,
+      emergencyContactName,
+      emergencyRelationship,
+      emergencyContactPhone,
+      consentConfirmed
+    } = req.body;
+
+    // Basic Validation
+    if (!firstName || !lastName || !email || !phone || !preferredDepartment || !availability || !motivation || !emergencyContactName || !emergencyContactPhone || !consentConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please fill in all required fields including personal info, contact, volunteer preferences, motivation, emergency contact, and consent.'
+      });
+    }
+
+    // Corporate / Organisation validation if applicable
+    const validApplicantType = applicantType || 'Individual Volunteer';
+    if (validApplicantType !== 'Individual Volunteer' && !sponsoringOrgName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide the name of the Sponsoring or Nominating Organisation.'
+      });
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = String(email).trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a valid email address.'
+      });
+    }
+
+    // Phone format validation
+    const cleanPhone = String(phone).trim();
+    const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+    if (phoneDigits.length < 7 || phoneDigits.length > 18) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a valid telephone number with minimum 7 digits.'
+      });
+    }
+
+    // String length limits / payload protection
+    if (String(firstName).length > 80 || String(lastName).length > 80 || String(motivation).length > 2500 || String(skills || '').length > 1000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Input exceeds permissible character lengths.'
+      });
+    }
+
+    // DUPLICATE APPLICATION CHECK (Individual Email or Phone only - allows multiple volunteers from the same organization)
+    const normalizedPhoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+    const isDuplicate = data.volunteer_applications.some((existing: any) => {
+      const existingEmail = (existing.email || '').trim().toLowerCase();
+      const existingPhoneDigits = (existing.phone || '').replace(/[^0-9]/g, '');
+      return existingEmail === cleanEmail || (existingPhoneDigits.length >= 7 && existingPhoneDigits === normalizedPhoneDigits);
+    });
+
+    if (isDuplicate) {
+      return res.status(409).json({
+        success: false,
+        duplicate: true,
+        error: 'We found an existing volunteer application using these contact details. Please contact the Summit Secretariat if you need to update your application.'
+      });
+    }
+
+    // Generate unique, sequential reference number: ASS-VOL-2026-XXXX
+    let seq = data.volunteer_applications.length + 1;
+    let refNum = `ASS-VOL-2026-${String(seq).padStart(4, '0')}`;
+    while (data.volunteer_applications.some((v: any) => v.reference === refNum)) {
+      seq++;
+      refNum = `ASS-VOL-2026-${String(seq).padStart(4, '0')}`;
+    }
+
+    const now = new Date().toISOString();
+    const appId = `vol-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newApplication = {
+      id: appId,
+      reference: refNum,
+      applicantType: validApplicantType,
+      firstName: String(firstName).trim(),
+      middleName: middleName ? String(middleName).trim() : undefined,
+      lastName: String(lastName).trim(),
+      preferredName: preferredName ? String(preferredName).trim() : undefined,
+      dobOrAgeGroup: dobOrAgeGroup ? String(dobOrAgeGroup).trim() : '18-25',
+      gender: gender ? String(gender).trim() : undefined,
+      country: country ? String(country).trim() : 'Nigeria',
+      state: state ? String(state).trim() : 'Lagos',
+      city: city ? String(city).trim() : 'Ikeja',
+      email: cleanEmail,
+      phone: cleanPhone,
+      altPhone: altPhone ? String(altPhone).trim() : undefined,
+      address: address ? String(address).trim() : '',
+      occupation: occupation ? String(occupation).trim() : '',
+      organisation: organisation ? String(organisation).trim() : undefined,
+      profession: profession ? String(profession).trim() : undefined,
+      educationStatus: educationStatus || 'Other',
+      qualifications: qualifications ? String(qualifications).trim() : undefined,
+      skills: skills ? String(skills).trim() : '',
+      // Sponsoring Organisation Details
+      sponsoringOrgName: sponsoringOrgName ? String(sponsoringOrgName).trim() : undefined,
+      sponsoringOrgType: sponsoringOrgType ? String(sponsoringOrgType).trim() : undefined,
+      sponsoringOrgSector: sponsoringOrgSector ? String(sponsoringOrgSector).trim() : undefined,
+      sponsoringOrgAddress: sponsoringOrgAddress ? String(sponsoringOrgAddress).trim() : undefined,
+      sponsoringOrgEmail: sponsoringOrgEmail ? String(sponsoringOrgEmail).trim().toLowerCase() : undefined,
+      sponsoringOrgPhone: sponsoringOrgPhone ? String(sponsoringOrgPhone).trim() : undefined,
+      orgContactPersonName: orgContactPersonName ? String(orgContactPersonName).trim() : undefined,
+      orgContactPersonPosition: orgContactPersonPosition ? String(orgContactPersonPosition).trim() : undefined,
+      orgContactPersonEmail: orgContactPersonEmail ? String(orgContactPersonEmail).trim().toLowerCase() : undefined,
+      orgContactPersonPhone: orgContactPersonPhone ? String(orgContactPersonPhone).trim() : undefined,
+      // Nature of Support
+      natureOfSupport: natureOfSupport || undefined,
+      sponsoredVolunteersCount: sponsoredVolunteersCount ? Number(sponsoredVolunteersCount) : undefined,
+      supportDescription: supportDescription ? String(supportDescription).trim() : undefined,
+      corporateMessage: corporateMessage ? String(corporateMessage).trim() : undefined,
+      specialRequirements: specialRequirements ? String(specialRequirements).trim() : undefined,
+      // Department and Preferences
+      preferredDepartment: String(preferredDepartment).trim(),
+      secondaryDepartment: secondaryDepartment ? String(secondaryDepartment).trim() : undefined,
+      experience: experience ? String(experience).trim() : undefined,
+      aviationExperience: aviationExperience ? String(aviationExperience).trim() : undefined,
+      languages: languages ? String(languages).trim() : undefined,
+      specialSkills: specialSkills ? String(specialSkills).trim() : undefined,
+      availability: availability || 'Full Summit (All Days)',
+      preferredPeriod: preferredPeriod ? String(preferredPeriod).trim() : undefined,
+      preferredShift: preferredShift || 'Flexible',
+      motivation: String(motivation).trim(),
+      additionalInfo: additionalInfo ? String(additionalInfo).trim() : undefined,
+      emergencyContactName: String(emergencyContactName).trim(),
+      emergencyRelationship: String(emergencyRelationship).trim(),
+      emergencyContactPhone: String(emergencyContactPhone).trim(),
+      consentConfirmed: !!consentConfirmed,
+      status: 'SUBMITTED',
+      createdAt: now,
+      updatedAt: now,
+      source: 'PUBLIC_WEB',
+      auditReference: `AUD-VOL-2026-${Date.now()}`
+    };
+
+    data.volunteer_applications.unshift(newApplication);
+
+    recordAuditLog(data, {
+      action: 'CREATE',
+      entityType: 'VOLUNTEER_APPLICATION',
+      recordId: appId,
+      referenceNumber: refNum,
+      newValue: {
+        id: appId,
+        reference: refNum,
+        applicantName: `${newApplication.firstName} ${newApplication.lastName}`,
+        email: cleanEmail,
+        department: newApplication.preferredDepartment,
+        status: 'SUBMITTED'
+      },
+      performedBy: 'Public Volunteer Intake Web'
+    });
+
+    writeDb(data);
+
+    // Return receipt payload strictly to the submitter (no internal notes, scores, or private data)
+    res.status(201).json({
+      success: true,
+      application: {
+        id: newApplication.id,
+        reference: newApplication.reference,
+        firstName: newApplication.firstName,
+        lastName: newApplication.lastName,
+        email: newApplication.email,
+        phone: newApplication.phone,
+        preferredDepartment: newApplication.preferredDepartment,
+        secondaryDepartment: newApplication.secondaryDepartment,
+        availability: newApplication.availability,
+        status: newApplication.status,
+        createdAt: newApplication.createdAt
+      },
+      message: 'Volunteer application submitted successfully.'
+    });
+  } catch (err: any) {
+    console.error('Failed to process volunteer application:', err);
+    res.status(500).json({ success: false, error: 'Internal server error processing volunteer application.' });
+  }
+});
+
+// Volunteer Reference Lookup (Public sanitized summary)
+app.get('/api/volunteers/lookup', (req, res) => {
+  const { reference, email } = req.query;
+  if (!reference && !email) {
+    return res.status(400).json({ error: 'Please supply application reference or email.' });
+  }
+
+  const data = readDb();
+  ensureVolunteerDefaults(data);
+
+  const queryRef = reference ? String(reference).trim().toUpperCase() : null;
+  const queryEmail = email ? String(email).trim().toLowerCase() : null;
+
+  const found = data.volunteer_applications.find((v: any) => {
+    if (queryRef && (v.reference || '').toUpperCase() === queryRef) return true;
+    if (queryEmail && (v.email || '').toLowerCase() === queryEmail) return true;
+    return false;
+  });
+
+  if (!found) {
+    return res.status(404).json({ error: 'Volunteer application reference not found.' });
+  }
+
+  // Sanitize: return public non-sensitive verification only
+  res.json({
+    success: true,
+    application: {
+      reference: found.reference,
+      firstName: found.firstName,
+      lastName: found.lastName,
+      preferredDepartment: found.preferredDepartment,
+      status: found.status,
+      createdAt: found.createdAt
+    }
+  });
+});
+
+// Admin list for secure CMS / Secretariat panel
+app.get('/api/admin/volunteers', (req, res) => {
+  const isAdmin = req.headers['x-admin-mode'] === 'true' || req.query.admin === 'true';
+  if (!isAdmin) {
+    return res.status(403).json({ error: 'Unauthorized access to volunteer directory' });
+  }
+  const data = readDb();
+  ensureVolunteerDefaults(data);
+  ensureVolunteerPerformanceDefaults(data);
+  res.json({ success: true, volunteers: data.volunteer_applications });
+});
+
+// ============================================================
+// VOLUNTEER PERFORMANCE, COMMENDATION, CORRECTIVE REPORT & CERTIFICATION
+// ============================================================
+
+function ensureVolunteerPerformanceDefaults(data: any) {
+  if (!data.volunteer_applications || data.volunteer_applications.length === 0) {
+    data.volunteer_applications = [
+      {
+        id: 'vol-app-2026-0001',
+        reference: 'ASS-VOL-2026-0001',
+        applicantType: 'Corporate-Sponsored Volunteer',
+        firstName: 'Chidinma',
+        middleName: 'Grace',
+        lastName: 'Eze',
+        preferredName: 'Chidinma',
+        dobOrAgeGroup: '26-35',
+        gender: 'Female',
+        country: 'Nigeria',
+        state: 'Lagos',
+        city: 'Victoria Island',
+        email: 'chidinma.eze@shell-partner.ng',
+        phone: '+234 803 111 2233',
+        address: '14 Marina, Lagos Island, Lagos',
+        occupation: 'Sustainability & Corporate Relations Lead',
+        organisation: 'Shell Nigeria',
+        profession: 'CSR & External Affairs Specialist',
+        educationStatus: 'Graduate',
+        qualifications: 'B.Sc. Mass Communication, CIPR Certified',
+        skills: 'Diplomatic protocol, stakeholder hospitality, crisis communication, VIP liaison',
+        sponsoringOrgName: 'Shell Nigeria',
+        sponsoringOrgType: 'Corporate Enterprise',
+        sponsoringOrgSector: 'OIL_AND_GAS',
+        sponsoringOrgAddress: 'Shell Petroleum Development Company of Nigeria, Freeman House, Marina, Lagos',
+        sponsoringOrgEmail: 'csr-relations@shell.com.ng',
+        sponsoringOrgPhone: '+234 1 276 0000',
+        orgContactPersonName: 'Osagie Okunbor',
+        orgContactPersonPosition: 'Managing Director & Country Chair',
+        orgContactPersonEmail: 'osagie.okunbor@shell.com.ng',
+        natureOfSupport: 'Sponsored Volunteer',
+        sponsoredVolunteersCount: 4,
+        preferredDepartment: 'Protocol',
+        secondaryDepartment: 'VIP/VVIP Ushering',
+        availability: 'Full Summit (All Days)',
+        preferredShift: 'Full Day',
+        motivation: 'Dedicated to supporting aviation safety and representing Shell with top-tier protocol excellence.',
+        emergencyContactName: 'Engr. Emeka Eze',
+        emergencyRelationship: 'Brother',
+        emergencyContactPhone: '+234 802 999 1122',
+        consentConfirmed: true,
+        status: 'SUBMITTED',
+        createdAt: '2026-09-01T10:00:00.000Z',
+        updatedAt: '2026-09-01T10:00:00.000Z',
+        source: 'PUBLIC_WEB',
+        auditReference: 'AUD-VOL-2026-1001'
+      },
+      {
+        id: 'vol-app-2026-0002',
+        reference: 'ASS-VOL-2026-0002',
+        applicantType: 'Organisation-Nominated Volunteer',
+        firstName: 'Tariq',
+        lastName: 'Abubakar',
+        dobOrAgeGroup: '26-35',
+        gender: 'Male',
+        country: 'Nigeria',
+        state: 'Abuja (FCT)',
+        city: 'Garki',
+        email: 'tariq.abubakar@nimet-meteorology.gov.ng',
+        phone: '+234 806 222 3344',
+        address: 'NiMET Headquarters, Bill Clinton Drive, Nnamdi Azikiwe International Airport, Abuja',
+        occupation: 'Aeronautical Meteorologist',
+        organisation: 'NiMET (Nigerian Meteorological Agency)',
+        profession: 'Aviation Weather Specialist',
+        educationStatus: 'Graduate',
+        qualifications: 'M.Sc. Applied Meteorology, WMO Certified Aeronautical Forecaster',
+        skills: 'Weather briefing, flight safety analytics, technical documentation, IT data feeds',
+        sponsoringOrgName: 'NiMET',
+        sponsoringOrgType: 'Government / Regulatory Agency',
+        sponsoringOrgSector: 'REGULATORS',
+        sponsoringOrgAddress: 'Bill Clinton Drive, Nnamdi Azikiwe Airport, Abuja',
+        sponsoringOrgEmail: 'secretariat@nimet.gov.ng',
+        sponsoringOrgPhone: '+234 9 876 5432',
+        orgContactPersonName: 'Prof. Mansur Bako',
+        orgContactPersonPosition: 'Director-General / CEO',
+        natureOfSupport: 'Nominated Volunteer',
+        sponsoredVolunteersCount: 2,
+        preferredDepartment: 'Emergency & Safety Support',
+        secondaryDepartment: 'Documentation & Rapporteur',
+        availability: 'Full Summit (All Days)',
+        preferredShift: 'Flexible',
+        motivation: 'Passionate about integrating weather intelligence into civil aviation risk prevention.',
+        emergencyContactName: 'Amina Abubakar',
+        emergencyRelationship: 'Spouse',
+        emergencyContactPhone: '+234 809 333 4455',
+        consentConfirmed: true,
+        status: 'SUBMITTED',
+        createdAt: '2026-09-02T11:15:00.000Z',
+        updatedAt: '2026-09-02T11:15:00.000Z',
+        source: 'PUBLIC_WEB',
+        auditReference: 'AUD-VOL-2026-1002'
+      },
+      {
+        id: 'vol-app-2026-0003',
+        reference: 'ASS-VOL-2026-0003',
+        applicantType: 'Individual Volunteer',
+        firstName: 'Adebisi',
+        lastName: 'Oluwaseun',
+        preferredName: 'Bisi',
+        dobOrAgeGroup: '18-25',
+        gender: 'Female',
+        country: 'Nigeria',
+        state: 'Oyo',
+        city: 'Ibadan',
+        email: 'bisi.oluwaseun.remote@gmail.com',
+        phone: '+234 814 333 4455',
+        address: 'Bodija Estate, Ibadan',
+        occupation: 'Digital Media Strategist & Content Designer',
+        profession: 'UI/UX & Digital Communications',
+        educationStatus: 'Graduate',
+        qualifications: 'B.A. Graphic Design & Multimedia Arts',
+        skills: 'Remote digital management, live infographic publishing, Canva Pro, Figma, live captioning',
+        preferredDepartment: 'Media & Publicity',
+        secondaryDepartment: 'IT & Digital Support',
+        availability: 'Pre-Summit & Summit Days',
+        preferredShift: 'Flexible',
+        motivation: 'Contributing high-impact digital infographics and social broadcast assets remotely throughout the summit.',
+        emergencyContactName: 'Pastor Samuel Oluwaseun',
+        emergencyRelationship: 'Father',
+        emergencyContactPhone: '+234 803 777 8899',
+        consentConfirmed: true,
+        status: 'SUBMITTED',
+        createdAt: '2026-09-03T14:20:00.000Z',
+        updatedAt: '2026-09-03T14:20:00.000Z',
+        source: 'PUBLIC_WEB',
+        auditReference: 'AUD-VOL-2026-1003'
+      },
+      {
+        id: 'vol-app-2026-0004',
+        reference: 'ASS-VOL-2026-0004',
+        applicantType: 'Corporate-Sponsored Volunteer',
+        firstName: 'Femi',
+        lastName: 'Balogun',
+        dobOrAgeGroup: '26-35',
+        gender: 'Male',
+        country: 'Nigeria',
+        state: 'Lagos',
+        city: 'Ikoyi',
+        email: 'femi.balogun@mtn-foundation.ng',
+        phone: '+234 803 444 5566',
+        address: 'Golden Plaza, Falomo, Ikoyi, Lagos',
+        occupation: 'Senior Network Systems Engineer',
+        organisation: 'MTN Nigeria',
+        profession: 'Telecommunications & Cloud Infrastructure',
+        educationStatus: 'Graduate',
+        qualifications: 'B.Eng. Electrical/Electronic Engineering, Cisco CCNA, AWS Solutions Architect',
+        skills: 'High-density Wi-Fi deployment, audio/visual stream telemetry, digital registration desks',
+        sponsoringOrgName: 'MTN Nigeria',
+        sponsoringOrgType: 'Corporate Enterprise',
+        sponsoringOrgSector: 'TELECOMMUNICATIONS',
+        sponsoringOrgAddress: 'MTN Plaza, Falomo, Ikoyi, Lagos',
+        sponsoringOrgEmail: 'summit-support@mtn.com',
+        sponsoringOrgPhone: '+234 1 803 2000',
+        orgContactPersonName: 'Karl Toriola',
+        orgContactPersonPosition: 'Chief Executive Officer',
+        natureOfSupport: 'Corporate Volunteer Team',
+        sponsoredVolunteersCount: 3,
+        preferredDepartment: 'IT & Digital Support',
+        secondaryDepartment: 'Registration',
+        availability: 'Full Summit (All Days)',
+        preferredShift: 'Full Day',
+        motivation: 'Ensuring seamless high-speed connectivity and digital attendee support on-site at Marriott Ikeja.',
+        emergencyContactName: 'Kemi Balogun',
+        emergencyRelationship: 'Spouse',
+        emergencyContactPhone: '+234 802 555 6677',
+        consentConfirmed: true,
+        status: 'SUBMITTED',
+        createdAt: '2026-09-04T09:30:00.000Z',
+        updatedAt: '2026-09-04T09:30:00.000Z',
+        source: 'PUBLIC_WEB',
+        auditReference: 'AUD-VOL-2026-1004'
+      },
+      {
+        id: 'vol-app-2026-0005',
+        reference: 'ASS-VOL-2026-0005',
+        applicantType: 'Individual Volunteer',
+        firstName: 'Ngozi',
+        lastName: 'Okonkwo',
+        dobOrAgeGroup: '18-25',
+        gender: 'Female',
+        country: 'Nigeria',
+        state: 'Lagos',
+        city: 'Ikeja',
+        email: 'ngozi.okonkwo.aviation@gmail.com',
+        phone: '+234 818 555 6677',
+        address: '28 Allen Avenue, Ikeja, Lagos',
+        occupation: 'Final Year Aviation Law Student',
+        profession: 'Legal & Regulatory Compliance Research',
+        educationStatus: 'Student',
+        qualifications: 'LL.B in Progress (Unilag), Aviation Law Society Chair',
+        skills: 'Session transcription, legal rapporteur synthesis, plenary summary drafting',
+        preferredDepartment: 'Documentation & Rapporteur',
+        secondaryDepartment: 'Guest Services',
+        availability: 'Full Summit (All Days)',
+        preferredShift: 'Morning Shift',
+        motivation: 'Passionate about documenting high-level regulatory resolutions and contributing to the official summit compendium.',
+        emergencyContactName: 'Chief Arthur Okonkwo',
+        emergencyRelationship: 'Parent',
+        emergencyContactPhone: '+234 803 123 4567',
+        consentConfirmed: true,
+        status: 'SUBMITTED',
+        createdAt: '2026-09-05T13:45:00.000Z',
+        updatedAt: '2026-09-05T13:45:00.000Z',
+        source: 'PUBLIC_WEB',
+        auditReference: 'AUD-VOL-2026-1005'
+      }
+    ];
+  }
+
+  if (!data.volunteer_performance) {
+    data.volunteer_performance = [
+      {
+        id: 'perf-2026-0001',
+        performanceId: 'PERF-2026-0001',
+        volunteerApplicationId: 'vol-app-2026-0001',
+        volunteerReference: 'ASS-VOL-2026-0001',
+        volunteerName: 'Chidinma Grace Eze',
+        volunteerEmail: 'chidinma.eze@shell-partner.ng',
+        volunteerPhone: '+234 803 111 2233',
+        applicantType: 'Corporate-Sponsored Volunteer',
+        organisationName: 'Shell Nigeria',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        eventName: 'Aviation Safety Summit 2026',
+        department: 'Protocol',
+        assignment: 'Lead VIP Diplomatic Liaison & Executive Lounge Protocol',
+        workMode: 'ON-SITE — LAGOS',
+        supervisorId: 'sup-sec-01',
+        supervisorName: 'Barr. Folashade Adeleke',
+        supervisorTitle: 'Director of Protocol & Ceremonials',
+        evaluationPeriod: '15-18 November 2026 (Pre-Summit & Summit Plenary)',
+        evaluationStatus: 'APPROVED',
+        scores: {
+          attendanceScore: 10,
+          punctualityScore: 10,
+          reliabilityScore: 10,
+          teamworkScore: 10,
+          communicationScore: 9,
+          professionalismScore: 10,
+          taskCompletionScore: 10,
+          initiativeScore: 9,
+          safetyComplianceScore: 10,
+          adaptabilityScore: 9
+        },
+        totalScore: 97,
+        percentage: 97,
+        grade: 'A+',
+        evidenceNotes: 'Punctual arrival at 06:15 AM daily; flawlessly managed VIP entrance escort for Minister and 4 Aviation Directors; zero protocol missteps observed.',
+        deliverablesReference: 'VIP Escort Log, Diplomatic Seating Chart Sign-Off, Executive Lounge Access Registry',
+        attendanceRecordSummary: '100% On-Site Physical Attendance (Pre-Summit Briefing, Rehearsal, & Full Summit Day)',
+        supervisorObservations: 'Exemplary leadership qualities and immaculate professional demeanour reflecting the highest corporate standards of Shell Nigeria.',
+        supervisorComments: 'Chidinma performed at an extraordinary standard throughout the summit. Her calm coordination during the surprise arrival of international dignitaries was masterclass.',
+        reviewerComments: 'Performance validated against official Directorate of Protocol check-in logs. Recommendation for highest commendation strongly endorsed.',
+        approvalNotes: 'Approved by Secretariat Executive Directorate. Formal Commendation and Outstanding Volunteer Service Certificate authorised.',
+        finalOutcome: 'COMMENDED',
+        futureEventConsideration: 'RECOMMENDED FOR FUTURE CONSIDERATION',
+        considerForNextYear: true,
+        nextYearRecommendationNotes: 'Consider for Senior Protocol Coordinator / Team Lead role in 2027 Summit.',
+        createdBy: 'supervisor.protocol@sec.domislink.com',
+        createdByName: 'Barr. Folashade Adeleke',
+        createdAt: '2026-11-18T18:30:00.000Z',
+        submittedAt: '2026-11-18T19:00:00.000Z',
+        reviewedBy: 'dir.operations@sec.domislink.com',
+        reviewedByName: 'Capt. Nkechi Adebayo',
+        reviewedAt: '2026-11-19T09:15:00.000Z',
+        approvedBy: 'secgen@domislink.com',
+        approvedByName: 'Dr. Aliyu Mohammed, CON',
+        approvedAt: '2026-11-19T11:45:00.000Z',
+        updatedBy: 'secgen@domislink.com',
+        updatedAt: '2026-11-19T11:45:00.000Z',
+        auditReference: 'AUD-PERF-2026-0001'
+      },
+      {
+        id: 'perf-2026-0002',
+        performanceId: 'PERF-2026-0002',
+        volunteerApplicationId: 'vol-app-2026-0003',
+        volunteerReference: 'ASS-VOL-2026-0003',
+        volunteerName: 'Adebisi Oluwaseun',
+        volunteerEmail: 'bisi.oluwaseun.remote@gmail.com',
+        volunteerPhone: '+234 814 333 4455',
+        applicantType: 'Individual Volunteer',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        eventName: 'Aviation Safety Summit 2026',
+        department: 'Media & Publicity',
+        assignment: 'Remote Digital Infographics & Real-Time Keynote Quotation Banners',
+        workMode: 'REMOTE — ANYWHERE',
+        supervisorId: 'sup-media-01',
+        supervisorName: 'Mrs. Toyin Williams',
+        supervisorTitle: 'Head of Media & Digital Broadcast',
+        evaluationPeriod: '10-18 November 2026 (Campaign & Live Stream Coverage)',
+        evaluationStatus: 'APPROVED',
+        scores: {
+          attendanceScore: 10,
+          punctualityScore: 9,
+          reliabilityScore: 9,
+          teamworkScore: 10,
+          communicationScore: 10,
+          professionalismScore: 9,
+          taskCompletionScore: 10,
+          initiativeScore: 10,
+          safetyComplianceScore: 9,
+          adaptabilityScore: 9
+        },
+        totalScore: 95,
+        percentage: 95,
+        grade: 'A+',
+        evidenceNotes: 'Delivered 34 verified live quote graphics within 7 minutes of speaker statements during live broadcast; attended all digital sync briefings on Google Meet.',
+        deliverablesReference: 'Cloud Drive Folder: /Summit2026/LiveBanners/Bisi, Social Broadcast Metric Report',
+        attendanceRecordSummary: '100% remote availability on agreed digital desk shift; continuous Slack & WhatsApp responsiveness.',
+        supervisorObservations: 'Demonstrates that remote volunteers can deliver exceptional, mission-critical impact without physical location constraints.',
+        supervisorComments: 'Adebisi produced outstanding visual assets that elevated the Summit public profile across digital channels. Speed and typography were pristine.',
+        reviewerComments: 'Verified deliverable timestamps against live stream broadcast recording. Exceptional creative output.',
+        approvalNotes: 'Approved for Digital/Remote Contribution Commendation and Certificate of Outstanding Volunteer Service.',
+        finalOutcome: 'COMMENDED',
+        futureEventConsideration: 'RECOMMENDED FOR FUTURE CONSIDERATION',
+        considerForNextYear: true,
+        nextYearRecommendationNotes: 'Eligible for Remote Digital Art Lead in 2027 Summit.',
+        createdBy: 'supervisor.media@sec.domislink.com',
+        createdByName: 'Mrs. Toyin Williams',
+        createdAt: '2026-11-18T20:15:00.000Z',
+        submittedAt: '2026-11-18T20:45:00.000Z',
+        reviewedBy: 'dir.operations@sec.domislink.com',
+        reviewedByName: 'Capt. Nkechi Adebayo',
+        reviewedAt: '2026-11-19T09:40:00.000Z',
+        approvedBy: 'secgen@domislink.com',
+        approvedByName: 'Dr. Aliyu Mohammed, CON',
+        approvedAt: '2026-11-19T12:00:00.000Z',
+        updatedBy: 'secgen@domislink.com',
+        updatedAt: '2026-11-19T12:00:00.000Z',
+        auditReference: 'AUD-PERF-2026-0002'
+      },
+      {
+        id: 'perf-2026-0003',
+        performanceId: 'PERF-2026-0003',
+        volunteerApplicationId: 'vol-app-2026-0004',
+        volunteerReference: 'ASS-VOL-2026-0004',
+        volunteerName: 'Femi Balogun',
+        volunteerEmail: 'femi.balogun@mtn-foundation.ng',
+        volunteerPhone: '+234 803 444 5566',
+        applicantType: 'Corporate-Sponsored Volunteer',
+        organisationName: 'MTN Nigeria',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        eventName: 'Aviation Safety Summit 2026',
+        department: 'IT & Digital Support',
+        assignment: 'Technical Support & Delegate Check-In Station Network Telemetry',
+        workMode: 'ON-SITE — LAGOS',
+        supervisorId: 'sup-it-01',
+        supervisorName: 'Engr. David Okoro',
+        supervisorTitle: 'Director of ICT & Infrastructure',
+        evaluationPeriod: '16-17 November 2026',
+        evaluationStatus: 'APPROVED',
+        scores: {
+          attendanceScore: 9,
+          punctualityScore: 9,
+          reliabilityScore: 9,
+          teamworkScore: 8,
+          communicationScore: 8,
+          professionalismScore: 9,
+          taskCompletionScore: 9,
+          initiativeScore: 8,
+          safetyComplianceScore: 9,
+          adaptabilityScore: 8
+        },
+        totalScore: 87,
+        percentage: 87,
+        grade: 'A',
+        evidenceNotes: 'Maintained 100% uptime on the primary delegate check-in subnet; swiftly resolved 2 printer driver bottlenecks.',
+        deliverablesReference: 'Network Latency Log, Check-In Station Diagnostics Sheet',
+        attendanceRecordSummary: 'Present on site throughout both deployment days.',
+        supervisorObservations: 'Highly skilled technical resource whose corporate grounding at MTN was evident in fast troubleshooting.',
+        supervisorComments: 'Femi provided reliable, solid technical expertise ensuring the registration kiosks functioned without delay.',
+        reviewerComments: 'Solid technical delivery reviewed and endorsed.',
+        approvalNotes: 'Approved for Certificate of Volunteer Service.',
+        finalOutcome: 'CERTIFICATE ISSUED',
+        futureEventConsideration: 'ELIGIBLE FOR FUTURE CONSIDERATION',
+        considerForNextYear: true,
+        nextYearRecommendationNotes: 'Strong candidate for On-Site IT Infrastructure team in 2027.',
+        createdBy: 'supervisor.it@sec.domislink.com',
+        createdByName: 'Engr. David Okoro',
+        createdAt: '2026-11-18T17:00:00.000Z',
+        submittedAt: '2026-11-18T17:30:00.000Z',
+        reviewedBy: 'dir.operations@sec.domislink.com',
+        reviewedByName: 'Capt. Nkechi Adebayo',
+        reviewedAt: '2026-11-19T10:10:00.000Z',
+        approvedBy: 'secgen@domislink.com',
+        approvedByName: 'Dr. Aliyu Mohammed, CON',
+        approvedAt: '2026-11-19T12:15:00.000Z',
+        updatedBy: 'secgen@domislink.com',
+        updatedAt: '2026-11-19T12:15:00.000Z',
+        auditReference: 'AUD-PERF-2026-0003'
+      }
+    ];
+  }
+
+  if (!data.volunteer_commendations) {
+    data.volunteer_commendations = [
+      {
+        id: 'comm-2026-0001',
+        commendationId: 'COMM-2026-0001',
+        volunteerReference: 'ASS-VOL-2026-0001',
+        volunteerApplicationId: 'vol-app-2026-0001',
+        volunteerName: 'Chidinma Grace Eze',
+        organisationName: 'Shell Nigeria',
+        applicantType: 'Corporate-Sponsored Volunteer',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        department: 'Protocol',
+        assignment: 'Lead VIP Diplomatic Liaison & Executive Lounge Protocol',
+        commendationType: 'OUTSTANDING SERVICE',
+        title: 'Commendation for Outstanding Protocol Leadership and VIP Diplomatic Hospitality',
+        reason: 'In recognition of exceptional poise, impeccable punctuality, and flawless diplomatic protocol execution during the reception of high-ranking aviation dignitaries and ministerial delegations at the Aviation Safety Summit 2026.',
+        supportingEvidence: 'Zero protocol discrepancies recorded; commended verbally by two visiting Director-Generals; 100% check-in escort reliability.',
+        issuedBy: 'dir.protocol@sec.domislink.com',
+        issuedByName: 'Barr. Folashade Adeleke',
+        approvedBy: 'secgen@domislink.com',
+        approvedByName: 'Dr. Aliyu Mohammed, CON',
+        approvedAt: '2026-11-19T11:45:00.000Z',
+        issueDate: '2026-11-19',
+        status: 'ISSUED',
+        createdAt: '2026-11-19T10:00:00.000Z',
+        updatedAt: '2026-11-19T11:45:00.000Z',
+        auditReference: 'AUD-COMM-2026-0001'
+      },
+      {
+        id: 'comm-2026-0002',
+        commendationId: 'COMM-2026-0002',
+        volunteerReference: 'ASS-VOL-2026-0003',
+        volunteerApplicationId: 'vol-app-2026-0003',
+        volunteerName: 'Adebisi Oluwaseun',
+        applicantType: 'Individual Volunteer',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        department: 'Media & Publicity',
+        assignment: 'Remote Digital Infographics & Real-Time Keynote Quotation Banners',
+        commendationType: 'DIGITAL/REMOTE CONTRIBUTION',
+        title: 'Commendation for Exceptional Remote Digital Media & Real-Time Broadcast Visuals',
+        reason: 'In recognition of outstanding digital dedication, creative precision, and rapid turnaround in publishing 34 high-quality keynote infographics during the live summit stream from Ibadan.',
+        supportingEvidence: 'All graphics approved on first draft with zero typo corrections; broadcast social reach exceeded target by 140%.',
+        issuedBy: 'dir.media@sec.domislink.com',
+        issuedByName: 'Mrs. Toyin Williams',
+        approvedBy: 'secgen@domislink.com',
+        approvedByName: 'Dr. Aliyu Mohammed, CON',
+        approvedAt: '2026-11-19T12:00:00.000Z',
+        issueDate: '2026-11-19',
+        status: 'ISSUED',
+        createdAt: '2026-11-19T10:30:00.000Z',
+        updatedAt: '2026-11-19T12:00:00.000Z',
+        auditReference: 'AUD-COMM-2026-0002'
+      }
+    ];
+  }
+
+  if (!data.volunteer_corrective_reports) {
+    data.volunteer_corrective_reports = [
+      {
+        id: 'corr-2026-0001',
+        correctiveReportId: 'CORR-2026-0001',
+        volunteerReference: 'ASS-VOL-2026-0005',
+        volunteerApplicationId: 'vol-app-2026-0005',
+        volunteerName: 'Ngozi Okonkwo',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        department: 'Documentation & Rapporteur',
+        assignment: 'Session Transcription & Key Takeaways Drafting',
+        date: '2026-11-17',
+        issueCategory: 'PERFORMANCE ADVISORY',
+        title: 'Performance Advisory: Timeliness of Plenary Morning Session Draft Submission',
+        factualDescription: 'The transcript notes for Plenary Session 1 (Opening Ministerial Addresses) were submitted 90 minutes past the agreed 12:00 PM turnaround window, causing a minor delay in compiling the afternoon executive summary bulletin.',
+        relevantEvidence: 'Document upload timestamp on Google Drive: 13:30 PM (Agreed deadline: 12:00 PM).',
+        operationalImpact: 'Drafting team had to compress editing time for the afternoon press release; however, all core resolutions were captured accurately.',
+        expectedImprovement: 'Adopt incremental hourly batch saving during live sessions and notify lead rapporteur in advance if audio transcription requires cross-checking.',
+        responseRequired: true,
+        responseDeadline: '2026-11-20',
+        volunteerResponse: {
+          responseType: 'EXPLANATION',
+          statement: 'I experienced a brief local power cut at my recording station and prioritised cross-referencing legal acronyms used in the Minister speech to ensure 100% precision before uploading.',
+          supportingInformation: 'Backup audio notes and corrected draft attached for verification.',
+          submittedAt: '2026-11-18T09:00:00.000Z',
+          submittedBy: 'ngozi.okonkwo.aviation@gmail.com'
+        },
+        supervisorRecommendation: 'Acknowledge explanation. The final quality of the legal citations was excellent. Issue advisory as educational guidance without punitive record.',
+        reviewerDecision: 'Matter satisfactorily resolved. Advisory closed with positive acknowledgment of volunteer diligence.',
+        finalStatus: 'RESOLVED',
+        issuedBy: 'sup.doc@sec.domislink.com',
+        issuedByName: 'Mr. Jude Obi',
+        reviewedBy: 'dir.operations@sec.domislink.com',
+        reviewedByName: 'Capt. Nkechi Adebayo',
+        reviewedAt: '2026-11-18T14:00:00.000Z',
+        approvedBy: 'secgen@domislink.com',
+        approvedByName: 'Dr. Aliyu Mohammed, CON',
+        approvedAt: '2026-11-18T16:30:00.000Z',
+        createdAt: '2026-11-17T17:00:00.000Z',
+        updatedAt: '2026-11-18T16:30:00.000Z',
+        auditReference: 'AUD-CORR-2026-0001'
+      }
+    ];
+  }
+
+  if (!data.volunteer_certificates) {
+    data.volunteer_certificates = [
+      {
+        id: 'cert-2026-0001',
+        certificateNumber: 'ASS-CERT-2026-00001',
+        certificateType: 'Certificate of Outstanding Volunteer Service',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        eventName: 'Aviation Safety Summit 2026',
+        summitTheme: 'EVERYBODY IS INVOLVED IN AVIATION SAFETY',
+        isOrganisationCertificate: false,
+        recipientName: 'Chidinma Grace Eze',
+        volunteerReference: 'ASS-VOL-2026-0001',
+        volunteerApplicationId: 'vol-app-2026-0001',
+        organisationName: 'Shell Nigeria',
+        department: 'Protocol',
+        assignment: 'Lead VIP Diplomatic Liaison & Executive Lounge Protocol',
+        workMode: 'ON-SITE — LAGOS',
+        servicePeriod: '15-18 November 2026',
+        signatoryId: 'sig-sec-gen',
+        signatoryName: 'Dr. Aliyu Mohammed, CON',
+        signatoryTitle: 'Secretary-General',
+        signatoryOrg: 'Domislink International Services Ltd',
+        issueDate: '2026-11-19',
+        verificationCode: 'DOMIS-CERT-2026-V893K2',
+        status: 'ISSUED',
+        issuedBy: 'secgen@domislink.com',
+        issuedByName: 'Dr. Aliyu Mohammed, CON',
+        createdAt: '2026-11-19T12:30:00.000Z',
+        updatedAt: '2026-11-19T12:30:00.000Z',
+        auditReference: 'AUD-CERT-2026-0001'
+      },
+      {
+        id: 'cert-2026-0002',
+        certificateNumber: 'ASS-CERT-2026-00002',
+        certificateType: 'Certificate of Special Contribution',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        eventName: 'Aviation Safety Summit 2026',
+        summitTheme: 'EVERYBODY IS INVOLVED IN AVIATION SAFETY',
+        isOrganisationCertificate: false,
+        recipientName: 'Adebisi Oluwaseun',
+        volunteerReference: 'ASS-VOL-2026-0003',
+        volunteerApplicationId: 'vol-app-2026-0003',
+        department: 'Media & Publicity',
+        assignment: 'Remote Digital Infographics & Real-Time Keynote Quotation Banners',
+        workMode: 'REMOTE — ANYWHERE',
+        servicePeriod: '10-18 November 2026',
+        signatoryId: 'sig-sec-gen',
+        signatoryName: 'Dr. Aliyu Mohammed, CON',
+        signatoryTitle: 'Secretary-General',
+        signatoryOrg: 'Domislink International Services Ltd',
+        issueDate: '2026-11-19',
+        verificationCode: 'DOMIS-CERT-2026-M419X8',
+        status: 'ISSUED',
+        issuedBy: 'secgen@domislink.com',
+        issuedByName: 'Dr. Aliyu Mohammed, CON',
+        createdAt: '2026-11-19T12:35:00.000Z',
+        updatedAt: '2026-11-19T12:35:00.000Z',
+        auditReference: 'AUD-CERT-2026-0002'
+      },
+      {
+        id: 'cert-2026-0003',
+        certificateNumber: 'ASS-CERT-2026-00003',
+        certificateType: 'Certificate of Volunteer Service',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        eventName: 'Aviation Safety Summit 2026',
+        summitTheme: 'EVERYBODY IS INVOLVED IN AVIATION SAFETY',
+        isOrganisationCertificate: false,
+        recipientName: 'Femi Balogun',
+        volunteerReference: 'ASS-VOL-2026-0004',
+        volunteerApplicationId: 'vol-app-2026-0004',
+        organisationName: 'MTN Nigeria',
+        department: 'IT & Digital Support',
+        assignment: 'Technical Support & Delegate Check-In Station Network Telemetry',
+        workMode: 'ON-SITE — LAGOS',
+        servicePeriod: '16-17 November 2026',
+        signatoryId: 'sig-sec-gen',
+        signatoryName: 'Dr. Aliyu Mohammed, CON',
+        signatoryTitle: 'Secretary-General',
+        signatoryOrg: 'Domislink International Services Ltd',
+        issueDate: '2026-11-19',
+        verificationCode: 'DOMIS-CERT-2026-N771Q4',
+        status: 'ISSUED',
+        issuedBy: 'secgen@domislink.com',
+        issuedByName: 'Dr. Aliyu Mohammed, CON',
+        createdAt: '2026-11-19T12:40:00.000Z',
+        updatedAt: '2026-11-19T12:40:00.000Z',
+        auditReference: 'AUD-CERT-2026-0003'
+      },
+      {
+        id: 'cert-2026-0004',
+        certificateNumber: 'ASS-CERT-2026-00004',
+        certificateType: 'Organisation Certificate of Appreciation',
+        summitYear: 2026,
+        eventId: 'summit-2026',
+        eventName: 'Aviation Safety Summit 2026',
+        summitTheme: 'EVERYBODY IS INVOLVED IN AVIATION SAFETY',
+        isOrganisationCertificate: true,
+        recipientName: 'Shell Nigeria',
+        organisationName: 'Shell Nigeria',
+        organisationSector: 'OIL_AND_GAS',
+        verifiedVolunteersCount: 4,
+        department: 'Corporate Volunteer Partnership',
+        contributionDescription: 'In recognition of generous corporate sponsorship and institutional deployment of 4 high-calibre volunteer professionals across VIP Protocol, Safety Logistics, and Plenary Coordination.',
+        signatoryId: 'sig-sec-gen',
+        signatoryName: 'Dr. Aliyu Mohammed, CON',
+        signatoryTitle: 'Secretary-General',
+        signatoryOrg: 'Domislink International Services Ltd',
+        issueDate: '2026-11-19',
+        verificationCode: 'DOMIS-ORG-2026-SH772L',
+        status: 'ISSUED',
+        issuedBy: 'secgen@domislink.com',
+        issuedByName: 'Dr. Aliyu Mohammed, CON',
+        createdAt: '2026-11-19T13:00:00.000Z',
+        updatedAt: '2026-11-19T13:00:00.000Z',
+        auditReference: 'AUD-CERT-2026-0004'
+      }
+    ];
+  }
+}
+
+function calculateGradeAndPercentage(scores: any) {
+  const criteria = [
+    'attendanceScore',
+    'punctualityScore',
+    'reliabilityScore',
+    'teamworkScore',
+    'communicationScore',
+    'professionalismScore',
+    'taskCompletionScore',
+    'initiativeScore',
+    'safetyComplianceScore',
+    'adaptabilityScore'
+  ];
+  let total = 0;
+  for (const key of criteria) {
+    const val = Number(scores ? scores[key] : 0) || 0;
+    total += Math.min(10, Math.max(0, val));
+  }
+  const percentage = Math.round((total / 100) * 100);
+  let grade = 'E';
+  if (percentage >= 90) grade = 'A+';
+  else if (percentage >= 80) grade = 'A';
+  else if (percentage >= 70) grade = 'B';
+  else if (percentage >= 60) grade = 'C';
+  else if (percentage >= 50) grade = 'D';
+  else grade = 'E';
+
+  return { total, percentage, grade };
+}
+
+function generateCertificateNumber(data: any, summitYear: number = 2026): string {
+  if (!data.volunteer_certificates) data.volunteer_certificates = [];
+  let seq = data.volunteer_certificates.length + 1;
+  let certNum = `ASS-CERT-${summitYear}-${String(seq).padStart(5, '0')}`;
+  while (data.volunteer_certificates.some((c: any) => c.certificateNumber === certNum)) {
+    seq++;
+    certNum = `ASS-CERT-${summitYear}-${String(seq).padStart(5, '0')}`;
+  }
+  return certNum;
+}
+
+// 1. GET /api/secretariat/volunteer-performance
+app.get('/api/secretariat/volunteer-performance', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+  const { year, department, status, grade, search } = req.query;
+
+  let records = data.volunteer_performance || [];
+
+  if (year) {
+    records = records.filter((r: any) => String(r.summitYear) === String(year));
+  }
+  if (department && department !== 'ALL') {
+    records = records.filter((r: any) => r.department === department);
+  }
+  if (status && status !== 'ALL') {
+    records = records.filter((r: any) => r.evaluationStatus === status);
+  }
+  if (grade && grade !== 'ALL') {
+    records = records.filter((r: any) => r.grade === grade);
+  }
+  if (search && String(search).trim()) {
+    const q = String(search).trim().toLowerCase();
+    records = records.filter((r: any) =>
+      (r.volunteerName || '').toLowerCase().includes(q) ||
+      (r.volunteerReference || '').toLowerCase().includes(q) ||
+      (r.organisationName || '').toLowerCase().includes(q) ||
+      (r.department || '').toLowerCase().includes(q) ||
+      (r.supervisorName || '').toLowerCase().includes(q)
+    );
+  }
+
+  res.json({
+    success: true,
+    records,
+    total: records.length
+  });
+});
+
+// 2. GET /api/secretariat/volunteer-performance/stats
+app.get('/api/secretariat/volunteer-performance/stats', (req, res) => {
+  const data = readDb();
+  ensureVolunteerDefaults(data);
+  ensureVolunteerPerformanceDefaults(data);
+
+  const applications = data.volunteer_applications || [];
+  const performances = data.volunteer_performance || [];
+  const commendations = data.volunteer_commendations || [];
+  const correctiveReports = data.volunteer_corrective_reports || [];
+  const certificates = data.volunteer_certificates || [];
+
+  const totalVolunteers = applications.length;
+  const evaluatedCount = performances.filter((p: any) => p.evaluationStatus === 'APPROVED' || p.evaluationStatus === 'FINAL').length;
+  const pendingReviewsCount = performances.filter((p: any) => p.evaluationStatus === 'DRAFT' || p.evaluationStatus === 'SUBMITTED' || p.evaluationStatus === 'REVIEWED').length;
+
+  let totalScoreSum = 0;
+  let scoredCount = 0;
+  const gradeDistribution: Record<string, number> = { 'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 };
+
+  performances.forEach((p: any) => {
+    if (p.totalScore !== undefined) {
+      totalScoreSum += p.totalScore;
+      scoredCount++;
+    }
+    if (p.grade && gradeDistribution[p.grade] !== undefined) {
+      gradeDistribution[p.grade]++;
+    }
+  });
+
+  const averageScore = scoredCount > 0 ? Math.round((totalScoreSum / scoredCount) * 10) / 10 : 0;
+  const futureConsiderationCount = performances.filter((p: any) => p.considerForNextYear || p.futureEventConsideration === 'RECOMMENDED FOR FUTURE CONSIDERATION').length;
+
+  res.json({
+    success: true,
+    stats: {
+      totalVolunteers,
+      evaluatedCount,
+      pendingReviewsCount,
+      averageScore,
+      gradeDistribution,
+      commendationsCount: commendations.length,
+      certificatesIssuedCount: certificates.filter((c: any) => c.status === 'ISSUED').length,
+      correctiveReportsCount: correctiveReports.length,
+      futureConsiderationCount
+    }
+  });
+});
+
+// 3. POST /api/secretariat/volunteer-performance (Create new evaluation)
+app.post('/api/secretariat/volunteer-performance', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const {
+    volunteerApplicationId,
+    volunteerReference,
+    volunteerName,
+    volunteerEmail,
+    volunteerPhone,
+    applicantType,
+    organisationName,
+    summitYear = 2026,
+    eventId = 'summit-2026',
+    eventName = 'Aviation Safety Summit 2026',
+    department,
+    assignment,
+    workMode = 'ON-SITE — LAGOS',
+    supervisorId,
+    supervisorName,
+    supervisorTitle,
+    evaluationPeriod,
+    scores,
+    evidenceNotes,
+    deliverablesReference,
+    attendanceRecordSummary,
+    supervisorObservations,
+    incidentReference,
+    supervisorComments,
+    finalOutcome = 'SATISFACTORY SERVICE',
+    futureEventConsideration = 'ELIGIBLE FOR FUTURE CONSIDERATION',
+    considerForNextYear = true,
+    nextYearRecommendationNotes,
+    submitForReview = false,
+    actorEmail
+  } = req.body;
+
+  if (!volunteerReference || !volunteerName || !department || !supervisorName || !supervisorComments) {
+    return res.status(400).json({
+      success: false,
+      error: 'Please supply volunteer reference, volunteer name, department, supervisor name, and supervisor comments.'
+    });
+  }
+
+  // Duplicate Check: Check if active performance evaluation already exists for this volunteer and summit year
+  const existingIndex = data.volunteer_performance.findIndex(
+    (p: any) => (p.volunteerReference === volunteerReference || p.volunteerApplicationId === volunteerApplicationId) && p.summitYear === Number(summitYear)
+  );
+
+  if (existingIndex !== -1 && !req.body.allowOverwrite) {
+    return res.status(409).json({
+      success: false,
+      duplicate: true,
+      existingRecord: data.volunteer_performance[existingIndex],
+      error: `A performance evaluation already exists for ${volunteerName} (${volunteerReference}) for Summit Year ${summitYear}.`
+    });
+  }
+
+  const { total, percentage, grade } = calculateGradeAndPercentage(scores || {});
+  const now = new Date().toISOString();
+  const perfId = `perf-${Date.now()}`;
+  const perfReference = `PERF-${summitYear}-${String(data.volunteer_performance.length + 1).padStart(4, '0')}`;
+
+  const newRecord = {
+    id: perfId,
+    performanceId: perfReference,
+    volunteerApplicationId: volunteerApplicationId || `vol-${Date.now()}`,
+    volunteerReference,
+    volunteerName,
+    volunteerEmail: volunteerEmail || '',
+    volunteerPhone: volunteerPhone || '',
+    applicantType: applicantType || 'Individual Volunteer',
+    organisationName: organisationName || undefined,
+    summitYear: Number(summitYear),
+    eventId,
+    eventName,
+    department,
+    assignment: assignment || `${department} Support`,
+    workMode: workMode || 'ON-SITE — LAGOS',
+    supervisorId: supervisorId || `sup-${Date.now()}`,
+    supervisorName,
+    supervisorTitle: supervisorTitle || undefined,
+    evaluationPeriod: evaluationPeriod || `${summitYear} Summit Operations`,
+    evaluationStatus: submitForReview ? 'SUBMITTED' : 'DRAFT',
+    scores: scores || {
+      attendanceScore: 8,
+      punctualityScore: 8,
+      reliabilityScore: 8,
+      teamworkScore: 8,
+      communicationScore: 8,
+      professionalismScore: 8,
+      taskCompletionScore: 8,
+      initiativeScore: 8,
+      safetyComplianceScore: 8,
+      adaptabilityScore: 8
+    },
+    totalScore: total,
+    percentage,
+    grade,
+    evidenceNotes: evidenceNotes || undefined,
+    deliverablesReference: deliverablesReference || undefined,
+    attendanceRecordSummary: attendanceRecordSummary || undefined,
+    supervisorObservations: supervisorObservations || undefined,
+    incidentReference: incidentReference || undefined,
+    supervisorComments,
+    finalOutcome: finalOutcome || 'SATISFACTORY SERVICE',
+    futureEventConsideration: futureEventConsideration || 'ELIGIBLE FOR FUTURE CONSIDERATION',
+    considerForNextYear: !!considerForNextYear,
+    nextYearRecommendationNotes: nextYearRecommendationNotes || undefined,
+    createdBy: actorEmail || 'supervisor@sec.domislink.com',
+    createdByName: supervisorName,
+    createdAt: now,
+    submittedAt: submitForReview ? now : undefined,
+    updatedBy: actorEmail || 'supervisor@sec.domislink.com',
+    updatedAt: now,
+    auditReference: `AUD-PERF-${summitYear}-${Date.now()}`
+  };
+
+  data.volunteer_performance.unshift(newRecord);
+
+  recordAuditLog(data, {
+    action: submitForReview ? 'VOLUNTEER_PERFORMANCE_SUBMITTED' : 'VOLUNTEER_PERFORMANCE_CREATED',
+    entityType: 'VOLUNTEER_PERFORMANCE',
+    recordId: perfId,
+    referenceNumber: perfReference,
+    newValue: newRecord,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: `Performance evaluation created with score ${total}/100 (Grade ${grade})`
+  });
+
+  writeDb(data);
+
+  res.status(201).json({
+    success: true,
+    record: newRecord,
+    message: 'Volunteer performance evaluation record created successfully.'
+  });
+});
+
+// 4. PUT /api/secretariat/volunteer-performance/:id (Update evaluation)
+app.put('/api/secretariat/volunteer-performance/:id', (req, res) => {
+  const { id } = req.params;
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const index = data.volunteer_performance.findIndex((p: any) => p.id === id || p.performanceId === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Performance record not found.' });
+  }
+
+  const existing = data.volunteer_performance[index];
+
+  // Prevent direct silent modification of FINAL records without revision route
+  if (existing.evaluationStatus === 'FINAL' && !req.body.isRevision) {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot directly edit a FINAL approved performance record. Please use the controlled revision workflow.'
+    });
+  }
+
+  const oldValue = { ...existing };
+  const updatedScores = req.body.scores ? { ...existing.scores, ...req.body.scores } : existing.scores;
+  const { total, percentage, grade } = calculateGradeAndPercentage(updatedScores);
+
+  const actor = req.body.actorEmail || req.headers['x-actor-email'] || 'Secretariat Administrator';
+  const now = new Date().toISOString();
+
+  const updatedRecord = {
+    ...existing,
+    ...req.body,
+    id: existing.id,
+    performanceId: existing.performanceId,
+    scores: updatedScores,
+    totalScore: total,
+    percentage,
+    grade,
+    updatedBy: actor,
+    updatedAt: now
+  };
+
+  data.volunteer_performance[index] = updatedRecord;
+
+  recordAuditLog(data, {
+    action: 'VOLUNTEER_PERFORMANCE_UPDATED',
+    entityType: 'VOLUNTEER_PERFORMANCE',
+    recordId: id,
+    referenceNumber: existing.performanceId,
+    oldValue,
+    newValue: updatedRecord,
+    performedBy: actor,
+    reason: req.body.updateReason || 'Performance record details updated by supervisor/secretariat'
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    record: updatedRecord,
+    message: 'Performance evaluation updated successfully.'
+  });
+});
+
+// 5. POST /api/secretariat/volunteer-performance/:id/approve (ZERO SELF-APPROVAL ENFORCED)
+app.post('/api/secretariat/volunteer-performance/:id/approve', (req, res) => {
+  const { id } = req.params;
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const index = data.volunteer_performance.findIndex((p: any) => p.id === id || p.performanceId === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Performance record not found.' });
+  }
+
+  const record = data.volunteer_performance[index];
+  const approverEmail = req.body.approverEmail || req.headers['x-actor-email'] || 'secgen@domislink.com';
+  const approverName = req.body.approverName || 'Secretariat Approving Official';
+
+  // ZERO SELF-APPROVAL GOVERNANCE ENFORCEMENT
+  if (record.createdBy && approverEmail && record.createdBy.toLowerCase() === String(approverEmail).toLowerCase()) {
+    return res.status(403).json({
+      success: false,
+      error: 'Governance Safety Rule Violation: The Zero Self-Approval principle prevents an evaluator/supervisor from approving their own performance evaluation.'
+    });
+  }
+
+  const oldValue = { ...record };
+  const now = new Date().toISOString();
+
+  record.evaluationStatus = 'APPROVED';
+  record.approvedBy = approverEmail;
+  record.approvedByName = approverName;
+  record.approvedAt = now;
+  record.approvalNotes = req.body.approvalNotes || 'Evaluation reviewed and officially ratified by the Secretariat Executive Directorate.';
+  if (req.body.finalOutcome) record.finalOutcome = req.body.finalOutcome;
+  if (req.body.futureEventConsideration) record.futureEventConsideration = req.body.futureEventConsideration;
+  record.updatedBy = approverEmail;
+  record.updatedAt = now;
+
+  recordAuditLog(data, {
+    action: 'VOLUNTEER_PERFORMANCE_APPROVED',
+    entityType: 'VOLUNTEER_PERFORMANCE',
+    recordId: id,
+    referenceNumber: record.performanceId,
+    oldValue,
+    newValue: record,
+    performedBy: approverEmail,
+    reason: `Final evaluation approved with Score ${record.totalScore}/100 (${record.grade}) and Outcome: ${record.finalOutcome}`
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    record,
+    message: 'Volunteer performance evaluation officially APPROVED.'
+  });
+});
+
+// 6. POST /api/secretariat/volunteer-performance/:id/revise (Controlled Revision)
+app.post('/api/secretariat/volunteer-performance/:id/revise', (req, res) => {
+  const { id } = req.params;
+  const { revisionReason, newScores, newComments, actorEmail } = req.body;
+
+  if (!revisionReason) {
+    return res.status(400).json({ success: false, error: 'Please provide a formal revision reason.' });
+  }
+
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const index = data.volunteer_performance.findIndex((p: any) => p.id === id || p.performanceId === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Performance record not found.' });
+  }
+
+  const current = data.volunteer_performance[index];
+  const now = new Date().toISOString();
+  const actor = actorEmail || req.headers['x-actor-email'] || 'Secretariat Senior Official';
+
+  const updatedScores = newScores ? { ...current.scores, ...newScores } : current.scores;
+  const { total, percentage, grade } = calculateGradeAndPercentage(updatedScores);
+
+  const revisedRecord = {
+    ...current,
+    scores: updatedScores,
+    totalScore: total,
+    percentage,
+    grade,
+    supervisorComments: newComments || current.supervisorComments,
+    isRevision: true,
+    revisionReason,
+    originalRecordId: current.id,
+    updatedBy: actor,
+    updatedAt: now,
+    evaluationStatus: 'APPROVED'
+  };
+
+  data.volunteer_performance[index] = revisedRecord;
+
+  recordAuditLog(data, {
+    action: 'VOLUNTEER_PERFORMANCE_REVISED',
+    entityType: 'VOLUNTEER_PERFORMANCE',
+    recordId: id,
+    referenceNumber: current.performanceId,
+    oldValue: current,
+    newValue: revisedRecord,
+    performedBy: actor,
+    reason: `Controlled revision applied: ${revisionReason}`
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    record: revisedRecord,
+    message: 'Controlled revision recorded successfully.'
+  });
+});
+
+// ============================================================
+// COMMENDATIONS API ROUTES
+// ============================================================
+
+// 7. GET /api/secretariat/volunteer-commendations
+app.get('/api/secretariat/volunteer-commendations', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+  res.json({
+    success: true,
+    commendations: data.volunteer_commendations || [],
+    total: (data.volunteer_commendations || []).length
+  });
+});
+
+// 8. POST /api/secretariat/volunteer-commendations (Create Commendation)
+app.post('/api/secretariat/volunteer-commendations', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const {
+    volunteerReference,
+    volunteerApplicationId,
+    volunteerName,
+    organisationName,
+    applicantType = 'Individual Volunteer',
+    summitYear = 2026,
+    eventId = 'summit-2026',
+    department,
+    assignment,
+    commendationType = 'COMMENDATION',
+    title,
+    reason,
+    supportingEvidence,
+    actorEmail,
+    actorName
+  } = req.body;
+
+  if (!volunteerReference || !volunteerName || !title || !reason) {
+    return res.status(400).json({
+      success: false,
+      error: 'Please supply volunteer reference, volunteer name, title, and citation reason.'
+    });
+  }
+
+  const commSeq = (data.volunteer_commendations || []).length + 1;
+  const commId = `comm-${Date.now()}`;
+  const commendationRef = `COMM-${summitYear}-${String(commSeq).padStart(4, '0')}`;
+  const now = new Date().toISOString();
+
+  const newCommendation = {
+    id: commId,
+    commendationId: commendationRef,
+    volunteerReference,
+    volunteerApplicationId: volunteerApplicationId || `vol-${Date.now()}`,
+    volunteerName,
+    organisationName: organisationName || undefined,
+    applicantType,
+    summitYear: Number(summitYear),
+    eventId,
+    department: department || 'General Summit Support',
+    assignment: assignment || 'Volunteer Service',
+    commendationType,
+    title,
+    reason,
+    supportingEvidence: supportingEvidence || 'Observed exceptional performance during Summit deployment.',
+    issuedBy: actorEmail || 'secretariat@domislink.com',
+    issuedByName: actorName || 'Secretariat Directorate',
+    approvedBy: 'secgen@domislink.com',
+    approvedByName: 'Dr. Aliyu Mohammed, CON',
+    approvedAt: now,
+    issueDate: now.slice(0, 10),
+    status: 'ISSUED',
+    createdAt: now,
+    updatedAt: now,
+    auditReference: `AUD-COMM-${summitYear}-${Date.now()}`
+  };
+
+  data.volunteer_commendations.unshift(newCommendation);
+
+  recordAuditLog(data, {
+    action: 'COMMENDATION_ISSUED',
+    entityType: 'VOLUNTEER_COMMENDATION',
+    recordId: commId,
+    referenceNumber: commendationRef,
+    newValue: newCommendation,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: `Official commendation issued to ${volunteerName}: ${title}`
+  });
+
+  writeDb(data);
+
+  res.status(201).json({
+    success: true,
+    commendation: newCommendation,
+    message: 'Official commendation recorded and issued successfully.'
+  });
+});
+
+// ============================================================
+// CORRECTIVE / REBUKE REPORT API ROUTES (WITH RIGHT TO RESPOND)
+// ============================================================
+
+// 9. GET /api/secretariat/volunteer-corrective-reports
+app.get('/api/secretariat/volunteer-corrective-reports', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+  res.json({
+    success: true,
+    reports: data.volunteer_corrective_reports || [],
+    total: (data.volunteer_corrective_reports || []).length
+  });
+});
+
+// 10. POST /api/secretariat/volunteer-corrective-reports (Create Corrective Report)
+app.post('/api/secretariat/volunteer-corrective-reports', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const {
+    volunteerReference,
+    volunteerApplicationId,
+    volunteerName,
+    organisationName,
+    summitYear = 2026,
+    eventId = 'summit-2026',
+    department,
+    assignment,
+    issueCategory = 'PERFORMANCE ADVISORY',
+    title,
+    factualDescription,
+    relevantEvidence,
+    operationalImpact,
+    expectedImprovement,
+    responseRequired = true,
+    responseDeadline,
+    supervisorRecommendation,
+    actorEmail,
+    actorName
+  } = req.body;
+
+  if (!volunteerReference || !volunteerName || !title || !factualDescription || !expectedImprovement) {
+    return res.status(400).json({
+      success: false,
+      error: 'Please fill in required fields: volunteer reference, name, title, factual description, and expected improvement.'
+    });
+  }
+
+  const count = (data.volunteer_corrective_reports || []).length + 1;
+  const reportId = `corr-${Date.now()}`;
+  const reportRef = `CORR-${summitYear}-${String(count).padStart(4, '0')}`;
+  const now = new Date().toISOString();
+
+  const newReport = {
+    id: reportId,
+    correctiveReportId: reportRef,
+    volunteerReference,
+    volunteerApplicationId: volunteerApplicationId || `vol-${Date.now()}`,
+    volunteerName,
+    organisationName: organisationName || undefined,
+    summitYear: Number(summitYear),
+    eventId,
+    department: department || 'Operations',
+    assignment: assignment || 'Volunteer Service',
+    date: now.slice(0, 10),
+    issueCategory,
+    title,
+    factualDescription,
+    relevantEvidence: relevantEvidence || 'Supervisor operational logs',
+    operationalImpact: operationalImpact || 'Minor operational delay mitigated by team',
+    expectedImprovement,
+    responseRequired: !!responseRequired,
+    responseDeadline: responseDeadline || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    supervisorRecommendation: supervisorRecommendation || 'Provide constructive guidance and review in post-event feedback.',
+    finalStatus: 'ISSUED',
+    issuedBy: actorEmail || 'supervisor@sec.domislink.com',
+    issuedByName: actorName || 'Operations Supervisor',
+    createdAt: now,
+    updatedAt: now,
+    auditReference: `AUD-CORR-${summitYear}-${Date.now()}`
+  };
+
+  data.volunteer_corrective_reports.unshift(newReport);
+
+  recordAuditLog(data, {
+    action: 'CORRECTIVE_REPORT_CREATED',
+    entityType: 'VOLUNTEER_CORRECTIVE_REPORT',
+    recordId: reportId,
+    referenceNumber: reportRef,
+    newValue: newReport,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: `Corrective report issued: ${issueCategory} - ${title}`
+  });
+
+  writeDb(data);
+
+  res.status(201).json({
+    success: true,
+    report: newReport,
+    message: 'Corrective action report created and dispatched for response.'
+  });
+});
+
+// 11. POST /api/secretariat/volunteer-corrective-reports/:id/respond (Volunteer Right to Respond)
+app.post('/api/secretariat/volunteer-corrective-reports/:id/respond', (req, res) => {
+  const { id } = req.params;
+  const { responseType = 'EXPLANATION', statement, supportingInformation, submittedBy } = req.body;
+
+  if (!statement) {
+    return res.status(400).json({ success: false, error: 'Please provide a formal response statement.' });
+  }
+
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const index = data.volunteer_corrective_reports.findIndex((r: any) => r.id === id || r.correctiveReportId === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Corrective report not found.' });
+  }
+
+  const report = data.volunteer_corrective_reports[index];
+  const now = new Date().toISOString();
+
+  report.volunteerResponse = {
+    responseType,
+    statement,
+    supportingInformation: supportingInformation || undefined,
+    submittedAt: now,
+    submittedBy: submittedBy || report.volunteerName
+  };
+  report.finalStatus = 'RESPONSE_SUBMITTED';
+  report.updatedAt = now;
+
+  recordAuditLog(data, {
+    action: 'VOLUNTEER_RESPONSE_SUBMITTED',
+    entityType: 'VOLUNTEER_CORRECTIVE_REPORT',
+    recordId: id,
+    referenceNumber: report.correctiveReportId,
+    newValue: report.volunteerResponse,
+    performedBy: submittedBy || report.volunteerName,
+    reason: `Right-to-respond response received (${responseType})`
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    report,
+    message: 'Volunteer response formally incorporated into official dossier.'
+  });
+});
+
+// 12. POST /api/secretariat/volunteer-corrective-reports/:id/resolve (Secretariat Resolution)
+app.post('/api/secretariat/volunteer-corrective-reports/:id/resolve', (req, res) => {
+  const { id } = req.params;
+  const { reviewerDecision, finalStatus = 'RESOLVED', actorEmail, actorName } = req.body;
+
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const index = data.volunteer_corrective_reports.findIndex((r: any) => r.id === id || r.correctiveReportId === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Corrective report not found.' });
+  }
+
+  const report = data.volunteer_corrective_reports[index];
+  const now = new Date().toISOString();
+
+  report.reviewerDecision = reviewerDecision || 'Secretariat review complete. Explanation accepted and matter resolved.';
+  report.finalStatus = finalStatus;
+  report.reviewedBy = actorEmail || 'dir.operations@sec.domislink.com';
+  report.reviewedByName = actorName || 'Director of Operations';
+  report.reviewedAt = now;
+  report.updatedAt = now;
+
+  recordAuditLog(data, {
+    action: 'CORRECTIVE_REPORT_RESOLVED',
+    entityType: 'VOLUNTEER_CORRECTIVE_REPORT',
+    recordId: id,
+    referenceNumber: report.correctiveReportId,
+    newValue: report,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: `Corrective report resolution: ${finalStatus}`
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    report,
+    message: `Corrective action report updated to ${finalStatus}.`
+  });
+});
+
+// ============================================================
+// CERTIFICATES API ROUTES (INDIVIDUAL & ORGANISATION)
+// ============================================================
+
+// 13. GET /api/secretariat/volunteer-certificates
+app.get('/api/secretariat/volunteer-certificates', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+  res.json({
+    success: true,
+    certificates: data.volunteer_certificates || [],
+    total: (data.volunteer_certificates || []).length
+  });
+});
+
+// 14. POST /api/secretariat/volunteer-certificates (Issue Certificate)
+app.post('/api/secretariat/volunteer-certificates', (req, res) => {
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const {
+    certificateType = 'Certificate of Volunteer Service',
+    summitYear = 2026,
+    eventId = 'summit-2026',
+    eventName = 'Aviation Safety Summit 2026',
+    summitTheme = 'EVERYBODY IS INVOLVED IN AVIATION SAFETY',
+    isOrganisationCertificate = false,
+    recipientName,
+    volunteerReference,
+    volunteerApplicationId,
+    organisationName,
+    organisationSector,
+    verifiedVolunteersCount,
+    contributionDescription,
+    department,
+    assignment,
+    workMode = 'ON-SITE — LAGOS',
+    servicePeriod,
+    signatoryId = 'sig-sec-gen',
+    signatoryName = 'Dr. Aliyu Mohammed, CON',
+    signatoryTitle = 'Secretary-General',
+    signatoryOrg = 'Domislink International Services Ltd',
+    actorEmail,
+    actorName
+  } = req.body;
+
+  if (!recipientName) {
+    return res.status(400).json({ success: false, error: 'Recipient name is required to generate a certificate.' });
+  }
+
+  const certNumber = generateCertificateNumber(data, Number(summitYear));
+  const certId = `cert-${Date.now()}`;
+  const verificationCode = `DOMIS-${isOrganisationCertificate ? 'ORG' : 'CERT'}-${summitYear}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  const now = new Date().toISOString();
+
+  const newCert = {
+    id: certId,
+    certificateNumber: certNumber,
+    certificateType,
+    summitYear: Number(summitYear),
+    eventId,
+    eventName,
+    summitTheme,
+    isOrganisationCertificate: !!isOrganisationCertificate,
+    recipientName,
+    volunteerReference: volunteerReference || undefined,
+    volunteerApplicationId: volunteerApplicationId || undefined,
+    organisationName: organisationName || undefined,
+    organisationSector: organisationSector || undefined,
+    verifiedVolunteersCount: verifiedVolunteersCount ? Number(verifiedVolunteersCount) : undefined,
+    contributionDescription: contributionDescription || undefined,
+    department: department || 'Summit Secretariat Support',
+    assignment: assignment || 'Volunteer Service',
+    workMode: workMode || 'ON-SITE — LAGOS',
+    servicePeriod: servicePeriod || `${summitYear} Summit Operations`,
+    signatoryId,
+    signatoryName,
+    signatoryTitle,
+    signatoryOrg,
+    issueDate: now.slice(0, 10),
+    verificationCode,
+    status: 'ISSUED',
+    issuedBy: actorEmail || 'secgen@domislink.com',
+    issuedByName: actorName || 'Dr. Aliyu Mohammed, CON',
+    createdAt: now,
+    updatedAt: now,
+    auditReference: `AUD-CERT-${summitYear}-${Date.now()}`
+  };
+
+  data.volunteer_certificates.unshift(newCert);
+
+  recordAuditLog(data, {
+    action: 'CERTIFICATE_ISSUED',
+    entityType: 'VOLUNTEER_CERTIFICATE',
+    recordId: certId,
+    referenceNumber: certNumber,
+    newValue: newCert,
+    performedBy: actorEmail || 'Secretariat Administrator',
+    reason: `Certificate issued: ${certNumber} to ${recipientName} (${certificateType})`
+  });
+
+  writeDb(data);
+
+  res.status(201).json({
+    success: true,
+    certificate: newCert,
+    message: `Certificate ${certNumber} successfully generated and registered.`
+  });
+});
+
+// 15. POST /api/secretariat/volunteer-certificates/:id/reissue (Controlled Reissue with Revision Audit)
+app.post('/api/secretariat/volunteer-certificates/:id/reissue', (req, res) => {
+  const { id } = req.params;
+  const { reissueReason, correctedRecipientName, actorEmail } = req.body;
+
+  if (!reissueReason) {
+    return res.status(400).json({ success: false, error: 'Please provide a formal reissue reason.' });
+  }
+
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const index = data.volunteer_certificates.findIndex((c: any) => c.id === id || c.certificateNumber === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Certificate record not found.' });
+  }
+
+  const oldCert = data.volunteer_certificates[index];
+  const now = new Date().toISOString();
+  const actor = actorEmail || 'Secretariat Administrator';
+
+  // Mark old certificate as superseded/reissued
+  oldCert.status = 'REVISED';
+  oldCert.reissueReason = reissueReason;
+  oldCert.updatedAt = now;
+
+  // Generate new certificate record
+  const newCertNumber = generateCertificateNumber(data, oldCert.summitYear);
+  const newCertId = `cert-${Date.now()}`;
+  const newVerificationCode = `DOMIS-${oldCert.isOrganisationCertificate ? 'ORG' : 'CERT'}-${oldCert.summitYear}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+  const reissuedCert = {
+    ...oldCert,
+    id: newCertId,
+    certificateNumber: newCertNumber,
+    recipientName: correctedRecipientName || oldCert.recipientName,
+    verificationCode: newVerificationCode,
+    status: 'ISSUED',
+    previousCertificateNumber: oldCert.certificateNumber,
+    reissueReason,
+    createdAt: now,
+    updatedAt: now,
+    auditReference: `AUD-CERT-${oldCert.summitYear}-${Date.now()}`
+  };
+
+  oldCert.supersededBy = newCertNumber;
+  data.volunteer_certificates.unshift(reissuedCert);
+
+  recordAuditLog(data, {
+    action: 'CERTIFICATE_REISSUED',
+    entityType: 'VOLUNTEER_CERTIFICATE',
+    recordId: newCertId,
+    referenceNumber: newCertNumber,
+    oldValue: oldCert,
+    newValue: reissuedCert,
+    performedBy: actor,
+    reason: `Certificate reissued from ${oldCert.certificateNumber} to ${newCertNumber}. Reason: ${reissueReason}`
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    certificate: reissuedCert,
+    oldCertificate: oldCert,
+    message: `Certificate ${newCertNumber} reissued successfully.`
+  });
+});
+
+// 16. POST /api/secretariat/volunteer-certificates/:id/revoke
+app.post('/api/secretariat/volunteer-certificates/:id/revoke', (req, res) => {
+  const { id } = req.params;
+  const { revocationReason, actorEmail } = req.body;
+
+  if (!revocationReason) {
+    return res.status(400).json({ success: false, error: 'Revocation reason is required.' });
+  }
+
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const index = data.volunteer_certificates.findIndex((c: any) => c.id === id || c.certificateNumber === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Certificate record not found.' });
+  }
+
+  const cert = data.volunteer_certificates[index];
+  const oldValue = { ...cert };
+  const now = new Date().toISOString();
+  const actor = actorEmail || 'Secretariat Administrator';
+
+  cert.status = 'REVOKED';
+  cert.reissueReason = revocationReason;
+  cert.updatedAt = now;
+
+  recordAuditLog(data, {
+    action: 'CERTIFICATE_REVOKED',
+    entityType: 'VOLUNTEER_CERTIFICATE',
+    recordId: id,
+    referenceNumber: cert.certificateNumber,
+    oldValue,
+    newValue: cert,
+    performedBy: actor,
+    reason: `Certificate revoked: ${revocationReason}`
+  });
+
+  writeDb(data);
+
+  res.json({
+    success: true,
+    certificate: cert,
+    message: `Certificate ${cert.certificateNumber} has been revoked.`
+  });
+});
+
+// 17. PUBLIC CERTIFICATE VERIFICATION (MINIMAL & NON-SENSITIVE)
+// Never exposes scores, grades, corrective reports, contact details, or supervisor notes
+app.get('/api/certificates/verify/:code', (req, res) => {
+  const { code } = req.params;
+  if (!code) {
+    return res.status(400).json({ error: 'Please supply a verification code or certificate number.' });
+  }
+
+  const data = readDb();
+  ensureVolunteerPerformanceDefaults(data);
+
+  const queryCode = String(code).trim().toUpperCase();
+  const cert = (data.volunteer_certificates || []).find((c: any) =>
+    (c.verificationCode || '').toUpperCase() === queryCode ||
+    (c.certificateNumber || '').toUpperCase() === queryCode
+  );
+
+  if (!cert) {
+    return res.status(404).json({
+      success: false,
+      verified: false,
+      error: 'Certificate not found or verification reference invalid.'
+    });
+  }
+
+  // Strictly sanitized non-sensitive public metadata
+  res.json({
+    success: true,
+    verified: true,
+    certificate: {
+      certificateNumber: cert.certificateNumber,
+      recipientName: cert.recipientName,
+      certificateType: cert.certificateType,
+      summitYear: cert.summitYear,
+      eventName: cert.eventName,
+      summitTheme: cert.summitTheme,
+      department: cert.department,
+      isOrganisationCertificate: cert.isOrganisationCertificate,
+      organisationName: cert.organisationName,
+      verifiedVolunteersCount: cert.verifiedVolunteersCount,
+      signatoryName: cert.signatoryName,
+      signatoryTitle: cert.signatoryTitle,
+      signatoryOrg: cert.signatoryOrg,
+      issueDate: cert.issueDate,
+      status: cert.status
+    }
+  });
+});
+
+// 18. GET /api/secretariat/volunteer-organisations (Organisation Performance & Volunteer Deployment History)
+app.get('/api/secretariat/volunteer-organisations', (req, res) => {
+  const data = readDb();
+  ensureVolunteerDefaults(data);
+  ensureVolunteerPerformanceDefaults(data);
+
+  const applications = data.volunteer_applications || [];
+  const performances = data.volunteer_performance || [];
+  const commendations = data.volunteer_commendations || [];
+  const certificates = data.volunteer_certificates || [];
+
+  // Group by organisation name
+  const orgMap: Record<string, any> = {};
+
+  applications.forEach((app: any) => {
+    const orgName = app.sponsoringOrgName || app.organisation;
+    if (!orgName) return;
+
+    if (!orgMap[orgName]) {
+      orgMap[orgName] = {
+        name: orgName,
+        sector: app.sponsoringOrgSector || 'Corporate Enterprise',
+        type: app.sponsoringOrgType || app.applicantType,
+        address: app.sponsoringOrgAddress,
+        contactPerson: app.orgContactPersonName,
+        contactEmail: app.sponsoringOrgEmail || app.orgContactPersonEmail,
+        volunteers: [],
+        totalDeployed: 0,
+        completedService: 0,
+        commendationsCount: 0,
+        certificatesIssuedCount: 0
+      };
+    }
+
+    orgMap[orgName].volunteers.push({
+      reference: app.reference,
+      name: `${app.firstName} ${app.lastName}`,
+      department: app.preferredDepartment,
+      availability: app.availability
+    });
+    orgMap[orgName].totalDeployed++;
+  });
+
+  // Calculate evaluations and awards
+  Object.keys(orgMap).forEach((orgName) => {
+    const org = orgMap[orgName];
+    const orgPerformances = performances.filter((p: any) => (p.organisationName || '').toLowerCase() === orgName.toLowerCase());
+    org.completedService = orgPerformances.filter((p: any) => p.evaluationStatus === 'APPROVED' || p.evaluationStatus === 'FINAL').length;
+
+    const orgComms = commendations.filter((c: any) => (c.organisationName || '').toLowerCase() === orgName.toLowerCase());
+    org.commendationsCount = orgComms.length;
+
+    const orgCerts = certificates.filter((c: any) => (c.organisationName || '').toLowerCase() === orgName.toLowerCase() && c.status === 'ISSUED');
+    org.certificatesIssuedCount = orgCerts.length;
+  });
+
+  res.json({
+    success: true,
+    organisations: Object.values(orgMap)
+  });
+});
+
+// ============================================================
+// SOCIAL MEDIA SHARING & VOLUNTEER REFERRAL TRACKING ENDPOINTS
+// ============================================================
+
+function ensureShareAnalyticsDefaults(data: any) {
+  if (!data.share_analytics) {
+    data.share_analytics = [];
+  }
+  if (!data.referral_records) {
+    data.referral_records = [];
+  }
+}
+
+// 19. POST /api/analytics/share-event
+app.post('/api/analytics/share-event', (req, res) => {
+  const { eventType, channel, targetUrl, referralToken, landingPage, deviceCategory } = req.body;
+  if (!eventType || !targetUrl) {
+    return res.status(400).json({ error: 'Missing required event fields.' });
+  }
+
+  const data = readDb();
+  ensureShareAnalyticsDefaults(data);
+
+  const eventRecord = {
+    id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    eventType,
+    channel: channel || 'direct',
+    targetUrl,
+    referralToken: referralToken || null,
+    landingPage: landingPage || null,
+    deviceCategory: deviceCategory || 'desktop',
+    timestamp: new Date().toISOString()
+  };
+
+  data.share_analytics.push(eventRecord);
+
+  // Keep last 2000 events to prevent unbounded growth
+  if (data.share_analytics.length > 2000) {
+    data.share_analytics = data.share_analytics.slice(-2000);
+  }
+
+  // Update referral records if token exists
+  if (referralToken && typeof referralToken === 'string') {
+    const cleanToken = referralToken.trim().toUpperCase();
+    let refRec = data.referral_records.find((r: any) => r.token === cleanToken);
+    if (!refRec) {
+      refRec = {
+        token: cleanToken,
+        targetType: targetUrl.includes('volunteer') ? 'VOLUNTEER' : 'SUMMIT',
+        generatedAt: new Date().toISOString(),
+        landingCount: 0,
+        applicationCount: 0
+      };
+      data.referral_records.push(refRec);
+    }
+
+    if (eventType === 'REFERRAL_LANDING') {
+      refRec.landingCount = (refRec.landingCount || 0) + 1;
+      refRec.lastLandingAt = new Date().toISOString();
+    }
+  }
+
+  writeDb(data);
+  res.json({ success: true, eventId: eventRecord.id });
+});
+
+// 20. GET /api/analytics/share-summary
+app.get('/api/analytics/share-summary', (req, res) => {
+  const data = readDb();
+  ensureShareAnalyticsDefaults(data);
+
+  const events = data.share_analytics || [];
+  const referrals = data.referral_records || [];
+
+  const countsByChannel: Record<string, number> = {};
+  const countsByEventType: Record<string, number> = {};
+
+  events.forEach((evt: any) => {
+    const ch = evt.channel || 'unknown';
+    countsByChannel[ch] = (countsByChannel[ch] || 0) + 1;
+    const et = evt.eventType || 'unknown';
+    countsByEventType[et] = (countsByEventType[et] || 0) + 1;
+  });
+
+  res.json({
+    success: true,
+    totalShareEvents: events.length,
+    countsByChannel,
+    countsByEventType,
+    topReferrals: referrals.slice(0, 50)
+  });
+});
+
+
 async function start() {
   const publicPath = path.join(process.cwd(), 'public');
   if (fs.existsSync(publicPath)) {
     app.use(express.static(publicPath));
   }
 
-  const server = http.createServer(app);
-
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: false,
       },
       appType: 'spa',
     });
@@ -3914,7 +6426,7 @@ async function start() {
     });
   }
 
-  server.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`[FULLSTACK SERVER] running on http://0.0.0.0:${PORT}`);
   });
 }

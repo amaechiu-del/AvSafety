@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bgGradVol" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050D1A"/>
+      <stop offset="50%" stop-color="#0F223D"/>
+      <stop offset="100%" stop-color="#050D1A"/>
+    </linearGradient>
+    <linearGradient id="goldGradVol" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="50%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#C59B27"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradVol)"/>
+
+  <!-- Border -->
+  <rect x="24" y="24" width="1152" height="582" rx="20" fill="none" stroke="#D4AF37" stroke-width="4" stroke-opacity="0.6"/>
+
+  <!-- Top Ribbon -->
+  <g transform="translate(80, 70)">
+    <rect x="0" y="0" width="340" height="34" rx="8" fill="#D4AF37" fill-opacity="0.2" stroke="#D4AF37" stroke-width="1"/>
+    <text x="16" y="22" font-family="'Courier New', monospace" font-size="13" font-weight="bold" fill="#FFD700" letter-spacing="2">
+      OFFICIAL VOLUNTEER INTAKE
+    </text>
+  </g>
+
+  <!-- Main Headline -->
+  <text x="80" y="170" font-family="'Cinzel', serif, Georgia" font-size="52" font-weight="900" fill="url(#goldGradVol)" letter-spacing="2">
+    VOLUNTEER FROM WHEREVER YOU ARE
+  </text>
+
+  <!-- Subheading -->
+  <text x="80" y="220" font-family="'Cinzel', serif, Georgia" font-size="28" font-weight="bold" fill="#FFFFFF">
+    DOMISLINK AVIATION SAFETY SUMMIT 2026
+  </text>
+
+  <!-- Modes Pill -->
+  <g transform="translate(80, 260)">
+    <rect x="0" y="0" width="620" height="54" rx="10" fill="white" fill-opacity="0.08" stroke="#D4AF37" stroke-width="1.5"/>
+    <text x="24" y="34" font-family="'Courier New', monospace" font-size="17" font-weight="bold" fill="#FFD700" letter-spacing="3">
+      ON-SITE (LAGOS)  •  REMOTE (WORLDWIDE)  •  HYBRID
+    </text>
+  </g>
+
+  <!-- Key Areas Grid -->
+  <g transform="translate(80, 345)">
+    <rect x="0" y="0" width="1040" height="130" rx="12" fill="#07152B" stroke="#D4AF37" stroke-width="1.5" stroke-opacity="0.5"/>
+    
+    <text x="30" y="35" font-family="'Courier New', monospace" font-size="13" font-weight="bold" fill="#D4AF37" letter-spacing="2">
+      OPPORTUNITIES IN:
+    </text>
+    <text x="30" y="70" font-family="'Plus Jakarta Sans', sans-serif" font-size="18" fill="#FFFFFF">
+      Media &amp; Digital  •  IT Support  •  Rapporteur &amp; Documentation  •  Protocol &amp; VIP Escort
+    </text>
+    <text x="30" y="102" font-family="'Plus Jakarta Sans', sans-serif" font-size="18" fill="#FFFFFF">
+      Guest Services  •  Aviation Safety Research  •  Logistics  •  General Volunteer Support
+    </text>
+  </g>
+
+  <!-- Date & CTA Bottom Bar -->
+  <g transform="translate(80, 505)">
+    <text x="0" y="32" font-family="'Courier New', monospace" font-size="16" font-weight="bold" fill="#8A99AD">
+      DATE: 17 NOVEMBER 2026 • LAGOS &amp; ONLINE
+    </text>
+    <rect x="740" y="0" width="300" height="60" rx="12" fill="url(#goldGradVol)"/>
+    <text x="765" y="38" font-family="'Cinzel', serif, Georgia" font-size="18" font-weight="bold" fill="#0A192F" letter-spacing="1">
+      APPLY: summit.domislink.com/volunteer
+    </text>
+  </g>
+</svg>

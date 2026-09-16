@@ -68,6 +68,12 @@ export default function TopEventBar({ onNavigate }: TopEventBarProps) {
               RSVP
             </button>
             <button
+              onClick={() => onNavigate('volunteer')}
+              className="px-2.5 py-1 bg-[#D4AF37]/15 hover:bg-[#D4AF37]/30 border border-[#D4AF37]/60 text-[#FFD700] font-mono font-bold rounded text-[10px] tracking-wider uppercase transition-all hidden sm:inline"
+            >
+              Volunteer
+            </button>
+            <button
               onClick={() => onNavigate('register')}
               className="px-3 py-1 bg-gradient-to-r from-[#D4AF37] to-[#B89025] hover:from-[#B89025] hover:to-[#9E781C] text-[#0A192F] font-bold rounded text-[10px] tracking-widest uppercase transition-all shadow-sm flex items-center space-x-1"
             >

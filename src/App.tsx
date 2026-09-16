@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Crown, Mail, Phone, MapPin, ExternalLink, Calendar, 
   Clock, CheckCircle, ShieldCheck, Database, Award, 
@@ -57,6 +57,12 @@ import { PWAInstallButton } from './components/pwa/PWAInstallButton';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import GeminiLiveVoiceModal from './components/GeminiLiveVoiceModal';
 import RSVPPage from './components/rsvp/RSVPPage';
+import VolunteerPage from './components/volunteer/VolunteerPage';
+import DomisLinkSocialShare from './components/social/DomisLinkSocialShare';
+import SocialShareModal from './components/social/SocialShareModal';
+import CertificateVerificationModal from './components/social/CertificateVerificationModal';
+import { Share2, QrCode } from 'lucide-react';
+import { ShareTargetType } from './types';
 
 import { 
   Speaker, Organisation, Session, Registration, 
@@ -65,29 +71,21 @@ import {
 import { INITIAL_VERIFIED_SPEAKERS } from './data/speakersData';
 import { INITIAL_PROGRAMME_SESSIONS } from './data/programmeData';
 import { useAdminAuth, AdminProtectedView } from './components/AdminAuthWrapper';
+import { useNavigation } from './hooks/useNavigation';
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState('home');
+  const { activeSection, handleNavigate } = useNavigation('home');
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareModalTargetType, setShareModalTargetType] = useState<ShareTargetType>('SUMMIT');
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const { isAdmin, signIn, signOutAdmin } = useAdminAuth();
 
   useEffect(() => {
     if (!isAdmin) setIsAdminMode(false);
   }, [isAdmin]);
-
-  useEffect(() => {
-    // Check if user entered via /rsvp or #rsvp or query parameter ?ref=
-    const path = window.location.pathname;
-    const hash = window.location.hash;
-    const search = window.location.search;
-    if (path.includes('/rsvp') || hash === '#rsvp' || search.includes('ref=')) {
-      setTimeout(() => {
-        handleNavigate('rsvp');
-      }, 400);
-    }
-  }, []);
 
   const [showIntro, setShowIntro] = useState(() => {
     return !sessionStorage.getItem('domislink_intro_viewed');
@@ -128,8 +126,8 @@ export default function App() {
   });
   const [partners, setPartners] = useState<Partner[]>([]);
 
-  // Fetch initial database state on mount
-  const fetchDb = async () => {
+  // Fetch initial database state on mount with automatic retry
+  const fetchDb = async (retries = 3, delay = 800) => {
     try {
       const res = await fetch('/api/db', {
         headers: {
@@ -147,9 +145,14 @@ export default function App() {
         if (data.book) setBook(data.book);
         if (data.investment) setInvestment(data.investment);
         if (data.partners) setPartners(data.partners);
+        return;
       }
     } catch (err) {
-      console.error('Failed to load full-stack DB parameters:', err);
+      if (retries > 0) {
+        setTimeout(() => fetchDb(retries - 1, delay * 1.5), delay);
+        return;
+      }
+      console.warn('Database parameters synced with bundle defaults:', err);
     }
   };
 
@@ -271,14 +274,6 @@ export default function App() {
     }
   };
 
-  const handleNavigate = (sectionId: string) => {
-    setActiveSection(sectionId);
-    const target = document.getElementById(sectionId);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
   // Contact form submission state
   const [contactSubmitted, setContactSubmitted] = useState(false);
 
@@ -375,6 +370,31 @@ export default function App() {
       {/* 6. OFFICIAL POSTER */}
       <div id="poster">
         <SummitPoster onNavigate={handleNavigate} />
+      </div>
+
+      {/* 6.B OFFICIAL SOCIAL MEDIA SHARING & PUBLIC DISTRIBUTION HUB */}
+      <div id="share" className="py-16 bg-gradient-to-b from-[#050D1A] via-[#0A192F] to-[#050D1A] border-y-2 border-[#D4AF37]/40 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto space-y-8">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center space-x-2 px-3.5 py-1 bg-[#D4AF37]/10 rounded-full border border-[#D4AF37]/30 text-[#D4AF37]">
+              <Share2 className="h-3.5 w-3.5" />
+              <span className="text-[11px] font-mono uppercase font-bold tracking-wider text-[#FFD700]">
+                OFFICIAL PUBLIC DISTRIBUTION &amp; ENGAGEMENT HUB
+              </span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-serif font-black text-white uppercase tracking-tight">
+              SPREAD THE WORD &amp; ENGAGE YOUR NETWORK
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-300 max-w-2xl mx-auto font-light leading-relaxed">
+              Share the Aviation Safety Summit 2026 across social media channels, send direct WhatsApp invitations, generate high-resolution QR codes, or invite volunteers to join the workforce.
+            </p>
+          </div>
+
+          <DomisLinkSocialShare 
+            targetType="SUMMIT" 
+            variant="card"
+          />
+        </div>
       </div>
 
       {/* Kinetic Double-Word Ribbon: Cross-Industry Theme */}
@@ -519,6 +539,14 @@ export default function App() {
       {/* 17.B OFFICIAL RSVP & ATTENDANCE CONFIRMATION ENGINE */}
       <div id="rsvp">
         <RSVPPage 
+          onBackToSummit={() => handleNavigate('hero')}
+          onNavigateToRegister={() => handleNavigate('register')} 
+        />
+      </div>
+
+      {/* 17.C OFFICIAL VOLUNTEER INTAKE & APPLICATION ENGINE */}
+      <div id="volunteer">
+        <VolunteerPage 
           onBackToSummit={() => handleNavigate('hero')}
           onNavigateToRegister={() => handleNavigate('register')} 
         />
@@ -702,7 +730,10 @@ export default function App() {
               <div className="space-y-3">
                 <p className="text-[9px] font-mono text-[#D4AF37] uppercase tracking-widest font-bold">ACTION</p>
                 <ul className="space-y-2">
+                  <li><button onClick={() => { setShareModalTargetType('SUMMIT'); setIsShareModalOpen(true); }} className="hover:text-white transition-colors font-bold text-[#FFD700] flex items-center space-x-1.5"><Share2 className="h-3.5 w-3.5 text-[#D4AF37]" /><span>Share Summit Links</span></button></li>
                   <li><button onClick={() => handleNavigate('rsvp')} className="hover:text-white transition-colors font-bold text-[#FFD700]">RSVP Confirmation</button></li>
+                  <li><button onClick={() => handleNavigate('volunteer')} className="hover:text-white transition-colors font-bold text-[#D4AF37]">Volunteer Intake</button></li>
+                  <li><button onClick={() => setIsVerifyModalOpen(true)} className="hover:text-white transition-colors text-emerald-400 flex items-center space-x-1.5"><ShieldCheck className="h-3.5 w-3.5" /><span>Verify Certificate</span></button></li>
                   <li><button onClick={() => handleNavigate('sky-party')} className="hover:text-white transition-colors">Sky Party</button></li>
                   <li><button onClick={() => handleNavigate('register')} className="hover:text-white transition-colors font-bold text-[#D4AF37]">Register Delegate</button></li>
                   <li><button onClick={() => handleNavigate('partners')} className="hover:text-white transition-colors">Partnership</button></li>
@@ -731,6 +762,18 @@ export default function App() {
 
       {/* Offline Status Alert */}
       <OfflineIndicator />
+
+      {/* Floating Share Quick Pill */}
+      <div className="fixed bottom-6 right-6 md:right-84 z-30">
+        <button
+          onClick={() => { setShareModalTargetType('SUMMIT'); setIsShareModalOpen(true); }}
+          className="px-3.5 py-3 bg-[#0A192F]/95 hover:bg-[#132545] border border-[#D4AF37]/70 text-[#FFD700] hover:text-white rounded-2xl shadow-xl flex items-center space-x-2 font-mono text-xs uppercase font-bold tracking-wider backdrop-blur-md hover:scale-105 transition-all"
+          title="Share Summit or Volunteer Links"
+        >
+          <Share2 className="h-4 w-4 text-[#D4AF37]" />
+          <span className="hidden sm:inline">Share</span>
+        </button>
+      </div>
 
       {/* Floating Database Console Trigger Banner on Desktop */}
       <div className="fixed bottom-6 right-6 z-30 hidden md:block">
@@ -775,7 +818,19 @@ export default function App() {
         </button>
       </div>
 
-      {/* Database/CMS Admin Panel Modal */}
+      {/* Social Share Modal */}
+      <SocialShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        targetType={shareModalTargetType}
+      />
+
+      {/* Public Certificate Verification Modal */}
+      <CertificateVerificationModal
+        isOpen={isVerifyModalOpen}
+        onClose={() => setIsVerifyModalOpen(false)}
+      />
+
       {/* Database/CMS Admin Panel Modal */}
       <AdminPanel 
         registrations={registrations} 

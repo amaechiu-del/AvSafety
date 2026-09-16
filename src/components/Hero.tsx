@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { Calendar, MapPin, ArrowRight, ShieldCheck, Landmark, Radio, Plane, Sparkles, Compass } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, ShieldCheck, Landmark, Radio, Plane, Sparkles, Compass, Share2 } from 'lucide-react';
+import DomisLinkSocialShare from './social/DomisLinkSocialShare';
 
 interface HeroProps {
   onNavigate: (sectionId: string) => void;
@@ -155,6 +156,22 @@ export default function Hero({ onNavigate, eventDate, venue }: HeroProps) {
             >
               <span>SPONSOR & ADVERTISE</span>
             </button>
+          </div>
+
+          {/* Quick Social Share Bar in Hero */}
+          <div className="pt-2 max-w-3xl">
+            <div className="p-3.5 bg-[#050D1A]/85 rounded-xl border border-[#D4AF37]/30 backdrop-blur-sm space-y-2 shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-[#FFD700] uppercase font-bold tracking-wider flex items-center space-x-1.5">
+                  <Share2 className="h-3 w-3 text-[#D4AF37]" />
+                  <span>Share Summit &amp; RSVP Links</span>
+                </span>
+                <span className="text-[10px] text-gray-400 font-mono hidden sm:inline">
+                  WhatsApp • LinkedIn • X • Facebook • QR Code
+                </span>
+              </div>
+              <DomisLinkSocialShare targetType="SUMMIT" variant="compact" />
+            </div>
           </div>
 
           {/* Brand Presentation Footer */}

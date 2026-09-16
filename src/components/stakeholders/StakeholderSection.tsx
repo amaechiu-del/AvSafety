@@ -42,13 +42,27 @@ export default function StakeholderSection({ onOpenNominateModal }: StakeholderS
   const [submittingNom, setSubmittingNom] = useState(false);
 
   useEffect(() => {
-    fetch('/api/stakeholders')
-      .then(res => res.json())
-      .then(data => {
-        if (data.stakeholders) setStakeholders(data.stakeholders);
-      })
-      .catch(err => console.error('Error fetching stakeholders:', err))
-      .finally(() => setLoading(false));
+    const loadStakeholders = async (retries = 3, delay = 800) => {
+      try {
+        const res = await fetch('/api/stakeholders');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.stakeholders) setStakeholders(data.stakeholders);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        if (retries > 0) {
+          setTimeout(() => loadStakeholders(retries - 1, delay * 1.5), delay);
+          return;
+        }
+        console.warn('Stakeholders synced from bundle default directory:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStakeholders();
   }, []);
 
   // Current category data

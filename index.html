@@ -17,7 +17,7 @@
             function isViteSocket(url, protocols) {
               const u = String(url || '');
               const p = String(protocols || '');
-              return p.includes('vite-hmr') || p.includes('vite-ping') || u.includes('token=') || u.includes('@vite') || u.includes('5173');
+              return p.includes('vite') || u.includes('vite') || u.includes('token=') || u.includes('24678') || u.includes('5173');
             }
 
             class MockViteSocket extends EventTarget {
@@ -39,11 +39,32 @@
                     const evt = new Event('open');
                     this.dispatchEvent(evt);
                     if (typeof this.onopen === 'function') this.onopen(evt);
+                    // Dispatch connected event to satisfy Vite HMR client
+                    const msgEvt = new MessageEvent('message', {
+                      data: JSON.stringify({ type: 'connected' })
+                    });
+                    this.dispatchEvent(msgEvt);
+                    if (typeof this.onmessage === 'function') this.onmessage(msgEvt);
                   } catch (e) {}
                 });
               }
 
-              send() {}
+              send(data) {
+                try {
+                  const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                  if (parsed && parsed.type === 'ping') {
+                    queueMicrotask(() => {
+                      try {
+                        const pongEvt = new MessageEvent('message', {
+                          data: JSON.stringify({ type: 'pong' })
+                        });
+                        this.dispatchEvent(pongEvt);
+                        if (typeof this.onmessage === 'function') this.onmessage(pongEvt);
+                      } catch (e) {}
+                    });
+                  }
+                } catch (e) {}
+              }
 
               close(code = 1000, reason = '') {
                 this.readyState = 3;
@@ -131,12 +152,19 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="canonical" href="https://summit.domislink.com" />
     <title>DOMISLINK Aviation Safety Summit 2026 | Everybody Is Involved in Aviation Safety</title>
     <meta name="description" content="DOMISLINK Aviation Safety Summit 2026 — 17 November 2026 at Marriott Hotel, Ikeja, Lagos, Nigeria. Official Theme: 'EVERYBODY IS INVOLVED IN AVIATION SAFETY.'" />
     <meta property="og:title" content="DOMISLINK Aviation Safety Summit 2026" />
-    <meta property="og:description" content="EVERYBODY IS INVOLVED IN AVIATION SAFETY — 17 November 2026, Marriott Hotel, Ikeja, Lagos, Nigeria." />
+    <meta property="og:description" content="EVERYBODY IS INVOLVED IN AVIATION SAFETY — 17 November 2026, Marriott Hotel, Ikeja, Lagos, Nigeria. On-site in Lagos and Remote Worldwide." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://summit.domislink.com" />
+    <meta property="og:image" content="https://summit.domislink.com/social-preview-summit.svg" />
+    <meta property="og:site_name" content="DOMISLINK Aviation Safety Summit 2026" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DOMISLINK Aviation Safety Summit 2026" />
+    <meta name="twitter:description" content="EVERYBODY IS INVOLVED IN AVIATION SAFETY — 17 November 2026, Marriott Hotel, Ikeja, Lagos, Nigeria." />
+    <meta name="twitter:image" content="https://summit.domislink.com/social-preview-summit.svg" />
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",

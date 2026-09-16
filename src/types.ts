@@ -759,29 +759,40 @@ export type SummitSector =
   | 'Aviation'
   | 'Government'
   | 'Regulatory'
-  | 'Airports'
-  | 'Airlines'
-  | 'Air Traffic Management'
-  | 'Aviation Training'
   | 'Security'
   | 'Emergency Services'
-  | 'Road Safety'
   | 'Transport'
-  | 'Oil & Gas'
-  | 'Banking & Finance'
+  | 'Finance'
+  | 'Banking'
   | 'Insurance'
-  | 'Telecommunications'
+  | 'Oil & Gas'
+  | 'Telecoms'
   | 'Technology'
   | 'Manufacturing'
   | 'Logistics'
   | 'Healthcare'
   | 'Education'
-  | 'Religious Organisations'
+  | 'Faith'
   | 'Media'
+  | 'Investment'
+  | 'Hospitality'
+  | 'Real Estate'
   | 'Legal'
+  | 'Professional Services'
+  | 'NGO/Civil Society'
+  | 'Entertainment'
+  | 'Sports'
+  | 'Agriculture'
+  | 'Airports'
+  | 'Airlines'
+  | 'Air Traffic Management'
+  | 'Aviation Training'
+  | 'Road Safety'
+  | 'Banking & Finance'
+  | 'Telecommunications'
+  | 'Religious Organisations'
   | 'Professional Bodies'
   | 'Investors'
-  | 'Hospitality'
   | 'Tourism'
   | 'State Government'
   | 'Local Government'
@@ -791,8 +802,31 @@ export type SummitSector =
   | 'Other';
 
 export type SummitCategory =
+  | 'Patron'
+  | 'VVIP'
+  | 'VIP'
   | 'Government Official'
   | 'Regulator'
+  | 'Aviation Executive'
+  | 'Airline Representative'
+  | 'Airport Representative'
+  | 'ATC/Airspace'
+  | 'Safety Professional'
+  | 'Security'
+  | 'Emergency Service'
+  | 'Sponsor'
+  | 'Partner'
+  | 'Media'
+  | 'Speaker'
+  | 'Panellist'
+  | 'Moderator'
+  | 'Exhibitor'
+  | 'Vendor'
+  | 'Delegate'
+  | 'Observer'
+  | 'Guest'
+  | 'Institutional'
+  | 'Special Invite'
   | 'Airline Executive'
   | 'Airport Executive'
   | 'ATC / ATM Professional'
@@ -803,11 +837,9 @@ export type SummitCategory =
   | 'Dispatcher'
   | 'Aviation Trainer'
   | 'Security Organisation'
-  | 'Emergency Service'
   | 'Business Leader'
   | 'Investor'
   | 'Academic'
-  | 'Media'
   | 'Religious Leader'
   | 'Traditional / Community Leader'
   | 'Professional Association'
@@ -823,19 +855,33 @@ export type SummitCategory =
 export type InvitationType =
   | 'VIP'
   | 'VVIP'
+  | 'OFFICIAL'
   | 'Official'
+  | 'SPEAKER'
   | 'Speaker'
+  | 'PANELLIST'
   | 'Panellist'
+  | 'MODERATOR'
   | 'Moderator'
+  | 'SPONSOR'
   | 'Sponsor'
+  | 'PARTNER'
   | 'Partner'
+  | 'EXHIBITOR'
   | 'Exhibitor'
+  | 'MEDIA'
   | 'Media'
+  | 'GUEST'
   | 'Guest'
+  | 'OBSERVER'
   | 'Observer'
+  | 'DELEGATE'
   | 'Delegate'
+  | 'INSTITUTIONAL'
   | 'Institutional'
+  | 'SPECIAL INVITE'
   | 'Special Invite'
+  | 'OTHER'
   | 'Other';
 
 export type MasterInvitationStatus =
@@ -866,27 +912,71 @@ export type InvitationPurpose =
   | 'Special Guest'
   | 'Other';
 
+export type PreferredContactMethod = 
+  | 'EMAIL' 
+  | 'PHONE' 
+  | 'WHATSAPP' 
+  | 'OFFICIAL_LETTER' 
+  | 'OFFICIAL_DISPATCH' 
+  | 'COURIER' 
+  | 'ASSISTANT';
+
+export type RelationshipClassification = 
+  | 'HEAD_OF_STATE'
+  | 'MINISTER_GOVERNOR'
+  | 'CHIEF_EXECUTIVE'
+  | 'BOARD_MEMBER'
+  | 'DIRECTOR_GENERAL'
+  | 'COMMANDANT'
+  | 'AMBASSADOR_DIPLOMAT'
+  | 'COMMISSIONER'
+  | 'INDUSTRY_LEADER'
+  | 'ACADEMIC_FELLOW'
+  | 'MEDIA_PRINCIPAL'
+  | 'PRIMARY_CONTACT' 
+  | 'DECISION_MAKER' 
+  | 'TECHNICAL_LEAD' 
+  | 'PROTOCOL_LIAISON' 
+  | 'EXECUTIVE' 
+  | 'REPRESENTATIVE' 
+  | 'DELEGATE_PARTICIPANT'
+  | 'SPECIAL_GUEST'
+  | 'OTHER';
+
 export interface MasterPerson {
   id: string;
+  stakeholderId?: string;
+  personId?: string;
+  organisationId?: string;
   referenceNumber: string;
+  fullName?: string;
   title: string;
   firstName: string;
   middleName?: string;
   lastName: string;
   preferredName?: string;
   designation: string;
+  position?: string;
   organisation: string;
+  organisationName?: string;
+  organisationType?: string;
   department?: string;
   email: string;
   phone: string;
   altPhone?: string;
+  alternativePhone?: string;
+  address?: string;
   country: string;
   state?: string;
   city?: string;
   sector: SummitSector;
   category: SummitCategory;
+  stakeholderCategory?: SummitCategory;
   subcategory?: string;
+  preferredContactMethod?: PreferredContactMethod;
+  relationshipClassification?: RelationshipClassification;
   notes?: string;
+  activeStatus?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -896,6 +986,7 @@ export interface MasterPerson {
 
 export interface MasterOrganisation {
   id: string;
+  organisationId?: string;
   name: string;
   type: string;
   sector: SummitSector;
@@ -907,23 +998,34 @@ export interface MasterOrganisation {
   email?: string;
   phone?: string;
   contactPerson?: string;
+  activeStatus?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 export interface MasterInvitation {
   id: string;
+  invitationId?: string;
+  invitationReference?: string;
   invitationNumber: string;
   personId: string;
+  stakeholderId?: string;
   orgId: string;
+  organisationId?: string;
   sector: SummitSector;
   category: SummitCategory;
   invitationType: InvitationType;
-  invitationPurpose: InvitationPurpose;
-  invitationDate: string;
-  eventDate: string;
+  invitationPurpose?: InvitationPurpose;
+  responsibleOfficer?: string;
+  invitationDate?: string;
+  eventDate?: string;
+  currentStatus?: MasterInvitationStatus;
   invitationStatus: MasterInvitationStatus;
+  internalNotes?: string;
+  auditReference?: string;
   createdAt: string;
   updatedAt: string;
   createdBy?: string;
@@ -1042,5 +1144,464 @@ export interface CorrespondenceSignatory {
   isActive: boolean;
   isDefault: boolean;
   createdAt: string;
+}
+
+export type VolunteerDepartment =
+  | 'Protocol'
+  | 'Registration'
+  | 'Guest Services'
+  | 'VIP/VVIP Ushering'
+  | 'Logistics & Venue Operations'
+  | 'Media & Publicity'
+  | 'IT & Digital Support'
+  | 'Documentation & Rapporteur'
+  | 'Programme Support'
+  | 'Hospitality & Refreshments'
+  | 'Airport & Transport Coordination'
+  | 'Emergency & Safety Support'
+  | 'General Volunteer Support'
+  | 'Other';
+
+export type VolunteerApplicantType = 
+  | 'Individual Volunteer'
+  | 'Corporate-Sponsored Volunteer'
+  | 'Organisation-Nominated Volunteer';
+
+export type NatureOfVolunteerSupport = 
+  | 'Sponsored Volunteer'
+  | 'Nominated Volunteer'
+  | 'Deployed Staff Member'
+  | 'Corporate Volunteer Team'
+  | 'Other';
+
+export interface VolunteerApplication {
+  id: string;
+  reference: string;
+  applicantType: VolunteerApplicantType;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  preferredName?: string;
+  dobOrAgeGroup: string;
+  gender?: string;
+  country: string;
+  state: string;
+  city: string;
+  
+  // Contact
+  email: string;
+  phone: string;
+  altPhone?: string;
+  address: string;
+
+  // Professional / Educational
+  occupation: string;
+  organisation?: string;
+  profession?: string;
+  educationStatus: 'Student' | 'Graduate' | 'Employed Professional' | 'Self-Employed' | 'Other';
+  qualifications?: string;
+  skills: string;
+
+  // Corporate / Sponsoring / Nominating Organisation Details (When applicantType !== 'Individual Volunteer')
+  sponsoringOrgName?: string;
+  sponsoringOrgType?: string;
+  sponsoringOrgSector?: string;
+  sponsoringOrgAddress?: string;
+  sponsoringOrgEmail?: string;
+  sponsoringOrgPhone?: string;
+  orgContactPersonName?: string;
+  orgContactPersonPosition?: string;
+  orgContactPersonEmail?: string;
+  orgContactPersonPhone?: string;
+
+  // Nature of Support / Deployment
+  natureOfSupport?: NatureOfVolunteerSupport;
+  sponsoredVolunteersCount?: number;
+  supportDescription?: string;
+  corporateMessage?: string;
+  specialRequirements?: string;
+
+  // Volunteer Interest
+  preferredDepartment: VolunteerDepartment;
+  secondaryDepartment?: VolunteerDepartment;
+  experience?: string;
+  aviationExperience?: string;
+  languages?: string;
+  specialSkills?: string;
+  availability: 'Full Summit (All Days)' | 'Summit Day Only (17 Nov)' | 'Pre-Summit & Summit Days' | 'Specific Shifts Only';
+  preferredPeriod?: string;
+  preferredShift?: 'Morning Shift' | 'Afternoon / Evening Shift' | 'Full Day' | 'Flexible';
+  motivation: string;
+  additionalInfo?: string;
+
+  // Emergency Contact
+  emergencyContactName: string;
+  emergencyRelationship: string;
+  emergencyContactPhone: string;
+
+  // Consent & Status
+  consentConfirmed: boolean;
+  status: 'SUBMITTED';
+  createdAt: string;
+  updatedAt: string;
+  source: 'PUBLIC_WEB';
+  auditReference: string;
+}
+
+// ============================================================
+// VOLUNTEER PERFORMANCE, COMMENDATION, CORRECTIVE REPORT & CERTIFICATION
+// ============================================================
+
+export type VolunteerWorkMode =
+  | 'ON-SITE — LAGOS'
+  | 'REMOTE — ANYWHERE'
+  | 'HYBRID'
+  | 'FLEXIBLE'
+  | 'TO BE DETERMINED';
+
+export type PerformanceEvaluationStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'REVIEWED'
+  | 'APPROVED'
+  | 'FINAL'
+  | 'RETURNED_FOR_CORRECTION';
+
+export type PerformanceGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'E';
+
+export type PerformanceFinalOutcome =
+  | 'COMMENDED'
+  | 'CERTIFICATE ISSUED'
+  | 'APPRECIATION'
+  | 'SATISFACTORY SERVICE'
+  | 'IMPROVEMENT REQUIRED'
+  | 'CORRECTIVE ACTION'
+  | 'UNSATISFACTORY SERVICE'
+  | 'REVIEW REQUIRED'
+  | 'NO FORMAL ACTION';
+
+export type FutureEventConsideration =
+  | 'ELIGIBLE FOR FUTURE CONSIDERATION'
+  | 'RECOMMENDED FOR FUTURE CONSIDERATION'
+  | 'PRIOR SERVICE RECOGNITION'
+  | 'ORGANISATION PARTNERSHIP CONTINUATION'
+  | 'REVIEW REQUIRED BEFORE FUTURE ASSIGNMENT'
+  | 'NOT CURRENTLY RECOMMENDED FOR FUTURE ASSIGNMENT'
+  | 'NO DECISION RECORDED';
+
+export interface PerformanceCriteriaScores {
+  attendanceScore: number;         // 0-10 (On-site availability or agreed schedule)
+  punctualityScore: number;        // 0-10 (Timeliness / deadline compliance)
+  reliabilityScore: number;        // 0-10 (Consistency of commitments)
+  teamworkScore: number;           // 0-10 (Collaboration with team)
+  communicationScore: number;      // 0-10 (Digital/verbal responsiveness)
+  professionalismScore: number;    // 0-10 (Conduct and representation)
+  taskCompletionScore: number;     // 0-10 (Quality of assigned deliverables)
+  initiativeScore: number;         // 0-10 (Proactivity)
+  safetyComplianceScore: number;   // 0-10 (Aviation safety/event protocols)
+  adaptabilityScore: number;       // 0-10 (Dynamic context agility)
+}
+
+export interface VolunteerPerformanceRecord {
+  id: string;
+  performanceId: string;
+  volunteerApplicationId: string;
+  volunteerReference: string;
+  personId?: string;
+  organisationId?: string;
+  organisationName?: string;
+  stakeholderId?: string;
+  volunteerName: string;
+  volunteerEmail: string;
+  volunteerPhone: string;
+  applicantType: VolunteerApplicantType;
+  summitYear: number;
+  eventId: string;
+  eventName: string;
+  department: string;
+  assignment: string;
+  workMode: VolunteerWorkMode;
+  supervisorId: string;
+  supervisorName: string;
+  supervisorTitle?: string;
+  evaluationPeriod: string;
+  evaluationStatus: PerformanceEvaluationStatus;
+  
+  // Scoring & Grading
+  scores: PerformanceCriteriaScores;
+  totalScore: number;      // 0-100
+  percentage: number;      // 0-100
+  grade: PerformanceGrade; // A+, A, B, C, D, E
+  
+  // Evidence & Observations
+  evidenceNotes?: string;
+  deliverablesReference?: string;
+  attendanceRecordSummary?: string;
+  supervisorObservations?: string;
+  incidentReference?: string;
+  
+  // Narrative Comments
+  supervisorComments: string;
+  volunteerComments?: string;
+  reviewerComments?: string;
+  approvalNotes?: string;
+  
+  // Outcome & Future Consideration
+  finalOutcome: PerformanceFinalOutcome;
+  futureEventConsideration: FutureEventConsideration;
+  considerForNextYear: boolean;
+  nextYearRecommendationNotes?: string;
+  
+  // Governance & Review Lifecycle
+  createdBy: string;
+  createdByName?: string;
+  createdAt: string;
+  submittedAt?: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  updatedBy?: string;
+  updatedAt: string;
+  auditReference: string;
+  
+  // Versioning
+  isRevision?: boolean;
+  revisionReason?: string;
+  originalRecordId?: string;
+}
+
+export type CommendationType =
+  | 'COMMENDATION'
+  | 'OUTSTANDING SERVICE'
+  | 'EXCELLENT SERVICE'
+  | 'SPECIAL CONTRIBUTION'
+  | 'LEADERSHIP RECOGNITION'
+  | 'SERVICE APPRECIATION'
+  | 'TEAM CONTRIBUTION'
+  | 'DIGITAL/REMOTE CONTRIBUTION'
+  | 'SAFETY CONTRIBUTION'
+  | 'OTHER';
+
+export interface VolunteerCommendation {
+  id: string;
+  commendationId: string;
+  volunteerReference: string;
+  volunteerApplicationId: string;
+  volunteerName: string;
+  organisationId?: string;
+  organisationName?: string;
+  applicantType: VolunteerApplicantType;
+  summitYear: number;
+  eventId: string;
+  department: string;
+  assignment: string;
+  commendationType: CommendationType;
+  title: string;
+  reason: string;
+  supportingEvidence: string;
+  issuedBy: string;
+  issuedByName?: string;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  issueDate: string;
+  status: 'DRAFT' | 'APPROVED' | 'ISSUED' | 'ARCHIVED';
+  createdAt: string;
+  updatedAt: string;
+  auditReference: string;
+}
+
+export type CorrectiveIssueCategory =
+  | 'PERFORMANCE ADVISORY'
+  | 'IMPROVEMENT NOTICE'
+  | 'FORMAL REPRIMAND'
+  | 'UNSATISFACTORY SERVICE RECORD'
+  | 'OTHER CORRECTIVE ACTION';
+
+export type CorrectiveReportStatus =
+  | 'DRAFT'
+  | 'ISSUED'
+  | 'RESPONSE_SUBMITTED'
+  | 'REVIEWED'
+  | 'RESOLVED'
+  | 'ESCALATED'
+  | 'ARCHIVED';
+
+export interface VolunteerCorrectiveReport {
+  id: string;
+  correctiveReportId: string;
+  volunteerReference: string;
+  volunteerApplicationId: string;
+  personId?: string;
+  organisationId?: string;
+  organisationName?: string;
+  volunteerName: string;
+  summitYear: number;
+  eventId: string;
+  department: string;
+  assignment: string;
+  date: string;
+  issueCategory: CorrectiveIssueCategory;
+  title: string;
+  factualDescription: string;
+  relevantEvidence: string;
+  operationalImpact: string;
+  expectedImprovement: string;
+  responseRequired: boolean;
+  responseDeadline?: string;
+  
+  // Volunteer Right-to-Respond
+  volunteerResponse?: {
+    responseType: 'ACKNOWLEDGEMENT' | 'EXPLANATION' | 'DISAGREEMENT' | 'CLARIFICATION';
+    statement: string;
+    supportingInformation?: string;
+    submittedAt: string;
+    submittedBy: string;
+  };
+  
+  supervisorRecommendation: string;
+  reviewerDecision?: string;
+  finalStatus: CorrectiveReportStatus;
+  
+  issuedBy: string;
+  issuedByName?: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  auditReference: string;
+}
+
+export type CertificateType =
+  | 'Certificate of Volunteer Service'
+  | 'Certificate of Appreciation'
+  | 'Certificate of Outstanding Volunteer Service'
+  | 'Certificate of Special Contribution'
+  | 'Certificate of Leadership Service'
+  | 'Organisation Certificate of Appreciation'
+  | 'Other authorised certificate type';
+
+export type CertificateStatus = 'ISSUED' | 'REVISED' | 'REISSUED' | 'REVOKED';
+
+export interface VolunteerCertificate {
+  id: string;
+  certificateNumber: string; // e.g. ASS-CERT-2026-00001
+  certificateType: CertificateType;
+  summitYear: number;
+  eventId: string;
+  eventName: string;
+  summitTheme: string;
+  
+  // Recipient info (Individual or Organisation)
+  isOrganisationCertificate: boolean;
+  recipientName: string;
+  volunteerReference?: string;
+  volunteerApplicationId?: string;
+  organisationId?: string;
+  organisationName?: string;
+  department?: string;
+  assignment?: string;
+  workMode?: VolunteerWorkMode;
+  servicePeriod?: string;
+  
+  // Corporate / Organisation specific metrics
+  verifiedVolunteersCount?: number;
+  organisationSector?: string;
+  contributionDescription?: string;
+  
+  // Signatory & Issuance Details
+  signatoryId: string;
+  signatoryName: string;
+  signatoryTitle: string;
+  signatoryOrg: string;
+  issueDate: string;
+  verificationCode: string; // Secure token / verification reference
+  qrVerificationUrl?: string;
+  status: CertificateStatus;
+  
+  // Reissue / Revision controls
+  reissueReason?: string;
+  previousCertificateNumber?: string;
+  supersededBy?: string;
+  
+  issuedBy: string;
+  issuedByName?: string;
+  createdAt: string;
+  updatedAt: string;
+  auditReference: string;
+}
+
+// ============================================================
+// SOCIAL MEDIA SHARING & VOLUNTEER REFERRAL TRACKING TYPES
+// ============================================================
+
+export type SocialShareChannel = 
+  | 'whatsapp' 
+  | 'facebook' 
+  | 'twitter' 
+  | 'linkedin' 
+  | 'telegram' 
+  | 'email' 
+  | 'copy' 
+  | 'native' 
+  | 'qr';
+
+export type ShareTargetType = 
+  | 'SUMMIT' 
+  | 'VOLUNTEER' 
+  | 'ORGANISATION' 
+  | 'CERTIFICATE';
+
+export interface ShareAnalyticsEvent {
+  id: string;
+  eventType: 
+    | 'SUMMIT_SHARE_CLICK' 
+    | 'VOLUNTEER_SHARE_CLICK' 
+    | 'ORGANISATION_SHARE_CLICK' 
+    | 'COPY_LINK' 
+    | 'NATIVE_SHARE' 
+    | 'QR_DISPLAY' 
+    | 'REFERRAL_LANDING';
+  channel?: SocialShareChannel | string;
+  targetUrl: string;
+  referralToken?: string;
+  landingPage?: string;
+  deviceCategory?: 'desktop' | 'mobile' | 'tablet';
+  timestamp: string;
+  source?: string;
+}
+
+export interface ReferralRecord {
+  token: string;
+  targetType: 'VOLUNTEER' | 'SUMMIT';
+  generatedAt: string;
+  landingCount: number;
+  applicationCount: number;
+  lastLandingAt?: string;
+}
+
+export interface PublicVerifiedCertificate {
+  certificateNumber: string;
+  recipientName: string;
+  certificateType: string;
+  summitYear: number;
+  eventName: string;
+  summitTheme: string;
+  department?: string;
+  isOrganisationCertificate: boolean;
+  organisationName?: string;
+  verifiedVolunteersCount?: number;
+  signatoryName: string;
+  signatoryTitle: string;
+  signatoryOrg: string;
+  issueDate: string;
+  status: CertificateStatus;
 }
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Menu, X, Crown, Shield, Globe, Award, Sparkles, FileText, Image as ImageIcon } from 'lucide-react';
 import { PWAInstallButton } from './pwa/PWAInstallButton';
 
@@ -16,13 +16,32 @@ interface NavigationProps {
 export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const isScrolledRef = useRef(false);
 
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 40);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const shouldBeScrolled = window.scrollY > 40;
+          if (isScrolledRef.current !== shouldBeScrolled) {
+            isScrolledRef.current = shouldBeScrolled;
+            setIsScrolled(shouldBeScrolled);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    // Check initial position
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   const navItems = [
@@ -37,14 +56,16 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
     { id: 'podcast', label: 'Podcast' },
     { id: 'marketplace', label: 'Sponsor' },
     { id: 'rsvp', label: 'RSVP' },
+    { id: 'volunteer', label: 'Volunteer' },
+    { id: 'share', label: 'Share' },
     { id: 'register', label: 'Register' },
     { id: 'contact', label: 'Contact' }
   ];
 
-  const handleItemClick = (id: string) => {
+  const handleItemClick = useCallback((id: string) => {
     onNavigate(id);
     setIsOpen(false);
-  };
+  }, [onNavigate]);
 
   return (
     <header className={`sticky top-0 left-0 right-0 z-50 transition-all duration-300 ${

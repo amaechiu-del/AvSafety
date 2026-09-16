@@ -125,6 +125,63 @@ export default function About() {
           </div>
 
         </div>
+
+        {/* Organizer Leadership & Founder's Vision */}
+        <div className="mt-20 border-t border-[#D4AF37]/15 pt-16">
+          <div className="bg-[#0A192F] rounded-2xl border border-[#D4AF37]/25 overflow-hidden shadow-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-12 items-stretch">
+              
+              {/* Left Profile Section */}
+              <div className="md:col-span-4 bg-[#050C17] p-8 flex flex-col justify-center items-center text-center border-b md:border-b-0 md:border-r border-[#D4AF37]/20 relative">
+                <div className="absolute top-4 left-4">
+                  <span className="px-2.5 py-0.5 rounded bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-[#D4AF37] text-[8px] font-mono tracking-wider font-bold uppercase">
+                    ORGANIZER & CONVENER
+                  </span>
+                </div>
+                
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-[#D4AF37]/20 to-[#0A192F] border-2 border-[#D4AF37] flex items-center justify-center font-serif font-black text-3xl text-[#D4AF37] mb-4 shadow-[0_0_20px_rgba(212,175,55,0.25)]">
+                  AU
+                </div>
+                
+                <h4 className="text-xl font-serif font-black text-white uppercase tracking-wide">
+                  AMAECHI UBADIKE
+                </h4>
+                <p className="text-xs text-[#D4AF37] font-mono mt-1 font-bold">FOUNDER & CEO</p>
+                <p className="text-[11px] text-slate-300 font-medium">DomisLink International Services Ltd</p>
+                
+                <div className="w-full border-t border-white/10 mt-6 pt-4 space-y-1.5 text-left text-xs text-slate-300 font-sans">
+                  <p className="text-[9px] font-mono text-slate-400 uppercase tracking-wider font-bold mb-1">PROVEN AIRSPACE EXPERTISE:</p>
+                  <p>• Commercial Pilot Licence (CPL)</p>
+                  <p>• Radar Air Traffic Controller (ATC)</p>
+                  <p>• Civil Aviation Safety Inspector (PEL)</p>
+                  <p>• Author, <em>"Cleared for Takeoff"</em></p>
+                </div>
+              </div>
+
+              {/* Right Message Section */}
+              <div className="md:col-span-8 p-8 sm:p-10 flex flex-col justify-center space-y-4">
+                <h3 className="text-xs font-mono text-[#D4AF37] uppercase tracking-widest font-bold">
+                  FOUNDER'S VISIONARY STATEMENT
+                </h3>
+                <h4 className="text-xl sm:text-2xl font-serif font-extrabold text-white leading-snug">
+                  "Safe Skies Are Built on Absolute Vigilance and Shared Responsibility"
+                </h4>
+                <p className="text-sm text-slate-300 leading-relaxed font-sans">
+                  "As the Founder and CEO of DomisLink International Services Ltd and convener of the Aviation Safety Summit 2026, my mission is to bridge the critical operational realities of the tarmac with strategic boardroom leadership. Aviation safety is not a single achievement we record once and celebrate forever; it is a relentless, hourly discipline."
+                </p>
+                <p className="text-sm text-slate-300 leading-relaxed font-sans">
+                  "Through my years as a commercial pilot, radar controller, and safety inspector, I have learned that the safety of our skies is an unbroken chain. Every controller, pilot, engineer, and executive holds a link. This summit is our collective commitment to keeping that chain unbreakable."
+                </p>
+                <div className="pt-4 border-t border-white/10 flex items-center justify-between text-xs text-[#D4AF37] font-mono font-bold">
+                  <span>DOMISLINK INTERNATIONAL SERVICES LTD</span>
+                  <span className="text-white/40">★ 2026 SAFETY MANDATE ★</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
   );
