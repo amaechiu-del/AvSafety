@@ -2358,5 +2358,44 @@
       "verificationSource": "Broadcasting Organisations of Nigeria (BON) Directory",
       "sponsorshipInterest": "SILVER"
     }
-  ]
+  ],
+  "committees": [
+    {
+      "id": "comm-safety-2026",
+      "name": "Main Aviation Safety Committee 2026",
+      "reference": "ASS-COMM-2026-001",
+      "committeeType": "Aviation Safety Committee",
+      "description": "Principal advisory and operational committee overseeing continental aviation safety protocols, regulatory alignment, and risk mitigation strategies.",
+      "purpose": "Establish unified safety compliance standards across African airspace.",
+      "chairpersonId": "",
+      "secretaryId": "",
+      "secretariatLiaison": "Dr. Aliyu Mohammed",
+      "startDate": "2026-01-15",
+      "endDate": "2026-11-20",
+      "isActive": true,
+      "status": "ACTIVE",
+      "notes": "Primary oversight committee.",
+      "createdAt": "2026-09-15T20:08:04.909Z",
+      "updatedAt": "2026-09-15T20:08:04.909Z"
+    },
+    {
+      "id": "comm-protocol-2026",
+      "name": "Protocol & VVIP Reception Committee",
+      "reference": "ASS-COMM-2026-002",
+      "committeeType": "Protocol Committee",
+      "description": "Managing high-level diplomatic delegations, ministerial arrivals, and VVIP security coordination.",
+      "purpose": "Ensure seamless protocol execution for all visiting dignitaries.",
+      "chairpersonId": "",
+      "secretaryId": "",
+      "secretariatLiaison": "Capt. Nkechi Adebayo",
+      "startDate": "2026-02-01",
+      "endDate": "2026-11-20",
+      "isActive": true,
+      "status": "ACTIVE",
+      "notes": "Coordinates with airport liaison.",
+      "createdAt": "2026-09-15T20:08:04.909Z",
+      "updatedAt": "2026-09-15T20:08:04.909Z"
+    }
+  ],
+  "committee_memberships": []
 }

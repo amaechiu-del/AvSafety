@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Plane, ShieldCheck, Sparkles, Compass, Radio, Crown, HeartHandshake, RotateCw, Pause, Play } from 'lucide-react';
+import { AUTHOR_NAME, BOOK_PRIMARY } from '../constants/author';
 
 interface KineticWordRibbonProps {
   title?: string;
@@ -21,14 +22,14 @@ export default function KineticWordRibbon({
   const [isPaused, setIsPaused] = useState(false);
 
   const topWords = [
-    'SAFETY FIRST', 'AIRWORTHINESS', 'FAITH IN ACTION', 'CLEARED FOR TAKEOFF',
+    'SAFETY FIRST', 'AIRWORTHINESS', 'FAITH IN ACTION', BOOK_PRIMARY.title,
     'RADAR MONITORING', 'MARRIOTT HOTEL LAGOS', 'ZERO ACCIDENTS',
     'CREW RESOURCE MANAGEMENT', 'PRESIDENT & GOVERNORS', 'MEN OF GOD',
     'PILOTS & ATC', 'AVIONICS & ENGINES', 'PASSENGER CARE', 'DOMISLINK EMPIRE'
   ];
 
   const bottomWords = [
-    '17 NOVEMBER 2026', 'AMAECHI UBADIKE', 'NCAA & NAMA', 'INTERFAITH PRAYERS',
+    '17 NOVEMBER 2026', AUTHOR_NAME, 'NCAA & NAMA', 'INTERFAITH PRAYERS',
     '24 KEY SECTORS', 'OIL & GAS REFUELLING', 'BANKING & FLEET LEASING',
     'SIMULATOR DRILLS', 'CABIN PRESSURE INTEGRITY', 'FLIGHT LEVEL 350',
     'SAFETY CULTURE', 'PRESERVATION OF LIFE', 'EVERYBODY IS INVOLVED'

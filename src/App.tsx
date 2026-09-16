@@ -43,6 +43,7 @@ import RegistrationForm from './components/RegistrationForm';
 import StickyMobileRegister from './components/StickyMobileRegister';
 import AdminPanel from './components/AdminPanel';
 import MarketplaceHub from './components/marketplace/MarketplaceHub';
+import { BOOK_PRIMARY } from './constants/author';
 import DomisLinkBookstore from './components/bookstore/DomisLinkBookstore';
 import DynamicFlowTicker from './components/DynamicFlowTicker';
 import KineticWordRibbon from './components/KineticWordRibbon';
@@ -108,11 +109,11 @@ export default function App() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [memos, setMemos] = useState<MemoSubmission[]>([]);
   const [book, setBook] = useState<BookInfo>({
-    id: 'bk-1',
-    title: 'CLEARED FOR TAKEOFF',
-    author: 'AMAECHI UBADIKE',
-    description: 'A Pilot, Controller, and Inspector\'s Unfiltered Account of 25 Years Above the Clouds and Behind the Radar.',
-    coverImagePlaceholder: 'CLEARED FOR TAKEOFF'
+    id: BOOK_PRIMARY.id,
+    title: BOOK_PRIMARY.title,
+    author: BOOK_PRIMARY.author,
+    description: BOOK_PRIMARY.description,
+    coverImagePlaceholder: BOOK_PRIMARY.coverImagePlaceholder
   });
   const [investment, setInvestment] = useState<InvestmentOpportunity>({
     id: 'inv-1',

@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Calendar, MapPin, ShieldAlert, ArrowRight, Bell, Sparkles, Radio, Plane } from 'lucide-react';
+import { AUTHOR_NAME, BOOK_PRIMARY } from '../constants/author';
 
 interface TopEventBarProps {
   onNavigate: (sectionId: string) => void;
@@ -84,7 +85,7 @@ export default function TopEventBar({ onNavigate }: TopEventBarProps) {
           {[
             '✈ OFFICIAL SUMMIT COUNTDOWN ACTIVE',
             '✦ THEME: EVERYBODY IS INVOLVED IN AVIATION SAFETY',
-            '✦ BOOK LAUNCH: "CLEARED FOR TAKEOFF" BY AMAECHI UBADIKE',
+            `✦ BOOK LAUNCH: "${BOOK_PRIMARY.title}" BY ${AUTHOR_NAME}`,
             '✦ INTERFAITH SAFETY PRAYERS: SENIOR CHRISTIAN & MUSLIM LEADERS',
             '✦ 24 STRATEGIC SECTORS REPRESENTED',
             '✦ NCAA & NAMA AUDIT COMPLIANCE',
@@ -93,7 +94,7 @@ export default function TopEventBar({ onNavigate }: TopEventBarProps) {
           ].concat([
             '✈ OFFICIAL SUMMIT COUNTDOWN ACTIVE',
             '✦ THEME: EVERYBODY IS INVOLVED IN AVIATION SAFETY',
-            '✦ BOOK LAUNCH: "CLEARED FOR TAKEOFF" BY AMAECHI UBADIKE',
+            `✦ BOOK LAUNCH: "${BOOK_PRIMARY.title}" BY ${AUTHOR_NAME}`,
             '✦ INTERFAITH SAFETY PRAYERS: SENIOR CHRISTIAN & MUSLIM LEADERS',
             '✦ 24 STRATEGIC SECTORS REPRESENTED',
             '✦ NCAA & NAMA AUDIT COMPLIANCE',

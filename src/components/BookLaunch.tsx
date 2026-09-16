@@ -6,9 +6,18 @@
 import React, { useState } from 'react';
 import { 
   BookOpen, Sparkles, Edit2, Save, X, ExternalLink, 
-  CheckCircle2, Shield, Award, Feather, Bookmark, Compass, ArrowRight 
+  CheckCircle2, Shield, Award, Feather, Bookmark, Compass, ArrowRight,
+  UserCheck, ShieldCheck, Plane, Radio, FileCheck
 } from 'lucide-react';
 import { BookInfo } from '../types';
+import { 
+  AUTHOR_NAME, 
+  AUTHOR_BIO, 
+  AUTHOR_ROLE, 
+  AUTHOR_CREDENTIALS, 
+  AUTHOR_CAREER_HIGHLIGHTS, 
+  BOOK_PRIMARY 
+} from '../constants/author';
 
 interface BookLaunchProps {
   book: BookInfo;
@@ -22,9 +31,9 @@ export default function BookLaunch({ book, onUpdateBook, isAdmin }: BookLaunchPr
   const [showExcerptModal, setShowExcerptModal] = useState(false);
 
   // Directly consume live state with explicit canonical fallbacks
-  const currentTitle = book?.title?.trim() || 'CLEARED FOR TAKEOFF';
-  const currentAuthor = book?.author?.trim() || 'AMAECHI UBADIKE';
-  const currentDescription = book?.description?.trim() || "A Pilot, Controller, and Inspector's Unfiltered Account of 25 Years Above the Clouds and Behind the Radar.";
+  const currentTitle = book?.title?.trim() || BOOK_PRIMARY.title;
+  const currentAuthor = book?.author?.trim() || AUTHOR_NAME;
+  const currentDescription = book?.description?.trim() || BOOK_PRIMARY.description;
 
   const handleStartEdit = () => {
     setIsEditing(true);
@@ -280,6 +289,103 @@ export default function BookLaunch({ book, onUpdateBook, isAdmin }: BookLaunchPr
 
                 </div>
               )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* Author Biography & Profile Dossier */}
+        <div className="max-w-5xl mx-auto bg-[#0A192F] border border-[#D4AF37]/30 rounded-2xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
+          
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/10 pb-6 mb-8">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-[#D4AF37] text-[10px] font-mono font-bold uppercase tracking-wider">
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>AUTHOR BIOGRAPHY & EDITORIAL PROFILE</span>
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-serif font-black text-white tracking-wide uppercase">
+                {AUTHOR_NAME}
+              </h3>
+              <p className="text-sm font-sans text-[#D4AF37] font-semibold">
+                {AUTHOR_ROLE}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-mono text-slate-300">
+              <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
+              <span>Verified 25+ Years Airspace Veteran</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Left: Author Identity Seal & Licensures */}
+            <div className="lg:col-span-4 bg-[#050C17] border border-[#D4AF37]/20 rounded-xl p-6 flex flex-col items-center text-center space-y-4">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-[#D4AF37]/20 to-[#0A192F] border-2 border-[#D4AF37] flex items-center justify-center font-serif font-black text-3xl text-[#D4AF37] shadow-[0_0_20px_rgba(212,175,55,0.25)]">
+                AU
+              </div>
+              
+              <div className="space-y-0.5">
+                <h4 className="text-lg font-serif font-black text-white uppercase tracking-wide">
+                  {AUTHOR_NAME}
+                </h4>
+                <p className="text-xs text-[#D4AF37] font-mono">Principal Author & Convener</p>
+                <p className="text-[11px] text-slate-400">DomisLink Aviation Safety Summit 2026</p>
+              </div>
+
+              <div className="w-full border-t border-white/10 pt-4 space-y-2 text-left">
+                <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold">
+                  Statutory Licensures & Qualifications:
+                </p>
+                <div className="space-y-1.5">
+                  {AUTHOR_CREDENTIALS.map((cred, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-xs text-slate-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#D4AF37] shrink-0 mt-0.5" />
+                      <span className="font-medium">{cred}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-full pt-2 border-t border-white/10 text-[10px] font-mono text-slate-400 text-center">
+                Publisher: <strong className="text-slate-200">DomisLink International Services Ltd</strong> / The Digital Empire
+              </div>
+            </div>
+
+            {/* Right: Detailed Biography & Career Highlights */}
+            <div className="lg:col-span-8 space-y-6">
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-mono text-[#D4AF37] uppercase tracking-wider font-bold">
+                  Biography & Airspace Chronicle
+                </h4>
+                <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-sans">
+                  {AUTHOR_BIO}
+                </p>
+                <p className="text-sm text-slate-300 leading-relaxed font-sans">
+                  Across a distinguished quarter-century in the aviation sector, {AUTHOR_NAME} has navigated the operational realities of air navigation services, airline line operations, and high-level regulatory audits. His writing merges the technical precision of flight deck procedures with an urgent moral call to preserve human life across the African continent.
+                </p>
+              </div>
+
+              {/* Career Highlights Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                {AUTHOR_CAREER_HIGHLIGHTS.map((item, idx) => (
+                  <div key={idx} className="bg-[#050C17]/80 border border-white/10 rounded-lg p-3.5 space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-mono text-[#D4AF37] font-bold">
+                      {idx === 0 && <Plane className="w-3.5 h-3.5 text-[#D4AF37]" />}
+                      {idx === 1 && <Radio className="w-3.5 h-3.5 text-[#D4AF37]" />}
+                      {idx === 2 && <FileCheck className="w-3.5 h-3.5 text-[#D4AF37]" />}
+                      {idx === 3 && <Award className="w-3.5 h-3.5 text-[#D4AF37]" />}
+                      <span>{item.role}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
 
             </div>
 

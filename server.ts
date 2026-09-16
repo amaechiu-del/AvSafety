@@ -531,6 +531,11 @@ app.get('/api/db', (req, res) => {
   const data = readDb();
   const isAdmin = req.headers['x-admin-mode'] === 'true' || req.query.admin === 'true';
   
+  // Guarantee canonical author identity for book launch
+  if (data.book) {
+    data.book.author = 'AMAECHI UBADIKE';
+  }
+
   // Privacy protection: Do not expose submitted personal information publicly
   if (!isAdmin) {
     const sanitized = { 

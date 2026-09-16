@@ -8,6 +8,7 @@ import {
   Sparkles, Radio, Plane, ShieldCheck, HeartHandshake, 
   Crown, Compass, Zap, BookOpen, Pause, Play, Eye, RotateCw
 } from 'lucide-react';
+import { AUTHOR_NAME, BOOK_PRIMARY } from '../constants/author';
 
 export type FlowMotionMode = 'stepped-pause' | 'slow-glide' | 'breathing-cadence';
 
@@ -43,7 +44,7 @@ export default function DynamicFlowTicker({
     FAITH_AND_BOOK: [
       { text: 'FAITH IN ACTION: "IN TURBULENCE, PRAYERS RISE ACROSS ALL TONGUES"', icon: <HeartHandshake className="h-3.5 w-3.5 text-rose-300" /> },
       { text: 'SPECIAL GUEST INVITATIONS: MEN OF GOD & SPIRITUAL LEADERS', icon: <Sparkles className="h-3.5 w-3.5 text-[#D4AF37]" /> },
-      { text: 'OFFICIAL BOOK LAUNCH: "CLEARED FOR TAKEOFF" BY AMAECHI UBADIKE', icon: <BookOpen className="h-3.5 w-3.5 text-amber-300" /> },
+      { text: `OFFICIAL BOOK LAUNCH: "${BOOK_PRIMARY.title}" BY ${AUTHOR_NAME}`, icon: <BookOpen className="h-3.5 w-3.5 text-amber-300" /> },
       { text: 'PRESERVATION OF HUMAN LIFE: SACRED AIRSPACE STEWARDSHIP', icon: <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" /> },
       { text: 'INTERFAITH SAFETY PRAYERS FOR SAFE NIGERIAN & GLOBAL SKIES', icon: <Crown className="h-3.5 w-3.5 text-[#D4AF37]" /> }
     ]

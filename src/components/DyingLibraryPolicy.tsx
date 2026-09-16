@@ -10,6 +10,7 @@ import {
   ChevronUp, CheckCircle2, BookmarkCheck, ArrowRight, ShieldAlert,
   Building2, GraduationCap, Gavel, Sparkles, Send
 } from 'lucide-react';
+import { AUTHOR_NAME, AUTHOR_FULL_TITLE, BOOK_PRIMARY } from '../constants/author';
 
 interface DyingLibraryProps {
   onNavigateToMemoir?: () => void;
@@ -128,7 +129,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
       title: "Formal Legislative Consideration by the 10th National Assembly",
       summary: "Formally submits this White Paper to the Senate and House Committees on Aviation to advance legislative bills codifying the Aviation Appointments Commission and Knowledge Archives.",
       details: [
-        "Companion policy instrument to 'CLEARED FOR TAKEOFF: But Who Is Flying Nigeria's Aviation?' by F/O Amaechi Ubadike.",
+        `Companion policy instrument to '${BOOK_PRIMARY.title}: ${BOOK_PRIMARY.subtitle}' by ${AUTHOR_NAME}.`,
         "Presented for full public hearing and committee enactment during the 2026 legislative session."
       ],
       badge: "Statutory Bill"
@@ -278,7 +279,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
           </p>
 
           <div className="pt-2 flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-[#8A99AD]">
-            <span>Author: <strong>F/O Amaechi Ubadike</strong></span>
+            <span>Author: <strong>{AUTHOR_NAME}</strong></span>
             <span>•</span>
             <span>Commercial Pilot · Air Traffic Controller · Safety Inspector</span>
             <span>•</span>
@@ -365,8 +366,8 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
                   “I make a challenge — not as a suggestion, not as an aspiration, but as a formal professional challenge addressed to every aviator, every controller, every engineer, every inspector, every dispatcher, every cabin crew member who has ever served in any capacity in civil aviation anywhere on earth. Keep your memoir. Write it down. Publish it. The sky you flew is not yours alone to keep.”
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-between border-t border-[#D4AF37]/20 pt-4 gap-3 text-xs font-mono">
-                  <span className="text-white font-bold tracking-wider uppercase">— F/O AMAECHI UBADike</span>
-                  <span className="text-[#8A99AD]">Companion to: Cleared for Takeoff: But Who Is Flying Nigeria’s Aviation?</span>
+                  <span className="text-white font-bold tracking-wider uppercase">— {AUTHOR_NAME}</span>
+                  <span className="text-[#8A99AD]">Companion to: {BOOK_PRIMARY.title}: {BOOK_PRIMARY.subtitle}</span>
                 </div>
               </div>
             </div>
