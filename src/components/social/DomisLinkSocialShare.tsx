@@ -129,45 +129,50 @@ export default function DomisLinkSocialShare({
       <div className={`flex flex-wrap items-center gap-2 ${className}`}>
         {/* WhatsApp */}
         <button
+          id="compact-share-whatsapp"
           onClick={() => handleChannelClick('whatsapp')}
           aria-label="Share via WhatsApp"
-          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] text-xs font-semibold transition-all focus:ring-2 focus:ring-[#25D366] focus:outline-none"
+          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 hover:border-[#25D366]/70 text-[#25D366] text-xs font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_16px_rgba(37,211,102,0.4)] focus:ring-2 focus:ring-[#25D366] focus:outline-none"
         >
           <span className="font-bold">WhatsApp</span>
         </button>
 
         {/* Facebook */}
         <button
+          id="compact-share-facebook"
           onClick={() => handleChannelClick('facebook')}
           aria-label="Share via Facebook"
-          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#1877F2]/15 hover:bg-[#1877F2]/25 border border-[#1877F2]/40 text-[#5B9DF8] text-xs font-semibold transition-all focus:ring-2 focus:ring-[#1877F2] focus:outline-none"
+          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#1877F2]/15 hover:bg-[#1877F2]/25 border border-[#1877F2]/40 hover:border-[#1877F2]/70 text-[#5B9DF8] text-xs font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_16px_rgba(24,119,242,0.4)] focus:ring-2 focus:ring-[#1877F2] focus:outline-none"
         >
           <span className="font-bold">Facebook</span>
         </button>
 
         {/* X / Twitter */}
         <button
+          id="compact-share-twitter"
           onClick={() => handleChannelClick('twitter')}
           aria-label="Share via X"
-          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs font-semibold transition-all focus:ring-2 focus:ring-white focus:outline-none"
+          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/25 hover:border-white/60 text-white text-xs font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_16px_rgba(255,255,255,0.3)] focus:ring-2 focus:ring-white focus:outline-none"
         >
           <span className="font-bold">X</span>
         </button>
 
         {/* LinkedIn */}
         <button
+          id="compact-share-linkedin"
           onClick={() => handleChannelClick('linkedin')}
           aria-label="Share via LinkedIn"
-          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#0A66C2]/15 hover:bg-[#0A66C2]/25 border border-[#0A66C2]/40 text-[#70B5F9] text-xs font-semibold transition-all focus:ring-2 focus:ring-[#0A66C2] focus:outline-none"
+          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#0A66C2]/15 hover:bg-[#0A66C2]/25 border border-[#0A66C2]/40 hover:border-[#0A66C2]/70 text-[#70B5F9] text-xs font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_16px_rgba(10,102,194,0.45)] focus:ring-2 focus:ring-[#0A66C2] focus:outline-none"
         >
           <span className="font-bold">LinkedIn</span>
         </button>
 
         {/* Telegram */}
         <button
+          id="compact-share-telegram"
           onClick={() => handleChannelClick('telegram')}
           aria-label="Share via Telegram"
-          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#229ED9]/15 hover:bg-[#229ED9]/25 border border-[#229ED9]/40 text-[#5EC4F7] text-xs font-semibold transition-all focus:ring-2 focus:ring-[#229ED9] focus:outline-none"
+          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#229ED9]/15 hover:bg-[#229ED9]/25 border border-[#229ED9]/40 hover:border-[#229ED9]/70 text-[#5EC4F7] text-xs font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_16px_rgba(34,158,217,0.4)] focus:ring-2 focus:ring-[#229ED9] focus:outline-none"
         >
           <Send className="h-3 w-3 mr-0.5" />
           <span className="font-bold">Telegram</span>
@@ -175,9 +180,10 @@ export default function DomisLinkSocialShare({
 
         {/* Email */}
         <button
+          id="compact-share-email"
           onClick={() => handleChannelClick('email')}
           aria-label="Share via Email"
-          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/25 text-gray-200 text-xs font-semibold transition-all focus:ring-2 focus:ring-[#D4AF37] focus:outline-none"
+          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/25 hover:border-[#D4AF37]/60 text-gray-200 text-xs font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_16px_rgba(212,175,55,0.4)] focus:ring-2 focus:ring-[#D4AF37] focus:outline-none"
         >
           <Mail className="h-3 w-3 mr-0.5 text-[#D4AF37]" />
           <span>Email</span>
@@ -185,12 +191,13 @@ export default function DomisLinkSocialShare({
 
         {/* Copy Link */}
         <button
+          id="compact-share-copylink"
           onClick={handleCopyLink}
           aria-label="Copy canonical share link"
-          className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all focus:ring-2 focus:ring-[#D4AF37] focus:outline-none ${
+          className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95 focus:ring-2 focus:ring-[#D4AF37] focus:outline-none ${
             copied
-              ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300 font-bold'
-              : 'bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 border-[#D4AF37]/50 text-[#FFD700]'
+              ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300 font-bold shadow-[0_0_14px_rgba(16,185,129,0.4)]'
+              : 'bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 border-[#D4AF37]/50 hover:border-[#D4AF37]/80 text-[#FFD700] hover:shadow-[0_0_16px_rgba(212,175,55,0.4)]'
           }`}
         >
           {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
@@ -200,9 +207,10 @@ export default function DomisLinkSocialShare({
         {/* Native Share button (if supported) */}
         {hasNativeShare && (
           <button
+            id="compact-share-native"
             onClick={handleNativeShare}
             aria-label="Native device share"
-            className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#D4AF37] hover:bg-[#C59B27] text-[#0A192F] text-xs font-bold transition-all focus:ring-2 focus:ring-white focus:outline-none shadow-sm"
+            className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#D4AF37] hover:bg-[#FFD700] text-[#0A192F] text-xs font-bold transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_18px_rgba(212,175,55,0.5)] focus:ring-2 focus:ring-white focus:outline-none shadow-sm"
           >
             <Share2 className="h-3.5 w-3.5" />
             <span>Share</span>
@@ -211,9 +219,10 @@ export default function DomisLinkSocialShare({
 
         {/* QR Code trigger */}
         <button
+          id="compact-share-qr"
           onClick={() => setIsQRModalOpen(true)}
           aria-label="Show QR code for sharing"
-          className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/20 text-gray-300 text-xs transition-all focus:ring-2 focus:ring-[#D4AF37] focus:outline-none"
+          className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/20 hover:border-[#D4AF37]/60 text-gray-300 text-xs transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_14px_rgba(212,175,55,0.35)] focus:ring-2 focus:ring-[#D4AF37] focus:outline-none"
           title="Display QR code"
         >
           <QrCode className="h-3.5 w-3.5 text-[#D4AF37]" />
@@ -290,8 +299,9 @@ export default function DomisLinkSocialShare({
           <div className="flex items-center space-x-2 shrink-0">
             {hasNativeShare && (
               <button
+                id="distribution-share-native"
                 onClick={handleNativeShare}
-                className="px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#C59B27] hover:brightness-110 text-[#0A192F] font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center space-x-2 transition-all"
+                className="px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#C59B27] hover:brightness-110 text-[#0A192F] font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center space-x-2 transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_22px_rgba(212,175,55,0.45)]"
                 aria-label="Native share"
               >
                 <Share2 className="h-4 w-4" />
@@ -300,8 +310,9 @@ export default function DomisLinkSocialShare({
             )}
 
             <button
+              id="distribution-share-qr"
               onClick={() => setIsQRModalOpen(true)}
-              className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/25 rounded-xl text-white text-xs font-mono uppercase flex items-center space-x-1.5 transition-all"
+              className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/25 hover:border-[#D4AF37]/60 rounded-xl text-white text-xs font-mono uppercase flex items-center space-x-1.5 transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_18px_rgba(212,175,55,0.3)]"
               aria-label="Show QR Code"
             >
               <QrCode className="h-4 w-4 text-[#D4AF37]" />
@@ -315,80 +326,86 @@ export default function DomisLinkSocialShare({
           
           {/* WhatsApp */}
           <button
+            id="distribution-share-whatsapp"
             onClick={() => handleChannelClick('whatsapp')}
             aria-label="Share to WhatsApp"
-            className="p-3.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/35 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all hover:scale-[1.02] focus:ring-2 focus:ring-[#25D366] focus:outline-none"
+            className="relative p-3.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/35 hover:border-[#25D366]/70 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_24px_rgba(37,211,102,0.35)] focus:ring-2 focus:ring-[#25D366] focus:outline-none"
           >
-            <div className="w-8 h-8 rounded-full bg-[#25D366]/20 flex items-center justify-center text-[#25D366] group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-full bg-[#25D366]/20 flex items-center justify-center text-[#25D366] group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(37,211,102,0.6)] transition-all duration-300">
               <span className="font-bold text-sm font-sans">WA</span>
             </div>
-            <span className="text-xs font-bold text-white">WhatsApp</span>
-            <span className="text-[10px] text-gray-400">Direct Message</span>
+            <span className="text-xs font-bold text-white group-hover:text-[#25D366] transition-colors">WhatsApp</span>
+            <span className="text-[10px] text-gray-400 group-hover:text-gray-300 transition-colors">Direct Message</span>
           </button>
 
           {/* Facebook */}
           <button
+            id="distribution-share-facebook"
             onClick={() => handleChannelClick('facebook')}
             aria-label="Share to Facebook"
-            className="p-3.5 bg-[#1877F2]/10 hover:bg-[#1877F2]/20 border border-[#1877F2]/35 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all hover:scale-[1.02] focus:ring-2 focus:ring-[#1877F2] focus:outline-none"
+            className="relative p-3.5 bg-[#1877F2]/10 hover:bg-[#1877F2]/20 border border-[#1877F2]/35 hover:border-[#1877F2]/70 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_24px_rgba(24,119,242,0.35)] focus:ring-2 focus:ring-[#1877F2] focus:outline-none"
           >
-            <div className="w-8 h-8 rounded-full bg-[#1877F2]/20 flex items-center justify-center text-[#5B9DF8] group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-full bg-[#1877F2]/20 flex items-center justify-center text-[#5B9DF8] group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(24,119,242,0.6)] transition-all duration-300">
               <span className="font-bold text-sm font-sans">FB</span>
             </div>
-            <span className="text-xs font-bold text-white">Facebook</span>
-            <span className="text-[10px] text-gray-400">Post & Feed</span>
+            <span className="text-xs font-bold text-white group-hover:text-[#5B9DF8] transition-colors">Facebook</span>
+            <span className="text-[10px] text-gray-400 group-hover:text-gray-300 transition-colors">Post & Feed</span>
           </button>
 
           {/* X / Twitter */}
           <button
+            id="distribution-share-twitter"
             onClick={() => handleChannelClick('twitter')}
             aria-label="Share to X (formerly Twitter)"
-            className="p-3.5 bg-white/5 hover:bg-white/15 border border-white/20 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all hover:scale-[1.02] focus:ring-2 focus:ring-white focus:outline-none"
+            className="relative p-3.5 bg-white/5 hover:bg-white/15 border border-white/20 hover:border-white/60 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_24px_rgba(255,255,255,0.25)] focus:ring-2 focus:ring-white focus:outline-none"
           >
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all duration-300">
               <span className="font-serif font-black text-sm">𝕏</span>
             </div>
-            <span className="text-xs font-bold text-white">X / Twitter</span>
-            <span className="text-[10px] text-gray-400">Tweet Message</span>
+            <span className="text-xs font-bold text-white group-hover:text-amber-200 transition-colors">X / Twitter</span>
+            <span className="text-[10px] text-gray-400 group-hover:text-gray-300 transition-colors">Tweet Message</span>
           </button>
 
           {/* LinkedIn */}
           <button
+            id="distribution-share-linkedin"
             onClick={() => handleChannelClick('linkedin')}
             aria-label="Share to LinkedIn"
-            className="p-3.5 bg-[#0A66C2]/10 hover:bg-[#0A66C2]/20 border border-[#0A66C2]/35 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all hover:scale-[1.02] focus:ring-2 focus:ring-[#0A66C2] focus:outline-none"
+            className="relative p-3.5 bg-[#0A66C2]/10 hover:bg-[#0A66C2]/20 border border-[#0A66C2]/35 hover:border-[#0A66C2]/70 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_24px_rgba(10,102,194,0.4)] focus:ring-2 focus:ring-[#0A66C2] focus:outline-none"
           >
-            <div className="w-8 h-8 rounded-full bg-[#0A66C2]/20 flex items-center justify-center text-[#70B5F9] group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-full bg-[#0A66C2]/20 flex items-center justify-center text-[#70B5F9] group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(10,102,194,0.6)] transition-all duration-300">
               <span className="font-bold text-sm font-sans">in</span>
             </div>
-            <span className="text-xs font-bold text-white">LinkedIn</span>
-            <span className="text-[10px] text-gray-400">Professional Feed</span>
+            <span className="text-xs font-bold text-white group-hover:text-[#70B5F9] transition-colors">LinkedIn</span>
+            <span className="text-[10px] text-gray-400 group-hover:text-gray-300 transition-colors">Professional Feed</span>
           </button>
 
           {/* Telegram */}
           <button
+            id="distribution-share-telegram"
             onClick={() => handleChannelClick('telegram')}
             aria-label="Share to Telegram"
-            className="p-3.5 bg-[#229ED9]/10 hover:bg-[#229ED9]/20 border border-[#229ED9]/35 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all hover:scale-[1.02] focus:ring-2 focus:ring-[#229ED9] focus:outline-none"
+            className="relative p-3.5 bg-[#229ED9]/10 hover:bg-[#229ED9]/20 border border-[#229ED9]/35 hover:border-[#229ED9]/70 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_24px_rgba(34,158,217,0.35)] focus:ring-2 focus:ring-[#229ED9] focus:outline-none"
           >
-            <div className="w-8 h-8 rounded-full bg-[#229ED9]/20 flex items-center justify-center text-[#5EC4F7] group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-full bg-[#229ED9]/20 flex items-center justify-center text-[#5EC4F7] group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(34,158,217,0.6)] transition-all duration-300">
               <Send className="h-4 w-4" />
             </div>
-            <span className="text-xs font-bold text-white">Telegram</span>
-            <span className="text-[10px] text-gray-400">Group or Chat</span>
+            <span className="text-xs font-bold text-white group-hover:text-[#5EC4F7] transition-colors">Telegram</span>
+            <span className="text-[10px] text-gray-400 group-hover:text-gray-300 transition-colors">Group or Chat</span>
           </button>
 
           {/* Email */}
           <button
+            id="distribution-share-email"
             onClick={() => handleChannelClick('email')}
             aria-label="Share via Email"
-            className="p-3.5 bg-white/5 hover:bg-white/15 border border-white/20 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all hover:scale-[1.02] focus:ring-2 focus:ring-[#D4AF37] focus:outline-none"
+            className="relative p-3.5 bg-white/5 hover:bg-[#D4AF37]/15 border border-white/20 hover:border-[#D4AF37]/70 rounded-xl flex flex-col items-center justify-center space-y-1.5 text-center group transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:shadow-[0_0_24px_rgba(212,175,55,0.35)] focus:ring-2 focus:ring-[#D4AF37] focus:outline-none"
           >
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.6)] transition-all duration-300">
               <Mail className="h-4 w-4" />
             </div>
-            <span className="text-xs font-bold text-white">Email</span>
-            <span className="text-[10px] text-gray-400">Official Invitation</span>
+            <span className="text-xs font-bold text-white group-hover:text-[#FFD700] transition-colors">Email</span>
+            <span className="text-[10px] text-gray-400 group-hover:text-gray-300 transition-colors">Official Invitation</span>
           </button>
 
         </div>
@@ -411,11 +428,12 @@ export default function DomisLinkSocialShare({
 
           <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0">
             <button
+              id="distribution-share-copylink"
               onClick={handleCopyLink}
-              className={`w-full sm:w-auto px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 ${
+              className={`w-full sm:w-auto px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all duration-300 ease-out hover:scale-105 active:scale-95 flex items-center justify-center space-x-1.5 ${
                 copied
-                  ? 'bg-emerald-600 border border-emerald-400 text-white'
-                  : 'bg-[#D4AF37] hover:bg-[#C59B27] text-[#0A192F]'
+                  ? 'bg-emerald-600 border border-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]'
+                  : 'bg-[#D4AF37] hover:bg-[#FFD700] text-[#0A192F] hover:shadow-[0_0_22px_rgba(212,175,55,0.45)]'
               }`}
               aria-label="Copy canonical link to clipboard"
             >
@@ -436,6 +454,7 @@ export default function DomisLinkSocialShare({
                 </span>
               </div>
               <button
+                id="distribution-generate-referral-btn"
                 onClick={handleGenerateNewReferral}
                 className="text-[11px] font-mono text-[#D4AF37] hover:underline flex items-center space-x-1 self-start sm:self-auto"
               >

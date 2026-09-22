@@ -484,6 +484,100 @@ const defaultDb = {
 };
 
 
+/**
+ * Idempotent Stakeholder Registry Synchronizer
+ * 
+ * Synchronizes the source registry (INITIAL_STAKEHOLDERS) with data stored in db.json:
+ * - Preserves all existing stakeholder records (including user-nominated records, status updates, 
+ *   notes, custom edits, and verification tags).
+ * - Identifies records using the strongest existing stable identifier:
+ *   1. Canonical `id` (e.g., `stk-airpeace-onyema`)
+ *   2. Normalized `name` + `organisation` fallback matching to avoid duplicates if an id is formatted differently.
+ * - Appends missing records from INITIAL_STAKEHOLDERS.
+ * - Enriches any missing canonical fields on existing records without overwriting user-modified values.
+ * - Completely avoids unsafe length thresholds like `< 5` or `< INITIAL_STAKEHOLDERS.length` that cause data loss.
+ * - Prevents duplicates on repeated server startup or multiple sync executions.
+ */
+function syncStakeholderRegistry(existingStakeholders: any[]): { merged: any[]; changed: boolean } {
+  if (!Array.isArray(existingStakeholders) || existingStakeholders.length === 0) {
+    return {
+      merged: [...INITIAL_STAKEHOLDERS],
+      changed: true
+    };
+  }
+
+  const existingMapById = new Map<string, any>();
+  const existingSetByNameOrg = new Set<string>();
+
+  for (const s of existingStakeholders) {
+    if (s && typeof s === 'object') {
+      if (s.id && typeof s.id === 'string') {
+        existingMapById.set(s.id.trim(), s);
+      }
+      if (s.name) {
+        const normKey = `${String(s.name).trim().toLowerCase()}:::${String(s.organisation || '').trim().toLowerCase()}`;
+        existingSetByNameOrg.add(normKey);
+      }
+    }
+  }
+
+  const merged = [...existingStakeholders];
+  let changed = false;
+
+  for (const canonical of INITIAL_STAKEHOLDERS) {
+    const canonicalId = canonical.id ? canonical.id.trim() : '';
+    const normKey = `${String(canonical.name).trim().toLowerCase()}:::${String(canonical.organisation || '').trim().toLowerCase()}`;
+    
+    const existingById = canonicalId ? existingMapById.get(canonicalId) : undefined;
+    const existingByNameOrg = existingSetByNameOrg.has(normKey);
+
+    if (existingById) {
+      // Existing record found by ID - preserve existing record and enrich any newly added canonical fields if undefined
+      let enriched = false;
+      for (const [key, val] of Object.entries(canonical)) {
+        if (existingById[key] === undefined && val !== undefined) {
+          existingById[key] = val;
+          enriched = true;
+        }
+      }
+      if (enriched) {
+        changed = true;
+      }
+    } else if (existingByNameOrg) {
+      // Existing record matches by normalized name & organisation - find and enrich without duplicating
+      const existingRecord = merged.find((s: any) => {
+        if (!s || !s.name) return false;
+        const key = `${String(s.name).trim().toLowerCase()}:::${String(s.organisation || '').trim().toLowerCase()}`;
+        return key === normKey;
+      });
+      if (existingRecord) {
+        let enriched = false;
+        if (!existingRecord.id && canonical.id) {
+          existingRecord.id = canonical.id;
+          enriched = true;
+        }
+        for (const [key, val] of Object.entries(canonical)) {
+          if (existingRecord[key] === undefined && val !== undefined) {
+            existingRecord[key] = val;
+            enriched = true;
+          }
+        }
+        if (enriched) {
+          changed = true;
+        }
+      }
+    } else {
+      // Record is missing from database - append canonical record
+      merged.push({ ...canonical });
+      if (canonicalId) existingMapById.set(canonicalId, canonical);
+      existingSetByNameOrg.add(normKey);
+      changed = true;
+    }
+  }
+
+  return { merged, changed };
+}
+
 // Reads db.json or loads defaults
 function readDb() {
   ensureDirExists(dbPath);
@@ -491,19 +585,31 @@ function readDb() {
     if (fs.existsSync(dbPath)) {
       const data = fs.readFileSync(dbPath, 'utf8');
       const parsed = JSON.parse(data);
+      let needsWrite = false;
+
       // Auto-migrate if speakers is missing, empty, or outdated
       if (!parsed.speakers || parsed.speakers.length < 10 || !parsed.speakers[0].workflowStage) {
         parsed.speakers = INITIAL_VERIFIED_SPEAKERS;
-        writeDb(parsed);
+        needsWrite = true;
       }
-      // Auto-migrate if stakeholders is missing or empty
-      if (!parsed.stakeholders || parsed.stakeholders.length < 5) {
-        parsed.stakeholders = INITIAL_STAKEHOLDERS;
-        writeDb(parsed);
+
+      // Idempotent stakeholder synchronization:
+      // Preserves all existing records (user nominations, status updates, notes, etc.)
+      // and merges any missing records from the source registry (INITIAL_STAKEHOLDERS)
+      // without duplicate creation or destructive overwrites.
+      const syncResult = syncStakeholderRegistry(parsed.stakeholders);
+      if (syncResult.changed || !parsed.stakeholders) {
+        parsed.stakeholders = syncResult.merged;
+        needsWrite = true;
       }
+
       // Auto-migrate if sessions is missing or empty
       if (!parsed.sessions || parsed.sessions.length === 0) {
         parsed.sessions = INITIAL_PROGRAMME_SESSIONS;
+        needsWrite = true;
+      }
+
+      if (needsWrite) {
         writeDb(parsed);
       }
       return parsed;
@@ -2627,6 +2733,149 @@ function isValidInvitationNumber(invNumber: string): boolean {
   return trimmed.length >= 3 && /^[A-Za-z0-9\/\-_\.]+$/.test(trimmed);
 }
 
+/**
+ * Synchronizes RSVP attendance submission with Master Invitation Registry
+ *
+ * Locates corresponding Master Invitation using strongest available identifier:
+ * 1. invitationNumber
+ * 2. invitationReference
+ * 3. invitationId (or id)
+ *
+ * Maps RSVP attendance options to Master Invitation statuses:
+ * - "I WILL ATTEND" -> CONFIRMED
+ * - "I WILL ATTEND WITH REPRESENTATIVE" -> CONFIRMED
+ * - "I AM TENTATIVE" -> TENTATIVE
+ * - "I AM UNABLE TO ATTEND" -> DECLINED
+ *
+ * Updates BOTH invitationStatus and currentStatus.
+ * Updates updatedAt timestamp.
+ * Preserves all existing metadata, notes, responsible officer, and approval info.
+ * Idempotent: repeated submissions do not duplicate invitations or audit records.
+ * Non-blocking: does not fail RSVP if invitation not found or reference omitted.
+ */
+function syncRsvpToMasterInvitation(
+  data: any,
+  rsvpRecord: any,
+  rawOption: string,
+  extraInvitationId?: string
+): { synchronized: boolean; invitation?: any } {
+  if (!data) return { synchronized: false };
+  if (!data.invitations) data.invitations = [];
+
+  const lookupNumber = (rsvpRecord.invitationNumber || '').trim();
+  const lookupRef = (rsvpRecord.invitationRef || '').trim();
+  const lookupId = (extraInvitationId || rsvpRecord.inviteeId || '').trim();
+
+  // If no invitation reference/id was provided with the RSVP, skip synchronization gracefully
+  if (!lookupNumber && !lookupRef && !lookupId) {
+    return { synchronized: false };
+  }
+
+  // Strongest identifier matching: invitationNumber -> invitationReference -> invitationId / id
+  const matchedIndex = data.invitations.findIndex((inv: any) => {
+    if (!inv) return false;
+    const invNum = String(inv.invitationNumber || '').trim().toLowerCase();
+    const invRef = String(inv.invitationReference || '').trim().toLowerCase();
+    const invId = String(inv.invitationId || '').trim().toLowerCase();
+    const id = String(inv.id || '').trim().toLowerCase();
+
+    // 1. Primary match on invitationNumber
+    if (lookupNumber) {
+      const target = lookupNumber.toLowerCase();
+      if (invNum === target || invRef === target || invId === target || id === target) return true;
+    }
+    // 2. Secondary match on invitationReference
+    if (lookupRef) {
+      const target = lookupRef.toLowerCase();
+      if (invRef === target || invNum === target || invId === target || id === target) return true;
+    }
+    // 3. Match on invitationId / id
+    if (lookupId) {
+      const target = lookupId.toLowerCase();
+      if (invId === target || id === target || invNum === target || invRef === target) return true;
+    }
+    return false;
+  });
+
+  // Map attendance option to target invitation status
+  const normOption = String(rawOption || rsvpRecord.attendanceOption || '').toUpperCase().trim();
+  let targetStatus: 'CONFIRMED' | 'TENTATIVE' | 'DECLINED' = 'CONFIRMED';
+
+  if (
+    normOption === 'I WILL ATTEND' ||
+    normOption === 'I_WILL_ATTEND' ||
+    normOption === 'I WILL ATTEND WITH REPRESENTATIVE' ||
+    normOption === 'I_WILL_ATTEND_WITH_REPRESENTATIVE' ||
+    normOption.includes('REPRESENTATIVE')
+  ) {
+    targetStatus = 'CONFIRMED';
+  } else if (
+    normOption === 'I AM TENTATIVE' ||
+    normOption === 'I_AM_TENTATIVE' ||
+    normOption.includes('TENTATIVE') ||
+    normOption.includes('MORE_INFO')
+  ) {
+    targetStatus = 'TENTATIVE';
+  } else if (
+    normOption === 'I AM UNABLE TO ATTEND' ||
+    normOption === 'I_AM_UNABLE_TO_ATTEND' ||
+    normOption.includes('UNABLE') ||
+    normOption.includes('CANNOT') ||
+    normOption.includes('DECLINED')
+  ) {
+    targetStatus = 'DECLINED';
+  }
+
+  // Case A: Invitation found -> synchronize status idempotently
+  if (matchedIndex >= 0) {
+    const inv = data.invitations[matchedIndex];
+    const statusChanged = inv.invitationStatus !== targetStatus || inv.currentStatus !== targetStatus;
+
+    if (statusChanged) {
+      const oldValueSnapshot = { ...inv };
+
+      inv.invitationStatus = targetStatus;
+      inv.currentStatus = targetStatus;
+      inv.updatedAt = new Date().toISOString();
+
+      recordAuditLog(data, {
+        action: 'INVITATION_STATUS_SYNCHRONIZED_FROM_RSVP',
+        entityType: 'INVITATION',
+        recordId: inv.id || inv.invitationId,
+        referenceNumber: inv.invitationNumber || inv.invitationReference,
+        oldValue: oldValueSnapshot,
+        newValue: inv,
+        performedBy: 'Public RSVP Synchronization Service',
+        reason: `Invitation status synchronized from RSVP ${rsvpRecord.confirmationRef} (${rawOption} -> ${targetStatus})`
+      });
+    }
+
+    return { synchronized: true, invitation: inv };
+  }
+
+  // Case B: Reference was provided but no matching invitation found -> log for secretariat investigation without failing RSVP
+  recordAuditLog(data, {
+    action: 'RSVP_INVITATION_UNMATCHED',
+    entityType: 'RSVP',
+    recordId: rsvpRecord.id,
+    referenceNumber: rsvpRecord.confirmationRef,
+    newValue: {
+      providedInvitationNumber: lookupNumber || undefined,
+      providedInvitationRef: lookupRef || undefined,
+      providedInvitationId: lookupId || undefined,
+      rsvpConfirmationRef: rsvpRecord.confirmationRef,
+      attendeeName: rsvpRecord.fullName,
+      attendeeEmail: rsvpRecord.email,
+      organisation: rsvpRecord.organisation,
+      attendanceOption: rawOption
+    },
+    performedBy: 'Public RSVP Synchronization Service',
+    reason: `RSVP submitted with reference '${lookupNumber || lookupRef || lookupId}', but no corresponding Master Invitation was found in registry.`
+  });
+
+  return { synchronized: false };
+}
+
 // 1. GET /api/rsvp/lookup (Disabled for security compliance and reference enumeration prevention)
 app.get('/api/rsvp/lookup', (req, res) => {
   return res.status(403).json({
@@ -2687,10 +2936,8 @@ app.post('/api/rsvp', (req, res) => {
   const resolvedEmail = (email || '').trim().toLowerCase();
   const resolvedPhone = (phone || '').trim();
 
-  // 1. Validate Invitation Number
-  if (!resolvedInvNumber) {
-    errors.invitationNumber = 'Official Invitation Number is required (e.g., ASS/INV/2026/0001 or invitation reference code).';
-  } else if (!isValidInvitationNumber(resolvedInvNumber)) {
+  // 1. Validate Invitation Number (optional reference, validated if provided)
+  if (resolvedInvNumber && !isValidInvitationNumber(resolvedInvNumber)) {
     errors.invitationNumber = 'Please provide a valid invitation number format (alphanumeric reference from your invitation).';
   }
 
@@ -2802,7 +3049,7 @@ app.post('/api/rsvp', (req, res) => {
 
   // 9. ACCIDENTAL DUPLICATE SUBMISSION DETECTION & IDEMPOTENCY
   // Rapid debounce check: If the same email or invitation submitted within the last 30 seconds
-  const debounceKey = `${resolvedEmail}::${resolvedInvNumber.toLowerCase()}`;
+  const debounceKey = `${resolvedEmail}::${(resolvedInvNumber || 'direct').toLowerCase()}`;
   const now = Date.now();
   const existingMutex = rsvpSubmissionMutex.get(debounceKey);
 
@@ -2872,7 +3119,7 @@ app.post('/api/rsvp', (req, res) => {
     confirmationRef,
     invitationNumber: resolvedInvNumber || (matchedStakeholder ? (matchedStakeholder.invitationNumber || matchedStakeholder.id) : undefined),
     invitationRef: resolvedInvNumber || (matchedStakeholder ? matchedStakeholder.id : undefined),
-    inviteeId: matchedStakeholder ? matchedStakeholder.id : undefined,
+    inviteeId: (req.body.invitationId ? String(req.body.invitationId).trim() : undefined) || (matchedStakeholder ? matchedStakeholder.id : undefined),
     title: title ? String(title).trim() : undefined,
     firstName: computedFirstName || undefined,
     middleName: computedMiddleName || undefined,
@@ -2908,6 +3155,15 @@ app.post('/api/rsvp', (req, res) => {
   }
 
   data.stakeholders = stakeholders;
+
+  // Issue #4: Synchronize Master Invitation status from RSVP submission
+  syncRsvpToMasterInvitation(
+    data,
+    newRsvpRecord,
+    attendanceOption || standardizedOption,
+    req.body.invitationId ? String(req.body.invitationId).trim() : undefined
+  );
+
   writeDb(data);
 
   const publicRsvpResponse = {
@@ -6414,6 +6670,7 @@ async function start() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
+        hmr: process.env.DISABLE_HMR === 'true' ? false : undefined,
       },
       appType: 'spa',
     });

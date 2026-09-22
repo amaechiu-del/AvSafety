@@ -86,6 +86,27 @@ export default defineConfig(() => {
           enabled: false,
         },
       }),
+      {
+        name: 'silence-vite-hmr-noise',
+        apply: 'serve' as const,
+        enforce: 'post' as const,
+        transform(code: string, id: string) {
+          if (id.includes('client.mjs') || id.includes('@vite/client')) {
+            return {
+              code: code
+                .replace(/console\.error\(`\[vite\] failed to connect to websocket[\s\S]*?`\);/g, '/* silenced */')
+                .replace(/console\.error\(\s*`\[vite\] failed to connect to websocket[\s\S]*?`\s*\);/g, '/* silenced */')
+                .replace(/console\.debug\("\[vite\] connecting\.\.\."\);/g, '/* silenced */')
+                .replace(/console\.debug\(`\[vite\] connected\.`\);/g, '/* silenced */')
+                .replace(/error:\s*\(err\)\s*=>\s*console\.error\("\[vite\]",\s*err\)/g, 'error: () => {}')
+                .replace(/debug:\s*\(\.\.\.msg\)\s*=>\s*console\.debug\("\[vite\]",\s*\.\.\.msg\)/g, 'debug: () => {}')
+                .replace(/console\.info\(\s*"\[vite\] Direct websocket connection fallback[\s\S]*?"\s*\);/g, '/* silenced */')
+                .replace(/throw e;/g, 'return;'),
+              map: null,
+            };
+          }
+        },
+      },
     ],
     resolve: {
       alias: {

@@ -12,14 +12,14 @@ import {
   BookOpen, Zap
 } from 'lucide-react';
 import { StakeholderInvitee, StakeholderCategory } from '../../types';
-import { STAKEHOLDER_CATEGORIES } from '../../data/stakeholdersData';
+import { STAKEHOLDER_CATEGORIES, INITIAL_STAKEHOLDERS } from '../../data/stakeholdersData';
 
 interface StakeholderSectionProps {
   onOpenNominateModal?: () => void;
 }
 
 export default function StakeholderSection({ onOpenNominateModal }: StakeholderSectionProps) {
-  const [stakeholders, setStakeholders] = useState<StakeholderInvitee[]>([]);
+  const [stakeholders, setStakeholders] = useState<StakeholderInvitee[]>(INITIAL_STAKEHOLDERS);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<StakeholderCategory>('BANKING_AND_FINANCE');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,28 +41,77 @@ export default function StakeholderSection({ onOpenNominateModal }: StakeholderS
   });
   const [submittingNom, setSubmittingNom] = useState(false);
 
+  // Safe JSON and Schema validator for stakeholder API response
+  // Protects against static hosts (e.g. Cloudflare) returning index.html or empty payloads
+  const validateStakeholderPayload = (
+    resOk: boolean,
+    contentType: string,
+    rawText: string
+  ): StakeholderInvitee[] | null => {
+    if (!resOk) return null;
+    if (!contentType.toLowerCase().includes('application/json')) return null;
+
+    try {
+      const data = JSON.parse(rawText);
+      if (data && Array.isArray(data.stakeholders) && data.stakeholders.length > 0) {
+        const seenIds = new Set<string>();
+        const validList: StakeholderInvitee[] = [];
+
+        for (const s of data.stakeholders) {
+          if (s && typeof s === 'object' && s.id && typeof s.id === 'string') {
+            const cleanId = s.id.trim();
+            if (!seenIds.has(cleanId)) {
+              seenIds.add(cleanId);
+              validList.push(s);
+            }
+          }
+        }
+
+        if (validList.length > 0) {
+          return validList;
+        }
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
   useEffect(() => {
-    const loadStakeholders = async (retries = 3, delay = 800) => {
+    let isMounted = true;
+
+    const loadStakeholders = async () => {
       try {
         const res = await fetch('/api/stakeholders');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.stakeholders) setStakeholders(data.stakeholders);
+        const contentType = res.headers.get('content-type') || '';
+        const rawText = await res.text();
+
+        const validatedData = validateStakeholderPayload(res.ok, contentType, rawText);
+        if (validatedData && isMounted) {
+          setStakeholders(validatedData);
           setLoading(false);
           return;
         }
-      } catch (err) {
-        if (retries > 0) {
-          setTimeout(() => loadStakeholders(retries - 1, delay * 1.5), delay);
-          return;
+
+        // Response was not valid JSON or contained invalid/empty data (e.g. static host returning HTML)
+        if (isMounted) {
+          setStakeholders(INITIAL_STAKEHOLDERS);
+          setLoading(false);
         }
-        console.warn('Stakeholders synced from bundle default directory:', err);
-      } finally {
-        setLoading(false);
+      } catch {
+        // Network failure, offline client, or unreachable API
+        if (isMounted) {
+          setStakeholders(INITIAL_STAKEHOLDERS);
+          setLoading(false);
+        }
       }
     };
 
     loadStakeholders();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Current category data

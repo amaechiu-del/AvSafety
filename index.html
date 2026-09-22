@@ -15,45 +15,55 @@
           const OriginalWebSocket = window.WebSocket;
           if (OriginalWebSocket) {
             function isViteSocket(url, protocols) {
-              const u = String(url || '');
-              const p = String(protocols || '');
-              return p.includes('vite') || u.includes('vite') || u.includes('token=') || u.includes('24678') || u.includes('5173');
+              const u = String(url || '').toLowerCase();
+              const p = String(protocols || '').toLowerCase();
+              return (
+                p.includes('vite-hmr') ||
+                p.includes('vite-ping') ||
+                u.includes('vite-hmr') ||
+                u.includes(':24678') ||
+                (u.includes('token=') && (u.includes('24678') || u.includes('5173') || u.includes('vite')))
+              );
             }
 
-            class MockViteSocket extends EventTarget {
+            class SilentViteSocket extends EventTarget {
               constructor(url, protocols) {
                 super();
                 this.url = url;
                 this.protocol = Array.isArray(protocols) ? protocols[0] || '' : (protocols || '');
-                this.readyState = 1; // WebSocket.OPEN
                 this.CONNECTING = 0;
                 this.OPEN = 1;
                 this.CLOSING = 2;
                 this.CLOSED = 3;
+                this.readyState = 1; // WebSocket.OPEN
                 this.binaryType = 'blob';
                 this.bufferedAmount = 0;
                 this.extensions = '';
+                this.onopen = null;
+                this.onmessage = null;
+                this.onerror = null;
+                this.onclose = null;
 
-                queueMicrotask(() => {
+                setTimeout(() => {
                   try {
-                    const evt = new Event('open');
-                    this.dispatchEvent(evt);
-                    if (typeof this.onopen === 'function') this.onopen(evt);
-                    // Dispatch connected event to satisfy Vite HMR client
+                    const openEvt = new Event('open');
+                    this.dispatchEvent(openEvt);
+                    if (typeof this.onopen === 'function') this.onopen(openEvt);
+
                     const msgEvt = new MessageEvent('message', {
                       data: JSON.stringify({ type: 'connected' })
                     });
                     this.dispatchEvent(msgEvt);
                     if (typeof this.onmessage === 'function') this.onmessage(msgEvt);
                   } catch (e) {}
-                });
+                }, 0);
               }
 
               send(data) {
                 try {
                   const parsed = typeof data === 'string' ? JSON.parse(data) : data;
                   if (parsed && parsed.type === 'ping') {
-                    queueMicrotask(() => {
+                    setTimeout(() => {
                       try {
                         const pongEvt = new MessageEvent('message', {
                           data: JSON.stringify({ type: 'pong' })
@@ -61,7 +71,7 @@
                         this.dispatchEvent(pongEvt);
                         if (typeof this.onmessage === 'function') this.onmessage(pongEvt);
                       } catch (e) {}
-                    });
+                    }, 0);
                   }
                 } catch (e) {}
               }
@@ -76,25 +86,26 @@
               }
             }
 
-            MockViteSocket.CONNECTING = 0;
-            MockViteSocket.OPEN = 1;
-            MockViteSocket.CLOSING = 2;
-            MockViteSocket.CLOSED = 3;
+            SilentViteSocket.prototype.CONNECTING = 0;
+            SilentViteSocket.prototype.OPEN = 1;
+            SilentViteSocket.prototype.CLOSING = 2;
+            SilentViteSocket.prototype.CLOSED = 3;
+            SilentViteSocket.CONNECTING = 0;
+            SilentViteSocket.OPEN = 1;
+            SilentViteSocket.CLOSING = 2;
+            SilentViteSocket.CLOSED = 3;
 
-            class CustomWebSocket {
-              constructor(url, protocols) {
-                if (isViteSocket(url, protocols)) {
-                  return new MockViteSocket(url, protocols);
-                }
-                return new OriginalWebSocket(url, protocols);
+            window.WebSocket = function(url, protocols) {
+              if (isViteSocket(url, protocols)) {
+                return new SilentViteSocket(url, protocols);
               }
-            }
-            CustomWebSocket.prototype = OriginalWebSocket.prototype;
-            CustomWebSocket.CONNECTING = 0;
-            CustomWebSocket.OPEN = 1;
-            CustomWebSocket.CLOSING = 2;
-            CustomWebSocket.CLOSED = 3;
-            window.WebSocket = CustomWebSocket;
+              return new OriginalWebSocket(url, protocols);
+            };
+            window.WebSocket.prototype = OriginalWebSocket.prototype;
+            window.WebSocket.CONNECTING = 0;
+            window.WebSocket.OPEN = 1;
+            window.WebSocket.CLOSING = 2;
+            window.WebSocket.CLOSED = 3;
           }
 
           function shouldSuppress(args) {
@@ -104,12 +115,18 @@
                 const item = args[i];
                 if (!item) continue;
                 const str = typeof item === 'string' ? item : (item.message || item.stack || (typeof item.toString === 'function' ? item.toString() : ''));
-                if (/\[vite\]|websocket|WebSocket|preamble|vite-hmr|vite-ping/i.test(str)) return true;
+                if (
+                  str.includes('[vite] failed to connect to websocket') ||
+                  str.includes('[vite] connecting...') ||
+                  str.includes('[vite] connected.') ||
+                  str.includes('[vite] Direct websocket connection fallback') ||
+                  str.includes('[vite] server connection lost') ||
+                  str.includes('WebSocket closed without opened.') ||
+                  (str.includes('failed to connect to websocket') && (str.includes('vite') || str.includes('24678')))
+                ) {
+                  return true;
+                }
               }
-              const full = Array.from(args).map(a => {
-                try { return typeof a === 'object' ? JSON.stringify(a) : String(a); } catch { return String(a); }
-              }).join(' ');
-              if (/\[vite\]|websocket|WebSocket|preamble|vite-hmr|vite-ping/i.test(full)) return true;
             } catch (e) {}
             return false;
           }
