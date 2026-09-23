@@ -32,7 +32,7 @@ let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI | null {
   if (aiClient) return aiClient;
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') return null;
   try {
     aiClient = new GoogleGenAI({
       apiKey,
@@ -47,6 +47,67 @@ function getAiClient(): GoogleGenAI | null {
     console.error("Failed to initialize GoogleGenAI:", e);
     return null;
   }
+}
+
+interface GeminiGenerationOptions {
+  systemInstruction?: string;
+  responseMimeType?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+}
+
+/**
+ * Resilient Gemini caller with:
+ * 1. Compliant model sequence per AI Studio guidelines: 'gemini-3.8-flash' -> 'gemini-flash-latest' -> 'gemini-3.1-flash-lite'
+ * 2. Automatic jittered retry for transient 503 (high demand) and 429 rate limit spikes
+ * 3. Graceful fallback returning null without throwing unhandled exceptions or noisy log dumps
+ */
+async function callGeminiWithFallback(
+  contents: any,
+  options?: GeminiGenerationOptions
+): Promise<string | null> {
+  const ai = getAiClient();
+  if (!ai) return null;
+
+  // Allowed models per guidelines (strictly non-deprecated)
+  const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+
+  for (const model of candidateModels) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction: options?.systemInstruction,
+            temperature: options?.temperature ?? 0.25,
+            responseMimeType: options?.responseMimeType,
+            maxOutputTokens: options?.maxOutputTokens
+          }
+        });
+        if (response && response.text) {
+          return response.text;
+        }
+      } catch (err: any) {
+        const errStr = err?.message || String(err);
+        const isTransient = errStr.includes('503') ||
+                            errStr.includes('UNAVAILABLE') ||
+                            errStr.includes('high demand') ||
+                            errStr.includes('429') ||
+                            errStr.includes('RESOURCE_EXHAUSTED');
+
+        if (isTransient && attempt === 0) {
+          // Brief jittered pause before retrying the same candidate model once
+          await new Promise(r => setTimeout(r, 350 + Math.random() * 200));
+          continue;
+        }
+        // Move to the next candidate model
+        break;
+      }
+    }
+  }
+
+  return null;
 }
 
 // Path to JSON DB file
@@ -820,8 +881,6 @@ app.post('/api/marketplace/ai-assistant', async (req, res) => {
 
     if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
       try {
-        const ai = new GoogleGenAI({ apiKey });
-        
         const systemPrompt = `You are the AI Summit Advertising & Sponsorship Advisor for the AVIATION SAFETY SUMMIT 2026 (17 November 2026, Marriott Hotel, Ikeja, Lagos, Nigeria, organised by Domislink International Services Ltd / The Digital Empire).
 Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY".
 
@@ -864,18 +923,19 @@ Visibility Interests: ${(visibilityTypes || []).join(', ') || 'Online, Venue, Br
 Customer Specific Request / Question: "${message || 'Recommend the most effective packages for our brand'}"
 Currency: ${currency}`;
 
-        const result = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: `${systemPrompt}\n\n${userPrompt}`,
-          config: {
-            responseMimeType: 'application/json'
-          }
+        const resultText = await callGeminiWithFallback(`${systemPrompt}\n\n${userPrompt}`, {
+          responseMimeType: 'application/json',
+          temperature: 0.25
         });
 
-        const parsed = JSON.parse(result.text || '{}');
-        return res.json({ success: true, aiGenerated: true, ...parsed });
-      } catch (geminiErr) {
-        console.warn('Gemini API call failed, using catalogue rule engine:', geminiErr);
+        if (resultText) {
+          const parsed = JSON.parse(resultText);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            return res.json({ success: true, aiGenerated: true, ...parsed });
+          }
+        }
+      } catch (geminiErr: any) {
+        console.info('Gemini models temporarily busy or unavailable, engaging grounded catalogue rule engine.');
       }
     }
 
@@ -1452,10 +1512,7 @@ Call to Action: "Explore Safety Solutions at Aviation Safety Summit 2026 — Mar
     const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
       try {
-        const ai = new GoogleGenAI({ apiKey });
-        const result = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: `Create 2 distinct high-impact advertising concepts for an aviation company attending Aviation Safety Summit 2026 (Marriott Hotel, Ikeja, Lagos, Nigeria).
+        const prompt = `Create 2 distinct high-impact advertising concepts for an aviation company attending Aviation Safety Summit 2026 (Marriott Hotel, Ikeja, Lagos, Nigeria).
 Company Name: ${companyName}
 Target Audience: ${targetAudience}
 Message/Goal: ${message}
@@ -1464,11 +1521,14 @@ Size/Format: ${preferredSizeFormat}
 Provide:
 1. Concept A (Direct & Authoritative) with Headline, Body copy, Visual composition notes, and CTA.
 2. Concept B (Innovative & Technology-focused) with Headline, Body copy, Visual composition notes, and CTA.
-Ensure all copy respects aviation safety standards and requires final customer approval.`
-        });
-        aiConcept = result.text || aiConcept;
+Ensure all copy respects aviation safety standards and requires final customer approval.`;
+
+        const resultText = await callGeminiWithFallback(prompt, { temperature: 0.3 });
+        if (resultText) {
+          aiConcept = resultText;
+        }
       } catch (e) {
-        console.warn('Creative AI generation failed, using standard template:', e);
+        // Fall back gracefully to standard template
       }
     }
 
@@ -1587,13 +1647,8 @@ app.get('/api/marketplace/revenue-metrics', (req, res) => {
 // GEMINI AI ASSISTANT API
 // ============================================================
 app.post('/api/gemini/chat', async (req, res) => {
-  const ai = getAiClient();
-  if (!ai) {
-    return res.status(500).json({ error: 'Gemini API not configured' });
-  }
-
   try {
-    const { message, context } = req.body;
+    const { message } = req.body;
     const currentDb = readDb();
     
     // Build context string from DB
@@ -1612,19 +1667,22 @@ OFFICIAL SESSIONS:
 ${sessionsData}
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: message,
-      config: {
-        systemInstruction,
-        temperature: 0.2,
-      }
+    const text = await callGeminiWithFallback(message, {
+      systemInstruction,
+      temperature: 0.2
     });
 
-    res.json({ text: response.text });
+    if (text) {
+      return res.json({ text });
+    }
+
+    res.json({
+      text: `Welcome to the Aviation Safety Summit 2026 (17 November 2026, Lagos Marriott Hotel, Ikeja, Lagos). Please consult the official Summit Programme Sessions and Confirmed Speakers directory for up-to-date schedules, or contact the Secretariat at domislinkint@gmail.com.`
+    });
   } catch (error: any) {
-    console.error('Gemini API Error:', error);
-    res.status(500).json({ error: error.message || 'Error communicating with AI assistant' });
+    res.json({
+      text: `Welcome to the Aviation Safety Summit 2026. For immediate inquiries, please consult the official programme or contact the Secretariat at domislinkint@gmail.com.`
+    });
   }
 });
 
@@ -1635,29 +1693,16 @@ async function generateGeminiTextWithFallback(
   systemInstruction?: string,
   temperature = 0.3
 ): Promise<string> {
-  const candidateModels = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
-  let lastError: any = null;
+  const result = await callGeminiWithFallback(contents, {
+    systemInstruction,
+    temperature
+  });
 
-  for (const model of candidateModels) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction,
-          temperature,
-        }
-      });
-      if (response.text) {
-        return response.text;
-      }
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`Model ${model} failed, attempting next candidate:`, err.message?.substring(0, 100));
-    }
+  if (result) {
+    return result;
   }
 
-  throw lastError || new Error('All Gemini models failed');
+  throw new Error('All Gemini candidate models are temporarily unavailable.');
 }
 
 // ============================================================
@@ -1845,7 +1890,7 @@ app.post('/api/gemini/tts', async (req, res) => {
   }
 });
 
-// ============================================================
+/// ============================================================
 // SPEAKERS: AI TOPIC SUGGESTER (GEMINI POWERED)
 // ============================================================
 app.post('/api/speakers/ai-suggest-topics', async (req, res) => {
@@ -1854,10 +1899,8 @@ app.post('/api/speakers/ai-suggest-topics', async (req, res) => {
     return res.status(400).json({ error: 'Name and organisation are required' });
   }
 
-  const ai = getAiClient();
-  if (ai) {
-    try {
-      const prompt = `You are a senior aviation safety consultant advising the Aviation Safety Summit 2026 (Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY").
+  try {
+    const prompt = `You are a senior aviation safety consultant advising the Aviation Safety Summit 2026 (Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY").
 Executive: ${name}
 Current Position: ${position || 'Executive Leader'}
 Organisation: ${organisation}
@@ -1870,34 +1913,29 @@ Each topic must be professional, authoritative, and strictly pertinent to aviati
 Return a JSON array of 3 strings containing only the topic titles, for example:
 ["Topic 1", "Topic 2", "Topic 3"]`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0.3,
-        }
-      });
+    const responseText = await callGeminiWithFallback(prompt, {
+      responseMimeType: "application/json",
+      temperature: 0.3
+    });
 
-      let topics: string[] = [];
+    let topics: string[] = [];
+    if (responseText) {
       try {
-        topics = JSON.parse(response.text || '[]');
+        topics = JSON.parse(responseText);
       } catch (e) {
-        topics = [
-          `Enhancing Operational Safety & Compliance Across ${organisation}`,
-          `Industry Leadership and Risk Mitigation in the ${industry} Sector`,
-          `Collaborative Safety Protocols for Sustainable Airspace Protection`
-        ];
+        // Fall back below
       }
+    }
 
+    if (Array.isArray(topics) && topics.length > 0) {
       return res.json({
         success: true,
-        topics: Array.isArray(topics) ? topics.slice(0, 3) : [],
+        topics: topics.slice(0, 3),
         disclaimer: 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL'
       });
-    } catch (err: any) {
-      console.error('Error generating AI topics:', err);
     }
+  } catch (err: any) {
+    // Continue to deterministic fallback
   }
 
   // Deterministic fallback if Gemini is offline
@@ -1905,7 +1943,7 @@ Return a JSON array of 3 strings containing only the topic titles, for example:
     success: true,
     topics: [
       `Building a Sustainable Safety Culture in ${organisation}: Leadership, Discipline and Risk Prevention`,
-      `${industry} and Aviation Safety: Cross-Sector Collaboration for Zero Mishaps`,
+      `${industry || 'Aviation'} and Aviation Safety: Cross-Sector Collaboration for Zero Mishaps`,
       `Modernising Operational Standards and Safety Accountability Across Nigerian Airspace`
     ],
     disclaimer: 'AI-GENERATED SUGGESTIONS — NOT OFFICIAL'
@@ -1940,10 +1978,8 @@ Safety Perspective: ${s.safetyPerspective || 'Safety is everyone\'s responsibili
 Verified By: ${s.verifiedBy || 'Summit Secretariat'} (${s.verificationDate || '2026'})`;
   }).join('\n\n');
 
-  const ai = getAiClient();
-  if (ai) {
-    try {
-      const systemInstruction = `You are the official "Ask About the Speakers" AI Assistant for the Aviation Safety Summit 2026.
+  try {
+    const systemInstruction = `You are the official "Ask About the Speakers" AI Assistant for the Aviation Safety Summit 2026.
 Event Date: 17 November 2026
 Venue: Marriott Hotel, Ikeja, Lagos, Nigeria
 Host: Domislink International Services Ltd
@@ -1962,23 +1998,20 @@ VERIFIED SUMMIT SPEAKER DATABASE:
 ${speakerContext}
 `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: question,
-        config: {
-          systemInstruction,
-          temperature: 0.2,
-        }
-      });
+    const answer = await callGeminiWithFallback(question, {
+      systemInstruction,
+      temperature: 0.2
+    });
 
+    if (answer) {
       return res.json({
         success: true,
-        answer: response.text,
+        answer,
         timestamp: new Date().toISOString()
       });
-    } catch (err: any) {
-      console.error('Gemini Speaker Assistant Error:', err);
     }
+  } catch (err: any) {
+    // Continue to fallback search match below
   }
 
   // Fallback search match if Gemini unavailable
@@ -2300,23 +2333,23 @@ Respond ONLY with valid JSON array in this exact schema:
   }
 ]`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          temperature: 0.3,
-          responseMimeType: "application/json"
-        }
+      const responseText = await callGeminiWithFallback(prompt, {
+        temperature: 0.3,
+        responseMimeType: "application/json"
       });
 
-      const parsed = JSON.parse(response.text || '[]');
-      return res.json({
-        success: true,
-        suggestions: parsed,
-        disclaimer: 'AI-GENERATED CANDIDATES — NOT YET VERIFIED. MUST BE AUDITED BEFORE OFFICIAL INVITATION.'
-      });
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return res.json({
+            success: true,
+            suggestions: parsed,
+            disclaimer: 'AI-GENERATED CANDIDATES — NOT YET VERIFIED. MUST BE AUDITED BEFORE OFFICIAL INVITATION.'
+          });
+        }
+      }
     } catch (err: any) {
-      console.error('Gemini Brainstorm Error:', err);
+      // Fall through to curated fallback suggestions
     }
   }
 
@@ -2453,26 +2486,24 @@ Respond in JSON format with these exact keys:
   "fullHtmlContent": "string (clean formatted HTML suitable for email)"
 }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          temperature: 0.25,
-          responseMimeType: "application/json"
-        }
+      const responseText = await callGeminiWithFallback(prompt, {
+        temperature: 0.25,
+        responseMimeType: "application/json"
       });
 
-      const parsed = JSON.parse(response.text || '{}');
-      if (parsed.subject) subject = parsed.subject;
-      if (parsed.formalSalutation) formalSalutation = parsed.formalSalutation;
-      if (parsed.formalInvitationText) formalInvitationText = parsed.formalInvitationText;
-      if (parsed.eventDetailsText) eventDetailsText = parsed.eventDetailsText;
-      if (parsed.sectorRelevanceText) sectorRelevanceText = parsed.sectorRelevanceText;
-      if (parsed.proposedRoleText) proposedRoleText = parsed.proposedRoleText;
-      if (parsed.callToActionText) callToActionText = parsed.callToActionText;
-      if (parsed.signatureBlock) signatureBlock = parsed.signatureBlock;
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
+        if (parsed.subject) subject = parsed.subject;
+        if (parsed.formalSalutation) formalSalutation = parsed.formalSalutation;
+        if (parsed.formalInvitationText) formalInvitationText = parsed.formalInvitationText;
+        if (parsed.eventDetailsText) eventDetailsText = parsed.eventDetailsText;
+        if (parsed.sectorRelevanceText) sectorRelevanceText = parsed.sectorRelevanceText;
+        if (parsed.proposedRoleText) proposedRoleText = parsed.proposedRoleText;
+        if (parsed.callToActionText) callToActionText = parsed.callToActionText;
+        if (parsed.signatureBlock) signatureBlock = parsed.signatureBlock;
+      }
     } catch (err: any) {
-      console.error('Gemini Letter Generation Error:', err);
+      // Fallback
     }
   }
 
@@ -2590,19 +2621,17 @@ Respond in valid JSON matching this schema:
   "callToAction": "string"
 }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          temperature: 0.2,
-          responseMimeType: "application/json"
-        }
+      const responseText = await callGeminiWithFallback(prompt, {
+        temperature: 0.2,
+        responseMimeType: "application/json"
       });
 
-      const parsed = JSON.parse(response.text || '{}');
-      if (parsed.headline) proposal = parsed;
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
+        if (parsed.headline) proposal = parsed;
+      }
     } catch (err: any) {
-      console.error('Gemini Sponsorship Proposal Error:', err);
+      // Fallback
     }
   }
 
