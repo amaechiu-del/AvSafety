@@ -19,7 +19,7 @@ export default defineConfig(() => {
           id: '/',
           name: 'Aviation Safety Summit 2026',
           short_name: 'AviaSafety26',
-          description: 'Aviation Safety Summit 2026 — 17 November 2026 at Marriott Hotel, Ikeja, Lagos, Nigeria.',
+          description: 'Aviation Safety Summit 2026 — Official Protocol Precedence, Assigned Addresses, Live Programme & Compendium.',
           theme_color: '#0A192F',
           background_color: '#0A192F',
           display: 'standalone',
@@ -27,6 +27,36 @@ export default defineConfig(() => {
           start_url: '/',
           scope: '/',
           categories: ['business', 'events', 'travel'],
+          shortcuts: [
+            {
+              name: 'Hierarchy & Speeches',
+              short_name: 'Hierarchy',
+              description: 'Official Protocol Order of Precedence & Assigned Addresses',
+              url: '/#protocol-hierarchy',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
+            },
+            {
+              name: 'Summit Programme',
+              short_name: 'Programme',
+              description: 'Interactive Summit Timetable & Technical Masterclasses',
+              url: '/#programme',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
+            },
+            {
+              name: 'Official Dignitaries',
+              short_name: 'Dignitaries',
+              description: 'Sovereign Leaders, Regulators & Governors',
+              url: '/#dignitaries',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
+            },
+            {
+              name: 'Register Delegate Pass',
+              short_name: 'Register',
+              description: 'Summit Badge Verification & Instant Registration',
+              url: '/#register',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
+            }
+          ],
           icons: [
             {
               src: '/pwa-192x192.png',
@@ -49,7 +79,10 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          maximumFileSizeToCacheInBytes: 5242880,
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
+          maximumFileSizeToCacheInBytes: 6291456,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,json}'],
           runtimeCaching: [
             {
@@ -80,10 +113,42 @@ export default defineConfig(() => {
                 },
               },
             },
+            {
+              // Curated official dignitary and church portraits from external web archives
+              urlPattern: /^https:\/\/(?:upload\.wikimedia\.org|.*\.gov\.ng|.*\.org|.*\.com)\/.*\.(?:png|jpg|jpeg|svg|webp)$/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'summit-remote-images-cache',
+                expiration: {
+                  maxEntries: 120,
+                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              // Local API data and JSON state updates
+              urlPattern: /\/data\/.*\.json|\/api\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'summit-api-data-cache',
+                networkTimeoutSeconds: 3,
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24, // 24 hours
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
           ],
         },
         devOptions: {
-          enabled: false,
+          enabled: true,
+          type: 'module',
         },
       }),
       {

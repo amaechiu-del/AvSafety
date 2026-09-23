@@ -48,6 +48,7 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
     { id: 'about', label: 'Summit' },
     { id: 'programme', label: 'Programme' },
     { id: 'dignitaries', label: 'Dignitaries' },
+    { id: 'protocol-hierarchy', label: 'Hierarchy & Speeches' },
     { id: 'speakers', label: 'Speakers' },
     { id: 'everybody-involved', label: 'Aviation Safety' },
     { id: 'safety-library', label: 'Safety Library' },

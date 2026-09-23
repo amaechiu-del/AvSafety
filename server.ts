@@ -69,8 +69,8 @@ async function callGeminiWithFallback(
   const ai = getAiClient();
   if (!ai) return null;
 
-  // Allowed models per guidelines (strictly non-deprecated)
-  const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  // Allowed models per guidelines (strictly non-deprecated), prioritized by availability
+  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 
   for (const model of candidateModels) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -1718,36 +1718,59 @@ app.post('/api/gemini/voice-live', async (req, res) => {
     const { message, audioBase64, mimeType, history, voice } = req.body;
     let userPrompt = (message || '').trim();
 
-    // If audio is uploaded without text, transcribe it using Gemini
+    // If audio is uploaded without text, transcribe it using Gemini multimodal
     if (!userPrompt && audioBase64) {
       try {
-        const transcribeText = await generateGeminiTextWithFallback(
-          ai,
-          {
-            parts: [
-              {
-                inlineData: {
-                  mimeType: mimeType || 'audio/wav',
-                  data: audioBase64
+        // Strip data URL prefix if provided
+        const cleanBase64 = audioBase64.replace(/^data:[^;]+;base64,/, '');
+        const normalizedMime = (mimeType || 'audio/webm').split(';')[0];
+
+        const transcribePrompt = 'You are an airspace speech-to-text transcriber for the Aviation Safety Summit. Transcribe verbatim the words spoken by the user in this audio recording. If there is no discernible speech or only ambient room noise/silence, reply with "[SILENT]". Return ONLY the transcribed words without any quotation marks or preamble.';
+        
+        const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+        let transcribedText = '';
+
+        for (const model of candidateModels) {
+          try {
+            const trRes = await ai.models.generateContent({
+              model,
+              contents: [
+                {
+                  parts: [
+                    {
+                      inlineData: {
+                        mimeType: normalizedMime,
+                        data: cleanBase64
+                      }
+                    },
+                    {
+                      text: transcribePrompt
+                    }
+                  ]
                 }
-              },
-              {
-                text: 'Transcribe the user voice query verbatim. If silent or unintelligible noise, reply with "[UNCLEAR]". Do not add commentary.'
+              ],
+              config: {
+                temperature: 0.1
               }
-            ]
-          },
-          undefined,
-          0.1
-        );
-        const transcribed = (transcribeText || '').trim();
-        if (transcribed && transcribed !== '[UNCLEAR]') {
-          userPrompt = transcribed;
+            });
+            if (trRes && trRes.text) {
+              transcribedText = trRes.text.trim();
+              break;
+            }
+          } catch (modelErr) {
+            // Try next model
+            continue;
+          }
+        }
+
+        if (transcribedText && !transcribedText.includes('[SILENT]') && transcribedText.length > 1) {
+          userPrompt = transcribedText;
         } else {
-          userPrompt = 'Hello, can you help me with information on the Aviation Safety Summit?';
+          userPrompt = 'Hello, can you give me an overview of the Aviation Safety Summit 2026?';
         }
       } catch (transcribeErr) {
-        console.warn('Audio transcription failed, using fallback:', transcribeErr);
-        userPrompt = 'Hello, I am speaking to the Aviation Safety Summit assistant.';
+        console.warn('Audio transcription error, falling back:', transcribeErr);
+        userPrompt = 'Hello, can you tell me about the Aviation Safety Summit 2026?';
       }
     }
 
@@ -1761,25 +1784,29 @@ app.post('/api/gemini/voice-live', async (req, res) => {
     const authorName = currentDb.book?.author || 'AMAECHI UBADIKE';
 
     const systemInstruction = `You are the Official Gemini Live Voice Assistant for the DOMISLINK AVIATION SAFETY SUMMIT 2026.
-You are interacting with summit attendees, commercial pilots, air traffic controllers, safety regulators, sponsors, and dignitaries through a real-time live voice microphone interface.
+You are communicating live with summit attendees, commercial airline captains, air traffic controllers, aircraft engineers, civil aviation regulators, and dignitaries.
 
-SUMMIT VITAL IDENTITY & CORE FACTS:
-- Theme: "${eventTheme}"
-- Date: Tuesday, 17 November 2026
-- Venue: Lagos Marriott Hotel, Ikeja, Lagos, Nigeria
-- Organiser: DomisLink International Services Ltd / The Digital Empire
-- Principal Author & Convener: ${authorName} (Commercial Pilot, Air Traffic Controller, Civil Aviation Safety Inspector - PEL, with over 25 years operational command across West African airspace)
-- Landmark Book Launch: "${bookTitle}: But Who Is Flying Nigeria's Aviation?" by ${authorName}
-- Statutory White Paper: "Dying Library Policy White Paper", addressing systemic accident prevention, institutional brain-drain, and regulatory oversight, submitted for legislative consideration to the 10th National Assembly Senate and House Aviation Committees
-- 24 Strategic Sectors: Commercial Pilots, Air Traffic Controllers, Licensed Aircraft Engineers, Scheduled Airlines, Ground Handling Agents, Into-Plane Fuel Suppliers, Aviation Insurers, Commercial Bankers, Emergency First Responders, Interfaith Spiritual Leaders, Traditional Rulers, and Regulatory Agencies (NCAA, NAMA, FAAN, NiMet, NSIB)
+CONVERSATION & SPOKEN AUDIO RULES:
+1. Speak in a confident, articulate, authoritative, and welcoming aviation professional tone.
+2. Keep responses brief: 1 to 3 clear spoken sentences designed specifically for audio playback over headphones or speakers.
+3. NEVER use asterisks, markdown bullets, brackets, hashtag titles, or emojis. Write plain spoken English that sounds natural when read aloud.
+4. When asked about Convener or Author, always accurately cite Captain AMAECHI UBADIKE (Commercial Pilot, Air Traffic Controller, Civil Aviation Safety Inspector - PEL with over 25 years operational command across West African airspace).
+
+ESSENTIAL SUMMIT KNOWLEDGE & PROTOCOL:
+- Official Theme: "${eventTheme}"
+- Date & Venue: Tuesday, 17 November 2026 at the Lagos Marriott Hotel, Ikeja, Lagos, Nigeria.
+- Organiser: DomisLink International Services Ltd / The Digital Empire.
+- Convener & Principal Author: ${authorName}.
+- Landmark Book Launch: "${bookTitle}: But Who Is Flying Nigeria's Aviation?" by ${authorName}.
+- Statutory White Paper: "Dying Library Policy White Paper" addressing institutional memory loss, simulator training deficits, and legislative safety mandates submitted to the 10th National Assembly.
 - Simulation Training Mandate: "Sim Saves Fuel. Sim Saves Dollars. Sim Saves Lives."
-- Interfaith Safety Prayers: Christian and Muslim religious fathers joining hands to sanctify Nigerian airspace
-
-VOICE CONVERSATION INSTRUCTIONS:
-1. Speak in a clear, confident, polite, and authoritative aviation voice.
-2. Provide answers in 1 to 3 concise, impactful spoken sentences designed for audio playback through speakers or headsets.
-3. Always accurately cite AMAECHI UBADIKE as author and convener when discussing the book or summit leadership.
-4. Avoid markdown bullet points, asterisks, or formatting that sounds awkward when read aloud. Keep it natural, conversational, and spoken.`;
+- Key Dignitaries & Protocol Order of Precedence:
+  * Special Guest of Honour: His Excellency Sen. Kashim Shettima, GCON (Vice President of Nigeria)
+  * Chairman: His Excellency Sen. Godswill Akpabio, GCON (President of the Senate)
+  * Chief Host: Olorogun Festus Keyamo, SAN, CON, FCIArb (Hon. Minister of Aviation & Aerospace Development)
+  * Regulatory Heads: Capt. Chris Najomo (DG NCAA), Capt. Alex Badeh Jr (DG NSIB), Mrs. Olubunmi Kuku (MD FAAN), Engr. Farouk Umar (MD NAMA)
+  * Spiritual Fathers & Assigned Speeches: Pastor E.A. Adeboye (RCCG), Bishop David Oyedepo (Winners Chapel), Pastor W.F. Kumuyi (Deeper Life), Cardinal John Onaiyekan (Catholic), Primate Henry Ndukuba (Anglican), Prelate Oliver Aba (Methodist), Archbishop Ignatius Kaigama, and Islamic spiritual leaders joining together to sanctify Nigerian airspace.
+  * 24 Strategic Sectors: Pilots, ATC, Engineers, Ground Handlers, Fuel Suppliers, Insurers, Bankers, Emergency Responders, Regulators, and Faith Leaders.`;
 
     // Construct conversation history
     const contents: any[] = [];
@@ -1796,32 +1823,40 @@ VOICE CONVERSATION INSTRUCTIONS:
       parts: [{ text: userPrompt }]
     });
 
-    // 1. Generate text answer with fallback resilience
+    // 1. Generate text response with fallback resilience
     let replyText = '';
     try {
-      replyText = await generateGeminiTextWithFallback(ai, contents, systemInstruction, 0.3);
+      replyText = await generateGeminiTextWithFallback(ai, contents, systemInstruction, 0.25);
     } catch (genErr) {
       console.warn('All Gemini models failed, using intelligent authoritative local response:', genErr);
       const lower = userPrompt.toLowerCase();
       if (lower.includes('author') || lower.includes('cleared for takeoff') || lower.includes('who wrote') || lower.includes('book')) {
-        replyText = `The landmark book "CLEARED FOR TAKEOFF: But Who Is Flying Nigeria's Aviation?" is authored by AMAECHI UBADIKE, veteran commercial pilot, air traffic controller, and civil aviation safety inspector.`;
+        replyText = `The landmark book "CLEARED FOR TAKEOFF: But Who Is Flying Nigeria's Aviation?" is authored by Captain AMAECHI UBADIKE, veteran commercial pilot, air traffic controller, and civil aviation safety inspector.`;
       } else if (lower.includes('theme')) {
-        replyText = `The official theme of the Aviation Safety Summit 2026 is "EVERYBODY IS INVOLVED IN AVIATION SAFETY," emphasizing collective accountability across all 24 industry sectors.`;
-      } else if (lower.includes('date') || lower.includes('when') || lower.includes('venue') || lower.includes('where')) {
+        replyText = `The official theme of the Aviation Safety Summit 2026 is "EVERYBODY IS INVOLVED IN AVIATION SAFETY," emphasizing collective accountability across all 24 strategic sectors.`;
+      } else if (lower.includes('date') || lower.includes('when') || lower.includes('venue') || lower.includes('where') || lower.includes('hotel')) {
         replyText = `The DomisLink Aviation Safety Summit 2026 takes place on Tuesday, 17 November 2026 at the Lagos Marriott Hotel in Ikeja, Lagos, Nigeria.`;
+      } else if (lower.includes('church') || lower.includes('faith') || lower.includes('adeboye') || lower.includes('oyedepo') || lower.includes('kumuyi') || lower.includes('dignitary') || lower.includes('shettima') || lower.includes('keyamo')) {
+        replyText = `The Summit brings together Vice President Kashim Shettima, Aviation Minister Festus Keyamo, regulatory directors general, and 24 eminent spiritual leaders including Pastor E.A. Adeboye, Bishop David Oyedepo, and Pastor W.F. Kumuyi to dedicate and sanctify Nigerian airspace.`;
       } else if (lower.includes('dying library') || lower.includes('white paper')) {
-        replyText = `The Dying Library Policy White Paper addresses institutional memory loss and accident prevention, presented for legislative consideration to the 10th National Assembly.`;
+        replyText = `The Dying Library Policy White Paper addresses institutional memory retention and accident prevention, submitted for legislative action to the National Assembly.`;
       } else {
-        replyText = `Welcome to the DomisLink Aviation Safety Summit 2026 convened by AMAECHI UBADIKE. Our theme is "EVERYBODY IS INVOLVED IN AVIATION SAFETY." How may I assist your inquiries today?`;
+        replyText = `Welcome to the DomisLink Aviation Safety Summit 2026 convened by Captain AMAECHI UBADIKE. Our theme is "EVERYBODY IS INVOLVED IN AVIATION SAFETY." How may I assist your inquiries today?`;
       }
     }
 
-    // 2. Generate spoken audio using Gemini TTS if requested or allowed
+    // Clean formatting for spoken audio output
+    replyText = replyText
+      .replace(/[*_#`~[\]]/g, '')
+      .replace(/\n+/g, ' ')
+      .trim();
+
+    // 2. Generate spoken audio using Gemini TTS if requested
     let ttsAudioBase64: string | null = null;
     let ttsMimeType: string | null = null;
 
     const shouldGenerateTTS = req.body.includeAudio !== false;
-    if (shouldGenerateTTS) {
+    if (shouldGenerateTTS && replyText) {
       try {
         const chosenVoice = voice || 'Zephyr'; // 'Zephyr', 'Kore', 'Puck', 'Fenrir'
         const ttsResponse = await ai.models.generateContent({
@@ -1843,7 +1878,7 @@ VOICE CONVERSATION INSTRUCTIONS:
           ttsMimeType = audioPart.mimeType || 'audio/l16; rate=24000; channels=1';
         }
       } catch (ttsErr) {
-        console.warn('Gemini TTS audio generation failed (client will use Web Speech Synthesis fallback):', ttsErr);
+        console.warn('Gemini TTS audio generation note (client Web Speech fallback available):', ttsErr);
       }
     }
 

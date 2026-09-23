@@ -9,7 +9,7 @@ import {
   Check, X, Shield, Calendar, FileText, Sparkles, Bot, ExternalLink, 
   ChevronDown, ChevronUp, Award, AlertCircle, Filter, Plus, Trash2, 
   Building, CheckCircle2, Send, Eye, EyeOff, Layers, MessageSquare, 
-  Info, RefreshCw, Star
+  Info, RefreshCw, Star, Crown, Landmark
 } from 'lucide-react';
 import { Speaker, SpeakerIndustry, SpeakerStatus, PhotoRightsStatus, SpeakerWorkflowStage } from '../types';
 import PhotoVerificationStatus from './PhotoVerificationStatus';
@@ -160,6 +160,14 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
 
   // Featured speakers slice
   const featuredSpeakers = speakers.filter(s => (s.isFeatured || s.category === 'Keynote Speaker' || s.category === 'Special Guest') && s.published !== false);
+
+  // Sovereign Plenary Leaders (Vice President, Senate President & Aviation Minister)
+  const vicePresident = speakers.find(s => s.id === 'sp-gov-shettima') || speakers[0];
+  const senatePresident = speakers.find(s => s.id === 'sp-gov-akpabio') || speakers.find(s => s.name.includes('AKPABIO'));
+  const aviationMinister = speakers.find(s => s.id === 'sp-gov-keyamo') || speakers[2] || speakers[1];
+  const regulatoryAndIndustryAnchors = featuredSpeakers.filter(
+    s => s.id !== 'sp-gov-shettima' && s.id !== 'sp-gov-akpabio' && !s.name.includes('AKPABIO') && s.id !== 'sp-gov-keyamo'
+  );
 
   // Admin: Save Speaker Edit
   const handleSaveSpeaker = (speakerToSave: Speaker) => {
@@ -318,23 +326,292 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
         </div>
 
         {/* ============================================================ */}
+        {/* SOVEREIGN EXECUTIVE, LEGISLATIVE & MINISTERIAL SPOTLIGHT */}
+        {/* ============================================================ */}
+        <div className="mb-14 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0A192F] text-white p-5 rounded-2xl border-2 border-[#D4AF37] shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-[#D4AF37]/15 to-transparent pointer-events-none" />
+            <div className="space-y-1 relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#FFD700] text-[10px] font-mono font-bold uppercase tracking-widest">
+                <Crown className="w-3.5 h-3.5 text-[#FFD700]" />
+                SOVEREIGN PATRONAGE, LEGISLATIVE OVERSIGHT & OFFICIAL HOST
+              </div>
+              <h3 className="text-xl sm:text-2xl font-serif font-black text-white">
+                Sovereign Presidential, Legislative & Ministerial Plenary Speakers
+              </h3>
+              <p className="text-xs text-[#8A99AD] max-w-2xl font-light">
+                Presiding over the official Summit Opening Ceremony, statutory safety enactments, and executive policies for the Federal Republic of Nigeria.
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-2 relative z-10">
+              <span className="px-3 py-1.5 rounded-xl bg-white/10 text-[#FFD700] text-[11px] font-mono font-bold border border-[#D4AF37]/40 flex items-center gap-1.5 shadow-sm">
+                <Clock className="w-3.5 h-3.5 text-[#D4AF37]" />
+                Opening Plenary • 08:15 AM - 09:30 AM
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 1. Vice President */}
+            {vicePresident && (
+              <div 
+                onClick={() => setSelectedSpeaker(vicePresident)}
+                className="bg-gradient-to-br from-[#0A192F] via-[#0D1E38] to-[#050B1A] border-2 border-[#D4AF37] rounded-3xl p-5 sm:p-6 shadow-[0_0_30px_rgba(212,175,55,0.12)] hover:border-[#FFD700] hover:shadow-[0_0_35px_rgba(255,215,0,0.22)] transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden text-white"
+              >
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-[#D4AF37] to-[#B89025] text-[#050B1A] text-[9px] font-mono font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-md flex items-center gap-1">
+                  <Crown className="w-3 h-3 text-[#050B1A]" />
+                  TIER 1 • PRESIDENCY SPECIAL GUEST
+                </div>
+
+                <div className="space-y-4 pt-3">
+                  <div className="flex gap-4 items-start">
+                    <div className="w-20 h-24 sm:w-24 sm:h-28 shrink-0 rounded-2xl overflow-hidden relative shadow-2xl border-2 border-[#FFD700]">
+                      <PhotoVerificationStatus
+                        photoUrl={vicePresident.photoUrl}
+                        name={vicePresident.name}
+                        organisation={vicePresident.organisation}
+                        photoRights={vicePresident.photoRights}
+                        size="lg"
+                        className="w-full h-full rounded-2xl"
+                      />
+                    </div>
+                    <div className="flex-grow min-w-0 space-y-1">
+                      <span className="text-[9px] font-mono font-bold tracking-widest text-[#FFD700] uppercase block">
+                        FEDERAL REPUBLIC OF NIGERIA
+                      </span>
+                      <h4 className="text-base sm:text-lg font-serif font-black text-white group-hover:text-[#FFD700] transition-colors leading-tight line-clamp-2">
+                        {vicePresident.name}
+                      </h4>
+                      <p className="text-xs font-semibold text-[#D4AF37]">
+                        {vicePresident.position}
+                      </p>
+                      <p className="text-[11px] text-gray-300 font-light line-clamp-1">
+                        {vicePresident.organisation}
+                      </p>
+                      <div className="pt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-mono font-bold border border-emerald-500/30">
+                          {vicePresident.status}
+                        </span>
+                        <span className="text-[9px] font-mono text-gray-400">
+                          {vicePresident.time || '08:15 AM - 08:35 AM'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1.5">
+                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#FFD700] flex items-center gap-1">
+                      <Bookmark className="w-3 h-3 text-[#D4AF37]" /> PRESIDENTIAL KEYNOTE ADDRESS
+                    </span>
+                    <p className="text-xs font-serif font-bold text-white leading-snug">
+                      "{vicePresident.topic}"
+                    </p>
+                    <p className="text-[11px] text-gray-300 font-light leading-relaxed line-clamp-3">
+                      {vicePresident.bio}
+                    </p>
+                  </div>
+
+                  {vicePresident.safetyPerspective && (
+                    <div className="p-2.5 bg-amber-500/10 border-l-2 border-[#D4AF37] rounded-r-xl">
+                      <p className="text-[11px] font-serif italic text-[#FFF3B0] leading-relaxed line-clamp-2">
+                        "{vicePresident.safetyPerspective}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                  <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-[#D4AF37]" />
+                    <span>State House Verified</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-[#FFD700] group-hover:underline flex items-center gap-1">
+                    Profile <ExternalLink className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Senate President */}
+            {senatePresident && (
+              <div 
+                onClick={() => setSelectedSpeaker(senatePresident)}
+                className="bg-gradient-to-br from-[#0A192F] via-[#0D1E38] to-[#050B1A] border-2 border-[#D4AF37] rounded-3xl p-5 sm:p-6 shadow-[0_0_30px_rgba(212,175,55,0.12)] hover:border-[#FFD700] hover:shadow-[0_0_35px_rgba(255,215,0,0.22)] transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden text-white"
+              >
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-[#D4AF37] to-[#B89025] text-[#050B1A] text-[9px] font-mono font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-md flex items-center gap-1">
+                  <Landmark className="w-3 h-3 text-[#050B1A]" />
+                  TIER 1 • SENATE PRESIDENT & SPECIAL GUEST
+                </div>
+
+                <div className="space-y-4 pt-3">
+                  <div className="flex gap-4 items-start">
+                    <div className="w-20 h-24 sm:w-24 sm:h-28 shrink-0 rounded-2xl overflow-hidden relative shadow-2xl border-2 border-[#FFD700]">
+                      <PhotoVerificationStatus
+                        photoUrl={senatePresident.photoUrl}
+                        name={senatePresident.name}
+                        organisation={senatePresident.organisation}
+                        photoRights={senatePresident.photoRights}
+                        size="lg"
+                        className="w-full h-full rounded-2xl"
+                      />
+                    </div>
+                    <div className="flex-grow min-w-0 space-y-1">
+                      <span className="text-[9px] font-mono font-bold tracking-widest text-[#FFD700] uppercase block">
+                        FEDERAL REPUBLIC OF NIGERIA
+                      </span>
+                      <h4 className="text-base sm:text-lg font-serif font-black text-white group-hover:text-[#FFD700] transition-colors leading-tight line-clamp-2">
+                        {senatePresident.name}
+                      </h4>
+                      <p className="text-xs font-semibold text-[#D4AF37]">
+                        {senatePresident.position}
+                      </p>
+                      <p className="text-[11px] text-gray-300 font-light line-clamp-1">
+                        {senatePresident.organisation}
+                      </p>
+                      <div className="pt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-mono font-bold border border-emerald-500/30">
+                          {senatePresident.status}
+                        </span>
+                        <span className="text-[9px] font-mono text-gray-400">
+                          {senatePresident.time || '08:35 AM - 08:55 AM'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1.5">
+                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#FFD700] flex items-center gap-1">
+                      <Bookmark className="w-3 h-3 text-[#D4AF37]" /> SOVEREIGN LEGISLATIVE KEYNOTE
+                    </span>
+                    <p className="text-xs font-serif font-bold text-white leading-snug">
+                      "{senatePresident.topic}"
+                    </p>
+                    <p className="text-[11px] text-gray-300 font-light leading-relaxed line-clamp-3">
+                      {senatePresident.bio}
+                    </p>
+                  </div>
+
+                  {senatePresident.safetyPerspective && (
+                    <div className="p-2.5 bg-amber-500/10 border-l-2 border-[#D4AF37] rounded-r-xl">
+                      <p className="text-[11px] font-serif italic text-[#FFF3B0] leading-relaxed line-clamp-2">
+                        "{senatePresident.safetyPerspective}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                  <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-[#D4AF37]" />
+                    <span>National Assembly Directorate</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-[#FFD700] group-hover:underline flex items-center gap-1">
+                    Profile <ExternalLink className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Minister of Aviation */}
+            {aviationMinister && (
+              <div 
+                onClick={() => setSelectedSpeaker(aviationMinister)}
+                className="bg-gradient-to-br from-[#0A192F] via-[#0D1E38] to-[#050B1A] border-2 border-[#D4AF37] rounded-3xl p-5 sm:p-6 shadow-[0_0_30px_rgba(212,175,55,0.12)] hover:border-[#FFD700] hover:shadow-[0_0_35px_rgba(255,215,0,0.22)] transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden text-white"
+              >
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-[#D4AF37] to-[#B89025] text-[#050B1A] text-[9px] font-mono font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl shadow-md flex items-center gap-1">
+                  <Landmark className="w-3 h-3 text-[#050B1A]" />
+                  TIER 2 • OFFICIAL HOST & MINISTERIAL KEYNOTE
+                </div>
+
+                <div className="space-y-4 pt-3">
+                  <div className="flex gap-4 items-start">
+                    <div className="w-20 h-24 sm:w-24 sm:h-28 shrink-0 rounded-2xl overflow-hidden relative shadow-2xl border-2 border-[#FFD700]">
+                      <PhotoVerificationStatus
+                        photoUrl={aviationMinister.photoUrl}
+                        name={aviationMinister.name}
+                        organisation={aviationMinister.organisation}
+                        photoRights={aviationMinister.photoRights}
+                        size="lg"
+                        className="w-full h-full rounded-2xl"
+                      />
+                    </div>
+                    <div className="flex-grow min-w-0 space-y-1">
+                      <span className="text-[9px] font-mono font-bold tracking-widest text-[#FFD700] uppercase block">
+                        FEDERAL MINISTRY OF AVIATION & AEROSPACE DEV.
+                      </span>
+                      <h4 className="text-base sm:text-lg font-serif font-black text-white group-hover:text-[#FFD700] transition-colors leading-tight line-clamp-2">
+                        {aviationMinister.name}
+                      </h4>
+                      <p className="text-xs font-semibold text-[#D4AF37]">
+                        {aviationMinister.position}
+                      </p>
+                      <p className="text-[11px] text-gray-300 font-light line-clamp-1">
+                        {aviationMinister.organisation}
+                      </p>
+                      <div className="pt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-mono font-bold border border-emerald-500/30">
+                          {aviationMinister.status}
+                        </span>
+                        <span className="text-[9px] font-mono text-gray-400">
+                          {aviationMinister.time || '08:55 AM - 09:25 AM'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1.5">
+                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#FFD700] flex items-center gap-1">
+                      <Bookmark className="w-3 h-3 text-[#D4AF37]" /> MINISTERIAL KEYNOTE ADDRESS
+                    </span>
+                    <p className="text-xs font-serif font-bold text-white leading-snug">
+                      "{aviationMinister.topic}"
+                    </p>
+                    <p className="text-[11px] text-gray-300 font-light leading-relaxed line-clamp-3">
+                      {aviationMinister.bio}
+                    </p>
+                  </div>
+
+                  {aviationMinister.safetyPerspective && (
+                    <div className="p-2.5 bg-amber-500/10 border-l-2 border-[#D4AF37] rounded-r-xl">
+                      <p className="text-[11px] font-serif italic text-[#FFF3B0] leading-relaxed line-clamp-2">
+                        "{aviationMinister.safetyPerspective}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                  <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-[#D4AF37]" />
+                    <span>Aviation Ministry Portal</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-[#FFD700] group-hover:underline flex items-center gap-1">
+                    Profile <ExternalLink className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
         {/* FEATURED SAFETY LEADERS SHOWCASE (HIGHLIGHTS) */}
         {/* ============================================================ */}
         <div className="mb-14 bg-white border border-[#D4AF37]/25 rounded-2xl p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 border-b border-gray-100 pb-4">
             <div>
               <span className="text-[10px] font-mono font-bold tracking-widest text-[#D4AF37] uppercase flex items-center gap-1">
-                <Star className="w-3.5 h-3.5 text-[#D4AF37] fill-[#D4AF37]" /> KEYNOTE & ANCHOR LEADERS
+                <Star className="w-3.5 h-3.5 text-[#D4AF37] fill-[#D4AF37]" /> REGULATORY & INDUSTRY ANCHORS
               </span>
-              <h3 className="text-xl font-serif font-black text-[#0A192F]">Featured Aviation & Industry Heads</h3>
+              <h3 className="text-xl font-serif font-black text-[#0A192F]">Aviation Directors General & Operational Chiefs</h3>
             </div>
             <p className="text-xs font-sans text-gray-500">
-              Verified office holders steering national safety policies and major operations
+              Statutory aviation regulators and operational leaders enforcing airspace safety
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {featuredSpeakers.slice(0, 4).map((leader) => {
+            {regulatoryAndIndustryAnchors.slice(0, 4).map((leader) => {
               const statusBadge = getStatusBadge(leader.status);
               return (
                 <div 
@@ -496,6 +773,32 @@ export default function Speakers({ speakers, onUpdateSpeakers, isAdmin }: Speake
         {/* ============================================================ */}
         {/* SPEAKERS CARDS DECK (GRID) */}
         {/* ============================================================ */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-emerald-950/20 via-[#0A192F]/5 to-emerald-950/20 border border-emerald-500/30 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3 text-left">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-serif font-black text-[#0A192F]">
+                  100% Summit Speeches Assigned & Verified
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-mono font-bold">
+                  All 31 Speakers Official
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-600 font-light">
+                Every distinguished dignitary, regulatory chief, industry CEO, and academic has been assigned an official keynote or panel topic and scheduled time slot.
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-2">
+            <span className="px-3 py-1.5 rounded-xl bg-[#0A192F] text-[#FFD700] text-[10px] font-mono font-bold flex items-center gap-1.5 shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+              Official Approved Topics
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSpeakers.map((speaker) => {
             const statusBadge = getStatusBadge(speaker.status);

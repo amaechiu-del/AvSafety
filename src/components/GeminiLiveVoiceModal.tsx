@@ -20,9 +20,14 @@ import {
   AlertCircle,
   HelpCircle,
   Square,
-  Compass,
   CheckCircle2,
-  Volume1
+  Volume1,
+  Copy,
+  Check,
+  Headphones,
+  Sliders,
+  Zap,
+  Info
 } from 'lucide-react';
 
 interface GeminiLiveVoiceModalProps {
@@ -31,947 +36,879 @@ interface GeminiLiveVoiceModalProps {
 }
 
 interface TranscriptItem {
+  id: string;
   sender: 'user' | 'gemini';
   text: string;
   time: string;
+  audioBase64?: string;
+  mimeType?: string;
 }
+
+const AVAILABLE_VOICES = [
+  { id: 'Zephyr', name: 'Zephyr (Warm & Authoritative)', description: 'Balanced commanding aviation tone' },
+  { id: 'Kore', name: 'Kore (Calm & Professional)', description: 'Crisp, articulate broadcast tone' },
+  { id: 'Puck', name: 'Puck (Engaging & Clear)', description: 'Dynamic, modern technical delivery' },
+  { id: 'Fenrir', name: 'Fenrir (Deep & Resonant)', description: 'Commanding executive voice' }
+];
+
+const QUICK_PROMPTS = [
+  'Who is the Convener & Author?',
+  'What is the Summit Theme?',
+  'Tell me about the Church Leaders & Dignitaries',
+  'What is the Dying Library White Paper?',
+  'How do I register for a Delegate Pass?'
+];
 
 export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoiceModalProps) {
   // Session States
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
 
-  // Audio & Hardware states
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [micPermissionError, setMicPermissionError] = useState<string | null>(null);
+  // Voice & Customisation
   const [activeVoice, setActiveVoice] = useState<'Zephyr' | 'Kore' | 'Puck' | 'Fenrir'>('Zephyr');
+  const [showSettings, setShowSettings] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Transcripts & Input
+  // Text query input
+  const [inputText, setInputText] = useState('');
+  const [interimSpeech, setInterimSpeech] = useState('');
+
+  // Conversation transcripts
   const [transcript, setTranscript] = useState<TranscriptItem[]>([
     {
+      id: 'welcome-msg',
       sender: 'gemini',
-      text: 'Welcome to Gemini Live Voice for the DomisLink Aviation Safety Summit 2026. Click "Start Live Microphone" or ask anything about Convener AMAECHI UBADIKE, the summit theme, book launch, or safety white paper.',
+      text: 'Welcome to Gemini Live Voice for the DomisLink Aviation Safety Summit 2026. Click "Start Live Voice" to talk in real-time, or choose a topic below to explore our safety protocols, author biography, and dignitary compendium.',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
-  const [interimSpeech, setInterimSpeech] = useState<string>('');
-  const [textInput, setTextInput] = useState('');
 
-  // Media & Web Audio Refs
-  const mediaStreamRef = useRef<MediaStream | null>(null);
+  // Audio Context & Media Refs
   const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const chatBottomRef = useRef<HTMLDivElement>(null);
-  const isSessionActiveRef = useRef(false);
-  const isAssistantSpeakingRef = useRef(false);
-  const isMicMutedRef = useRef(false);
+  const speechRecognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep refs in sync with state for callbacks
-  useEffect(() => {
-    isSessionActiveRef.current = isSessionActive;
-  }, [isSessionActive]);
-
-  useEffect(() => {
-    isAssistantSpeakingRef.current = isAssistantSpeaking;
-  }, [isAssistantSpeaking]);
+  // Auto-scroll conversation
+  const scrollToBottom = useCallback(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   useEffect(() => {
-    isMicMutedRef.current = isMicMuted;
-  }, [isMicMuted]);
-
-  // Scroll to bottom when transcript changes or interim speech arrives
-  useEffect(() => {
-    if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (isOpen) {
+      scrollToBottom();
     }
-  }, [transcript, interimSpeech]);
+  }, [transcript, interimSpeech, isOpen, scrollToBottom]);
 
-  // Cleanup when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      stopAllMedia();
-    }
-  }, [isOpen]);
-
-  // Initialize AudioContext lazily
-  const getOrCreateAudioContext = useCallback(() => {
+  // Initialize or get AudioContext
+  const getAudioContext = useCallback(() => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtxClass) {
-        audioContextRef.current = new AudioCtxClass();
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        audioContextRef.current = new AudioCtx();
       }
     }
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
+      audioContextRef.current.resume().catch(() => {});
     }
     return audioContextRef.current;
   }, []);
 
-  // Stop all active media, streams, and speech recognition
-  const stopAllMedia = useCallback(() => {
-    // 1. Stop animation loop
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-
-    // 2. Stop speech recognition
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch (e) {
-        // ignore
-      }
-      recognitionRef.current = null;
-    }
-
-    // 3. Stop active audio playing
+  // Stop currently playing assistant audio
+  const stopAssistantAudio = useCallback(() => {
     if (currentAudioSourceRef.current) {
       try {
         currentAudioSourceRef.current.stop();
-      } catch (e) {
-        // ignore
-      }
+        currentAudioSourceRef.current.disconnect();
+      } catch (_) {}
       currentAudioSourceRef.current = null;
     }
-
-    // 4. Cancel browser TTS
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
-
-    // 5. Stop microphone media tracks
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => {
-        try {
-          track.stop();
-        } catch (e) {
-          // ignore
-        }
-      });
-      mediaStreamRef.current = null;
-    }
-
-    setIsSessionActive(false);
-    setIsListening(false);
-    setIsProcessing(false);
     setIsAssistantSpeaking(false);
-    setIsConnecting(false);
-    setAudioLevel(0);
-    setInterimSpeech('');
   }, []);
 
-  // Play PCM Base64 audio stream returned by Gemini TTS
-  const playPCMBase64 = useCallback((base64Data: string, sampleRate = 24000): Promise<void> => {
-    return new Promise((resolve, reject) => {
+  // Play audio buffer (raw PCM or WAV) or fallback to SpeechSynthesis
+  const playAssistantSpeech = useCallback(async (text: string, audioBase64?: string, mimeType?: string) => {
+    if (isSpeakerMuted) return;
+    stopAssistantAudio();
+
+    // 1. If Gemini returned raw audio, decode and play through Web Audio API
+    if (audioBase64) {
       try {
-        const audioCtx = getOrCreateAudioContext();
-        if (!audioCtx) {
-          return reject(new Error('AudioContext unavailable'));
+        const audioCtx = getAudioContext();
+        if (audioCtx) {
+          const binaryStr = atob(audioBase64);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+
+          let audioBuffer: AudioBuffer | null = null;
+
+          // Check if PCM L16 24kHz
+          if (mimeType?.includes('audio/l16') || mimeType?.includes('rate=24000') || !mimeType?.includes('wav')) {
+            const int16Data = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
+            const sampleRate = 24000;
+            audioBuffer = audioCtx.createBuffer(1, int16Data.length, sampleRate);
+            const channel = audioBuffer.getChannelData(0);
+            for (let i = 0; i < int16Data.length; i++) {
+              channel[i] = int16Data[i] / 32768.0;
+            }
+          } else {
+            // Standard WAV/MP3 container
+            audioBuffer = await audioCtx.decodeAudioData(bytes.buffer.slice(0));
+          }
+
+          if (audioBuffer) {
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+
+            // Connect to visualizer analyser
+            if (analyserRef.current) {
+              source.connect(analyserRef.current);
+            }
+            source.connect(audioCtx.destination);
+
+            currentAudioSourceRef.current = source;
+            setIsAssistantSpeaking(true);
+
+            source.onended = () => {
+              setIsAssistantSpeaking(false);
+              currentAudioSourceRef.current = null;
+            };
+
+            source.start(0);
+            return;
+          }
         }
-
-        const binaryString = window.atob(base64Data);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        const int16Array = new Int16Array(bytes.buffer);
-        const float32Array = new Float32Array(int16Array.length);
-        for (let i = 0; i < int16Array.length; i++) {
-          float32Array[i] = int16Array[i] / 32768.0;
-        }
-
-        const audioBuffer = audioCtx.createBuffer(1, float32Array.length, sampleRate);
-        audioBuffer.getChannelData(0).set(float32Array);
-
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioCtx.destination);
-
-        currentAudioSourceRef.current = source;
-
-        source.onended = () => {
-          currentAudioSourceRef.current = null;
-          resolve();
-        };
-
-        source.start(0);
       } catch (err) {
-        console.warn('PCM playback failed:', err);
-        reject(err);
-      }
-    });
-  }, [getOrCreateAudioContext]);
-
-  // Speak assistant response aloud (Gemini PCM audio with SpeechSynthesis fallback)
-  const speakAssistantResponse = useCallback(async (text: string, audioBase64?: string | null) => {
-    if (isSpeakerMuted) {
-      return;
-    }
-
-    setIsAssistantSpeaking(true);
-    isAssistantSpeakingRef.current = true;
-
-    // Pause speech recognition while speaking to prevent feedback loops
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // ignore
+        console.warn('[Gemini Voice] Web Audio decode failed, falling back to speech synthesis:', err);
       }
     }
 
-    try {
-      if (audioBase64) {
-        // Try Gemini 24kHz PCM audio playback first
-        await playPCMBase64(audioBase64, 24000);
-      } else if ('speechSynthesis' in window) {
-        // Fallback to Web Speech Synthesis API
-        await new Promise<void>((resolve) => {
-          window.speechSynthesis.cancel();
-          const cleanText = text.replace(/[*_#`~]/g, '');
-          const utterance = new SpeechSynthesisUtterance(cleanText);
-          utterance.rate = 1.05;
-          utterance.pitch = 1.0;
-          utterance.onend = () => resolve();
-          utterance.onerror = () => resolve();
-          window.speechSynthesis.speak(utterance);
-        });
-      }
-    } catch (e) {
-      console.warn('Speech playback error, falling back to speech synthesis:', e);
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const cleanText = text.replace(/[*_#`~]/g, '');
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        window.speechSynthesis.speak(utterance);
-      }
-    } finally {
-      setIsAssistantSpeaking(false);
-      isAssistantSpeakingRef.current = false;
+    // 2. High-quality browser speech synthesis fallback
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
 
-      // Resume speech recognition if session is still alive and not muted
-      if (isSessionActiveRef.current && !isMicMutedRef.current && recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-          setIsListening(true);
-        } catch (e) {
-          // ignore already started
-        }
+      // Try selecting standard professional English voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel')) && v.lang.startsWith('en'))
+        || voices.find(v => v.lang.startsWith('en'));
+      if (preferred) {
+        utterance.voice = preferred;
       }
+
+      utterance.onstart = () => setIsAssistantSpeaking(true);
+      utterance.onend = () => setIsAssistantSpeaking(false);
+      utterance.onerror = () => setIsAssistantSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
     }
-  }, [isSpeakerMuted, playPCMBase64]);
+  }, [getAudioContext, isSpeakerMuted, stopAssistantAudio]);
 
-  // Send a query (spoken or typed) to the Gemini backend
-  const sendVoiceQuery = useCallback(async (promptText: string) => {
-    const trimmed = promptText.trim();
-    if (!trimmed) return;
+  // Submit query to backend Gemini endpoint
+  const sendQueryToGemini = useCallback(async (queryText: string, audioBase64?: string, mimeType?: string) => {
+    if ((!queryText.trim() && !audioBase64) || isProcessing) return;
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+    setInterimSpeech('');
+
+    const userMessageId = `user-${Date.now()}`;
+    const userText = queryText.trim() || '🎤 Voice Query';
 
     // Add user message to transcript
-    const userTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setTranscript(prev => [...prev, { sender: 'user', text: trimmed, time: userTime }]);
-    setInterimSpeech('');
-    setIsProcessing(true);
+    setTranscript(prev => [
+      ...prev,
+      {
+        id: userMessageId,
+        sender: 'user',
+        text: userText,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+
+    // Build message history for conversational context
+    const historyPayload = transcript.slice(-6).map(t => ({
+      role: t.sender === 'user' ? 'user' : 'model',
+      text: t.text
+    }));
 
     try {
       const response = await fetch('/api/gemini/voice-live', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: trimmed,
-          voice: activeVoice,
-          includeAudio: !isSpeakerMuted,
-          history: transcript.slice(-6)
+          message: queryText.trim(),
+          audioBase64: audioBase64 || null,
+          mimeType: mimeType || 'audio/webm',
+          history: historyPayload,
+          voice: activeVoice
         })
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to query live voice assistant');
+        throw new Error(`Server returned status ${response.status}`);
       }
 
-      const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setTranscript(prev => [...prev, {
-        sender: 'gemini',
-        text: data.text,
-        time: replyTime
-      }]);
+      const data = await response.json();
+      const replyText = data.replyText || 'Thank you for your inquiry regarding the Aviation Safety Summit 2026.';
+      const audioData = data.audioBase64;
+      const audioMime = data.mimeType;
 
-      setIsProcessing(false);
+      const assistantMessageId = `gemini-${Date.now()}`;
+      setTranscript(prev => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          sender: 'gemini',
+          text: replyText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          audioBase64: audioData,
+          mimeType: audioMime
+        }
+      ]);
 
-      // Speak assistant reply
-      await speakAssistantResponse(data.text, data.audioBase64);
-
+      // Play audio response
+      playAssistantSpeech(replyText, audioData, audioMime);
     } catch (err: any) {
-      console.error('Error querying voice assistant:', err);
+      console.error('[Gemini Voice] Query failed:', err);
+      setErrorMessage(err.message || 'Unable to connect to voice engine. Please check network connection.');
+      const fallbackText = 'I am currently processing offline. The Aviation Safety Summit 2026 takes place on Tuesday, 17 November 2026 at Lagos Marriott Hotel, convened by Captain AMAECHI UBADIKE.';
+      setTranscript(prev => [
+        ...prev,
+        {
+          id: `fallback-${Date.now()}`,
+          sender: 'gemini',
+          text: fallbackText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      playAssistantSpeech(fallbackText);
+    } finally {
       setIsProcessing(false);
-      setTranscript(prev => [...prev, {
-        sender: 'gemini',
-        text: 'I apologize, but I encountered an error connecting to the airspace voice server. Please try asking again.',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
     }
-  }, [activeVoice, isSpeakerMuted, speakAssistantResponse, transcript]);
+  }, [activeVoice, isProcessing, playAssistantSpeech, transcript]);
 
-  // Initialize Speech Recognition (Web Speech API)
-  const initSpeechRecognition = useCallback(() => {
-    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionClass) {
-      console.warn('SpeechRecognition API not available in this browser');
-      return null;
-    }
-
+  // Start microphone streaming & audio metering
+  const startMicSession = useCallback(async () => {
     try {
-      const recognition = new SpeechRecognitionClass();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-
-      recognition.onresult = (event: any) => {
-        let currentInterim = '';
-        let finalPhrase = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcriptChunk = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalPhrase += transcriptChunk;
-          } else {
-            currentInterim += transcriptChunk;
-          }
-        }
-
-        if (currentInterim) {
-          setInterimSpeech(currentInterim);
-        }
-
-        if (finalPhrase.trim()) {
-          setInterimSpeech('');
-          sendVoiceQuery(finalPhrase.trim());
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition event error:', event.error);
-        if (event.error === 'not-allowed') {
-          setMicPermissionError('Microphone access was denied in browser permissions. Please allow microphone access.');
-          stopAllMedia();
-        }
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        // Automatically restart if session is active and not muted
-        if (isSessionActiveRef.current && !isAssistantSpeakingRef.current && !isMicMutedRef.current) {
-          try {
-            recognition.start();
-            setIsListening(true);
-          } catch (e) {
-            // Already started or busy
-          }
-        }
-      };
-
-      return recognition;
-    } catch (e) {
-      console.error('Failed to create SpeechRecognition:', e);
-      return null;
-    }
-  }, [sendVoiceQuery, stopAllMedia]);
-
-  // Start Live Session (requests mic, sets up real audio visualizer, starts recognition)
-  const startLiveSession = async () => {
-    setIsConnecting(true);
-    setMicPermissionError(null);
-
-    try {
-      // 1. Hardware Microphone Check & Stream Acquisition
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Your browser does not support audio capture.');
-      }
+      setErrorMessage(null);
+      const audioCtx = getAudioContext();
+      if (!audioCtx) throw new Error('Web Audio is not supported in this browser.');
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
-        },
-        video: false
+        }
       });
+
       mediaStreamRef.current = stream;
 
-      // 2. Set up Web Audio API Analyser for real physical volume monitoring
-      const audioCtx = getOrCreateAudioContext();
-      if (audioCtx) {
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
-        source.connect(analyser);
-        analyserRef.current = analyser;
+      // Setup Web Audio Analyser for live frequency metering
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+      analyserRef.current = analyser;
 
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        const updateAudioMeter = () => {
-          if (!isSessionActiveRef.current && !mediaStreamRef.current) return;
-          analyser.getByteFrequencyData(dataArray);
-
+      const pcmData = new Uint8Array(analyser.frequencyBinCount);
+      const updateMeter = () => {
+        if (analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(pcmData);
           let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
+          for (let i = 0; i < pcmData.length; i++) {
+            sum += pcmData[i];
           }
-          const avg = sum / dataArray.length;
-          // Scale to 0-100
-          const scaled = Math.min(100, Math.round((avg / 128) * 100));
-          setAudioLevel(scaled);
+          const avg = sum / pcmData.length;
+          setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
+        }
+        animFrameRef.current = requestAnimationFrame(updateMeter);
+      };
+      updateMeter();
 
-          animationFrameRef.current = requestAnimationFrame(updateAudioMeter);
-        };
+      // Initialize SpeechRecognition if available for instantaneous transcription
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognizer = new SpeechRecognition();
+          recognizer.continuous = true;
+          recognizer.interimResults = true;
+          recognizer.lang = 'en-US';
 
-        animationFrameRef.current = requestAnimationFrame(updateAudioMeter);
+          recognizer.onresult = (event: any) => {
+            let interim = '';
+            let final = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              if (event.results[i].isFinal) {
+                final += event.results[i][0].transcript;
+              } else {
+                interim += event.results[i][0].transcript;
+              }
+            }
+            if (interim) {
+              setInterimSpeech(interim);
+            }
+            if (final.trim()) {
+              setInterimSpeech('');
+              sendQueryToGemini(final);
+            }
+          };
+
+          recognizer.onerror = (e: any) => {
+            if (e.error !== 'no-speech') {
+              console.warn('[SpeechRecognition] Note:', e.error);
+            }
+          };
+
+          recognizer.start();
+          speechRecognitionRef.current = recognizer;
+        } catch (recErr) {
+          console.warn('[SpeechRecognition] Init warning:', recErr);
+        }
       }
 
-      // 3. Set up Speech Recognition
-      const recognition = initSpeechRecognition();
-      if (recognition) {
-        recognitionRef.current = recognition;
-        try {
-          recognition.start();
-        } catch (e) {
-          console.warn('Initial recognition.start failed:', e);
-        }
+      // Initialize MediaRecorder for audio recording fallback
+      try {
+        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : 'audio/webm';
+
+        const recorder = new MediaRecorder(stream, { mimeType: mime });
+        audioChunksRef.current = [];
+
+        recorder.ondataavailable = (evt) => {
+          if (evt.data.size > 0) {
+            audioChunksRef.current.push(evt.data);
+          }
+        };
+
+        recorder.onstop = async () => {
+          if (audioChunksRef.current.length > 0) {
+            const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64Data = (reader.result as string).split(',')[1];
+              if (base64Data && !speechRecognitionRef.current) {
+                sendQueryToGemini('', base64Data, mime);
+              }
+            };
+            reader.readAsDataURL(audioBlob);
+            audioChunksRef.current = [];
+          }
+        };
+
+        mediaRecorderRef.current = recorder;
+      } catch (recInitErr) {
+        console.warn('[MediaRecorder] Init note:', recInitErr);
       }
 
       setIsSessionActive(true);
-      isSessionActiveRef.current = true;
-      setIsConnecting(false);
       setIsListening(true);
-
-      // Announce connection in transcript
-      const welcomeTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setTranscript(prev => [
-        ...prev,
-        {
-          sender: 'gemini',
-          text: 'Microphone active! I am listening. Speak into your microphone to ask about Summit 2026, Convener AMAECHI UBADIKE, or the aviation book launch.',
-          time: welcomeTime
-        }
-      ]);
-
     } catch (err: any) {
-      console.error('Microphone capture error:', err);
-      setIsConnecting(false);
+      console.error('[Gemini Live Voice] Mic start error:', err);
+      setErrorMessage(err.message || 'Microphone access denied. Please allow microphone permissions in your browser.');
       setIsSessionActive(false);
-
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setMicPermissionError(
-          'Microphone access was denied. Please allow microphone permissions in your browser settings (click the lock or camera icon in the URL bar) and retry.'
-        );
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setMicPermissionError('No microphone hardware was detected on your system. Please connect a microphone or headset.');
-      } else {
-        setMicPermissionError(err.message || 'Unable to access your microphone. You can also type your questions below.');
-      }
+      setIsListening(false);
     }
-  };
+  }, [getAudioContext, sendQueryToGemini]);
 
-  // Toggle Microphone Mute
-  const toggleMicMute = () => {
+  // Stop microphone session cleanly
+  const stopMicSession = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (_) {}
+      speechRecognitionRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (_) {}
+    }
     if (mediaStreamRef.current) {
-      const newMuted = !isMicMuted;
-      mediaStreamRef.current.getAudioTracks().forEach(track => {
-        track.enabled = !newMuted;
-      });
-      setIsMicMuted(newMuted);
-
-      if (newMuted) {
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-          } catch (e) {
-            // ignore
-          }
-        }
-        setIsListening(false);
-        setAudioLevel(0);
-      } else {
-        if (recognitionRef.current && isSessionActive) {
-          try {
-            recognitionRef.current.start();
-          } catch (e) {
-            // ignore
-          }
-        }
-        setIsListening(true);
-      }
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
     }
+    setAudioLevel(0);
+    setIsListening(false);
+    setIsSessionActive(false);
+  }, []);
+
+  // Cleanup on modal close or unmount
+  useEffect(() => {
+    if (!isOpen) {
+      stopMicSession();
+      stopAssistantAudio();
+    }
+  }, [isOpen, stopMicSession, stopAssistantAudio]);
+
+  // Handle Form text submit
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim() || isProcessing) return;
+    const query = inputText;
+    setInputText('');
+    sendQueryToGemini(query);
   };
 
-  // Interrupt / Stop assistant speaking
-  const handleStopSpeaking = () => {
-    if (currentAudioSourceRef.current) {
-      try {
-        currentAudioSourceRef.current.stop();
-      } catch (e) {
-        // ignore
-      }
-      currentAudioSourceRef.current = null;
-    }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    setIsAssistantSpeaking(false);
-    isAssistantSpeakingRef.current = false;
-
-    if (isSessionActive && !isMicMuted && recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (e) {
-        // ignore
-      }
-    }
+  // Copy transcript text to clipboard
+  const handleCopyText = (id: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2500);
+    });
   };
 
-  // Clear Transcript History
-  const clearTranscript = () => {
+  // Clear conversation history
+  const handleClearChat = () => {
+    stopAssistantAudio();
     setTranscript([
       {
+        id: `welcome-${Date.now()}`,
         sender: 'gemini',
-        text: 'Session history reset. The microphone is ready for your inquiries.',
+        text: 'Conversation reset. Ask any question regarding the Aviation Safety Summit 2026, Convener AMAECHI UBADIKE, or our protocol dignitaries.',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
   };
 
-  // Quick Inquiries Chips
-  const quickQuestions = [
-    'Who is Amaechi Ubadike?',
-    'What is the theme of Summit 2026?',
-    'Tell me about the book Cleared for Takeoff',
-    'What is the Dying Library White Paper?',
-    'What are the 24 strategic sectors?'
-  ];
-
   if (!isOpen) return null;
 
   return (
-    <div id="gemini-live-voice-modal-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-      <div id="gemini-live-voice-container" className="bg-gradient-to-br from-[#0A192F] via-[#0D1F38] to-[#050B1A] border-2 border-[#D4AF37]/60 rounded-3xl w-full max-w-2xl shadow-[0_0_60px_rgba(212,175,55,0.25)] flex flex-col relative overflow-hidden h-[700px] max-h-[94vh] text-white">
-
-        {/* Top Header */}
-        <div className="p-4 sm:p-5 border-b border-[#D4AF37]/30 flex items-center justify-between bg-[#050B1A]/90">
-          <div className="flex items-center space-x-3">
-            <div className={`p-2.5 rounded-xl shadow-lg flex items-center justify-center transition-all duration-300 ${
-              isAssistantSpeaking
-                ? 'bg-[#FFD700] text-[#0A192F] shadow-[0_0_20px_rgba(255,215,0,0.6)] animate-pulse'
-                : isListening
-                ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                : 'bg-[#132545] text-[#D4AF37]'
-            }`}>
-              <Radio className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                <h3 className="font-serif font-black text-[#FFD700] tracking-wider text-base sm:text-lg">
-                  GEMINI LIVE VOICE
-                </h3>
-                {/* Live Status Pill */}
-                {isSessionActive ? (
-                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 border ${
-                    isAssistantSpeaking
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                      : isProcessing
-                      ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50 animate-pulse'
-                      : isMicMuted
-                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
-                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                  }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${
-                      isAssistantSpeaking
-                        ? 'bg-amber-400 animate-ping'
-                        : isProcessing
-                        ? 'bg-indigo-400'
-                        : isMicMuted
-                        ? 'bg-rose-400'
-                        : 'bg-emerald-400 animate-ping'
-                    }`} />
-                    {isAssistantSpeaking
-                      ? 'SPEAKING'
-                      : isProcessing
-                      ? 'THINKING'
-                      : isMicMuted
-                      ? 'MIC MUTED'
-                      : 'MIC LIVE'}
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                    STANDBY
-                  </span>
-                )}
+    <div
+      id="gemini-live-voice-modal-backdrop"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-fadeIn"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Gemini Live Voice Assistant"
+    >
+      <div
+        id="gemini-live-voice-container"
+        className="bg-gradient-to-br from-[#0A192F] via-[#0E2A47] to-[#060D1A] border-2 border-[#D4AF37]/60 rounded-3xl w-full max-w-3xl shadow-[0_0_80px_rgba(212,175,55,0.25)] flex flex-col relative overflow-hidden h-[750px] max-h-[92vh] text-white"
+      >
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#D4AF37]/30 bg-[#0A192F]/90 backdrop-blur-md shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#8C701B] p-0.5 flex items-center justify-center shadow-lg">
+                <div className="w-full h-full bg-[#0A192F] rounded-[14px] flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-[#D4AF37]" />
+                </div>
               </div>
-              <p className="text-xs text-slate-300 font-sans">
-                Aviation Airspace Voice AI • Convener AMAECHI UBADIKE
+              {isSessionActive && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                </span>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-extrabold tracking-wide text-white uppercase font-serif">
+                  Gemini Live Voice
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#D4AF37] font-mono text-[10px] font-bold">
+                  PRO AUDIO
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Official Voice Protocol Assistant • DomisLink Aviation Safety Summit 2026
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <button
-              id="clear-live-transcript-btn"
-              onClick={clearTranscript}
-              title="Reset Transcript"
-              className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2 rounded-xl border transition cursor-pointer ${
+                showSettings
+                  ? 'bg-[#D4AF37] text-[#0A192F] border-[#D4AF37]'
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+              title="Voice & Audio Settings"
+              aria-label="Settings"
             >
-              <RotateCcw className="h-4 w-4" />
+              <Sliders className="w-4 h-4" />
             </button>
+
             <button
-              id="close-gemini-live-modal-btn"
-              onClick={() => {
-                stopAllMedia();
-                onClose();
-              }}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white"
+              onClick={handleClearChat}
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+              title="Reset Conversation"
+              aria-label="Reset Conversation"
             >
-              <X className="h-5 w-5" />
+              <RotateCcw className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-red-950 hover:text-red-300 text-slate-400 border border-slate-700 transition cursor-pointer"
+              title="Close Voice Assistant"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Permission Error Banner */}
-        {micPermissionError && (
-          <div className="mx-4 mt-3 p-3 bg-red-950/80 border border-red-500/60 rounded-xl flex items-start space-x-3 text-xs text-red-200">
-            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="font-semibold text-red-300 mb-1">Microphone Access Notice</p>
-              <p>{micPermissionError}</p>
-              <button
-                onClick={startLiveSession}
-                className="mt-2 px-3 py-1 bg-red-800 hover:bg-red-700 text-white font-medium rounded-lg text-xs transition-colors inline-flex items-center gap-1.5"
-              >
-                <Mic className="h-3.5 w-3.5" />
-                Retry Microphone Access
-              </button>
+        {/* Audio / Voice Customisation Drawer */}
+        {showSettings && (
+          <div className="bg-[#050D1A] border-b border-[#D4AF37]/30 px-5 py-3.5 space-y-3 shrink-0 animate-fadeIn">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+                <Headphones className="w-3.5 h-3.5" /> Select Gemini Vocal Persona:
+              </span>
+              <span className="text-slate-400 text-[11px]">Audio output sampled at 24kHz PCM</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {AVAILABLE_VOICES.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setActiveVoice(v.id as any)}
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                    activeVoice === v.id
+                      ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white shadow-md'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="font-bold text-xs flex items-center justify-between">
+                    <span>{v.id}</span>
+                    {activeVoice === v.id && <Check className="w-3.5 h-3.5 text-[#D4AF37]" />}
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate mt-0.5">{v.name.split('(')[1]?.replace(')', '')}</div>
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Central Visualizer & Stage */}
-        <div className="px-4 py-3 sm:py-4 flex flex-col items-center justify-center relative bg-gradient-to-b from-[#050B1A]/40 to-[#0A192F]/60">
-
-          {/* Interactive Microphone Orb */}
-          <div className="relative my-2 flex items-center justify-center">
-            {/* Animated Pulse Rings based on Real Hardware Audio Level */}
-            {isSessionActive && !isMicMuted && (
-              <>
-                <div
-                  className="absolute rounded-full transition-all duration-150"
-                  style={{
-                    width: `${110 + audioLevel * 1.2}px`,
-                    height: `${110 + audioLevel * 1.2}px`,
-                    backgroundColor: isAssistantSpeaking ? 'rgba(255, 215, 0, 0.15)' : 'rgba(16, 185, 129, 0.2)',
-                    filter: 'blur(8px)'
-                  }}
-                />
-                <div
-                  className="absolute rounded-full transition-all duration-100"
-                  style={{
-                    width: `${90 + audioLevel * 0.7}px`,
-                    height: `${90 + audioLevel * 0.7}px`,
-                    backgroundColor: isAssistantSpeaking ? 'rgba(255, 215, 0, 0.25)' : 'rgba(16, 185, 129, 0.35)',
-                    filter: 'blur(4px)'
-                  }}
-                />
-              </>
-            )}
-
-            {/* Center Orb Button */}
-            <button
-              id="live-orb-button"
-              onClick={isSessionActive ? toggleMicMute : startLiveSession}
-              disabled={isConnecting}
-              title={isSessionActive ? (isMicMuted ? 'Unmute Microphone' : 'Mute Microphone') : 'Click to start voice'}
-              className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center shadow-2xl transition-all duration-300 relative z-10 ${
-                isConnecting
-                  ? 'bg-[#132545] border-2 border-[#D4AF37]/50 text-[#D4AF37]'
-                  : isAssistantSpeaking
-                  ? 'bg-gradient-to-tr from-[#D4AF37] via-[#FFD700] to-[#FFF3B0] text-[#0A192F] scale-105 shadow-[0_0_40px_rgba(255,215,0,0.8)]'
-                  : isSessionActive && !isMicMuted
-                  ? 'bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 text-white scale-105 shadow-[0_0_35px_rgba(16,185,129,0.7)]'
-                  : isSessionActive && isMicMuted
-                  ? 'bg-gradient-to-tr from-rose-800 to-rose-900 border-2 border-rose-500/70 text-white'
-                  : 'bg-[#132545] hover:bg-[#1a345f] border-2 border-[#D4AF37]/70 text-[#FFD700] hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.3)]'
-              }`}
-            >
-              {isConnecting ? (
-                <Loader2 className="h-8 w-8 animate-spin text-[#FFD700]" />
-              ) : isAssistantSpeaking ? (
-                <div className="flex flex-col items-center">
-                  <Volume2 className="h-8 w-8 animate-bounce" />
-                  <span className="text-[9px] font-mono font-bold tracking-widest mt-1">SPEAKING</span>
-                </div>
-              ) : isSessionActive && !isMicMuted ? (
-                <div className="flex flex-col items-center">
-                  <Mic className="h-8 w-8 animate-pulse" />
-                  <span className="text-[9px] font-mono font-bold tracking-widest mt-1">LIVE MIC</span>
-                </div>
-              ) : isSessionActive && isMicMuted ? (
-                <div className="flex flex-col items-center">
-                  <MicOff className="h-8 w-8 text-rose-300" />
-                  <span className="text-[9px] font-mono font-bold tracking-widest mt-1">MUTED</span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <Mic className="h-8 w-8 opacity-90 mb-1" />
-                  <span className="text-[9px] font-mono font-bold tracking-widest uppercase">START MIC</span>
-                </div>
-              )}
-            </button>
-          </div>
-
-          {/* Real Audio Dynamic Frequency Bars */}
-          {isSessionActive && !isMicMuted && (
-            <div className="flex items-center justify-center space-x-1 mt-2 h-7 px-4 py-1 bg-black/40 rounded-full border border-emerald-500/30 backdrop-blur-sm">
-              {[...Array(24)].map((_, i) => {
-                const variance = ((i * 7) % 5) + 1;
-                const height = Math.min(100, Math.max(12, (audioLevel * variance) / 2.8));
-                return (
-                  <div
-                    key={i}
-                    className={`w-1 rounded-full transition-all duration-75 ${
-                      isAssistantSpeaking
-                        ? 'bg-gradient-to-t from-[#D4AF37] to-[#FFD700]'
-                        : 'bg-gradient-to-t from-emerald-500 to-teal-300'
-                    }`}
-                    style={{ height: `${height}%` }}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {/* Real-time speech preview banner */}
-          {interimSpeech && (
-            <div className="w-full mt-2 px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-xs text-emerald-300 flex items-center gap-2 animate-fadeIn">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-              <span className="font-mono text-[10px] text-emerald-400 uppercase tracking-wider">Listening:</span>
-              <span className="italic truncate">"{interimSpeech}..."</span>
-            </div>
-          )}
-
-          {/* Assistant Speaking banner with interrupt button */}
-          {isAssistantSpeaking && (
-            <div className="w-full mt-2 px-3 py-1.5 bg-amber-950/70 border border-amber-500/40 rounded-xl text-xs text-amber-200 flex items-center justify-between animate-fadeIn">
-              <div className="flex items-center gap-2 truncate">
-                <Volume2 className="h-3.5 w-3.5 text-[#FFD700] animate-pulse shrink-0" />
-                <span className="truncate">Assistant is speaking...</span>
-              </div>
-              <button
-                onClick={handleStopSpeaking}
-                className="px-2.5 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-bold flex items-center gap-1 transition-colors shrink-0"
-              >
-                <Square className="h-3 w-3 fill-current" />
-                Stop
-              </button>
-            </div>
-          )}
-
-          {/* Quick Questions Chips */}
-          <div className="w-full flex items-center gap-1.5 overflow-x-auto py-2 scrollbar-none no-scrollbar">
-            <span className="text-[10px] font-mono text-slate-400 uppercase shrink-0">Ask:</span>
-            {quickQuestions.map((q, i) => (
-              <button
-                key={i}
-                onClick={() => sendVoiceQuery(q)}
-                disabled={isProcessing}
-                className="text-[11px] whitespace-nowrap px-2.5 py-1 bg-[#132545]/80 hover:bg-[#1f3a6b] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-slate-200 hover:text-white rounded-lg transition-all shrink-0"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-
-        </div>
-
-        {/* Transcript Conversation Area */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-[#050B1A]/70 border-t border-b border-[#D4AF37]/20 text-xs font-sans">
-          {transcript.map((item, idx) => (
-            <div
-              key={idx}
-              className={`flex flex-col ${item.sender === 'user' ? 'items-end' : 'items-start'}`}
-            >
+        {/* Live Audio Visualizer Radar Banner */}
+        <div className="bg-gradient-to-r from-[#071322] via-[#0E233D] to-[#071322] border-b border-slate-800 px-5 py-3 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative flex items-center justify-center">
               <div
-                className={`max-w-[88%] px-3.5 py-2.5 rounded-2xl ${
-                  item.sender === 'user'
-                    ? 'bg-gradient-to-r from-[#D4AF37] to-[#C59B27] text-[#0A192F] font-semibold rounded-br-none shadow-md'
-                    : 'bg-[#0D1F38] text-slate-200 border border-[#D4AF37]/30 rounded-bl-none shadow-md'
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  isAssistantSpeaking
+                    ? 'bg-[#D4AF37]/30 border-2 border-[#D4AF37] shadow-[0_0_20px_rgba(212,175,55,0.6)]'
+                    : isListening
+                    ? 'bg-emerald-500/20 border-2 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                    : 'bg-slate-800 border border-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between gap-3 text-[9px] font-mono opacity-75 mb-1 uppercase tracking-wider">
-                  <span className="flex items-center gap-1">
-                    {item.sender === 'user' ? (
-                      <>
-                        <User className="h-3 w-3" />
-                        <span>You (Mic Input)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Bot className="h-3 w-3 text-[#FFD700]" />
-                        <span className="text-[#FFD700] font-bold">Gemini Live Assistant</span>
-                      </>
-                    )}
-                  </span>
-                  <span>{item.time}</span>
-                </div>
-                <p className="leading-relaxed whitespace-pre-wrap">{item.text}</p>
+                {isAssistantSpeaking ? (
+                  <Volume2 className="w-5 h-5 text-[#D4AF37] animate-pulse" />
+                ) : isListening ? (
+                  <Mic className="w-5 h-5 text-emerald-400 animate-pulse" />
+                ) : (
+                  <Radio className="w-5 h-5 text-slate-500" />
+                )}
               </div>
             </div>
-          ))}
 
+            <div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isAssistantSpeaking
+                      ? 'bg-[#D4AF37] animate-ping'
+                      : isListening
+                      ? 'bg-emerald-400 animate-pulse'
+                      : isProcessing
+                      ? 'bg-amber-400 animate-ping'
+                      : 'bg-slate-500'
+                  }`}
+                />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                  {isAssistantSpeaking
+                    ? 'Gemini Is Speaking...'
+                    : isProcessing
+                    ? 'Analyzing Airspace Knowledge...'
+                    : isListening
+                    ? 'Live Microphone Active — Speak Now'
+                    : 'Voice Engine Ready'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {isAssistantSpeaking
+                  ? `Broadcasting via ${activeVoice} voice synthesis`
+                  : isListening
+                  ? 'Real-time duplex voice recognition listening for your question'
+                  : 'Press "Start Live Voice" or type below to interact'}
+              </p>
+            </div>
+          </div>
+
+          {/* Dynamic Audio Bars */}
+          <div className="flex items-end gap-1 h-6">
+            {[40, 75, 55, 90, 60, 85, 45, 95].map((height, i) => {
+              const active = isSessionActive || isAssistantSpeaking;
+              const scale = active ? Math.max(20, (audioLevel * height) / 100) : 15;
+              return (
+                <div
+                  key={i}
+                  className={`w-1 rounded-full transition-all duration-100 ${
+                    isAssistantSpeaking
+                      ? 'bg-[#D4AF37]'
+                      : isListening
+                      ? 'bg-emerald-400'
+                      : 'bg-slate-700'
+                  }`}
+                  style={{ height: `${scale}%` }}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Error Notification Alert */}
+        {errorMessage && (
+          <div className="bg-red-950/80 border-b border-red-500/50 px-5 py-2.5 flex items-center justify-between text-xs text-red-200 shrink-0">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="text-red-400 hover:text-white p-1"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Main Conversation Feed */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scroll-smooth">
+          {transcript.map((item) => {
+            const isUser = item.sender === 'user';
+            const isCopied = copiedId === item.id;
+            return (
+              <div
+                key={item.id}
+                className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+              >
+                {!isUser && (
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8C701B] p-0.5 shrink-0 mt-0.5">
+                    <div className="w-full h-full bg-[#0A192F] rounded-[10px] flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                    </div>
+                  </div>
+                )}
+
+                <div className={`max-w-[85%] sm:max-w-[78%] space-y-1.5`}>
+                  <div
+                    className={`rounded-2xl px-4 py-3 text-xs sm:text-sm leading-relaxed shadow-md ${
+                      isUser
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-tr-none'
+                        : 'bg-[#0E2A47]/80 border border-[#D4AF37]/30 text-slate-100 rounded-tl-none backdrop-blur-sm'
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap">{item.text}</p>
+                  </div>
+
+                  <div
+                    className={`flex items-center gap-2 text-[10px] text-slate-400 px-1 ${
+                      isUser ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <span>{item.time}</span>
+                    <button
+                      onClick={() => handleCopyText(item.id, item.text)}
+                      className="hover:text-white transition flex items-center gap-1 cursor-pointer"
+                      title="Copy text"
+                    >
+                      {isCopied ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+
+                    {!isUser && (
+                      <button
+                        onClick={() => playAssistantSpeech(item.text, item.audioBase64, item.mimeType)}
+                        className="hover:text-[#D4AF37] transition flex items-center gap-1 cursor-pointer ml-1"
+                        title="Replay Voice Audio"
+                      >
+                        <Volume1 className="w-3 h-3" />
+                        <span>Replay</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isUser && (
+                  <div className="w-8 h-8 rounded-xl bg-blue-700/50 border border-blue-400/30 flex items-center justify-center shrink-0 mt-0.5 text-blue-200">
+                    <User className="w-4 h-4" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Interim Real-time Speech Caption */}
+          {interimSpeech && (
+            <div className="flex gap-3 justify-end animate-pulse">
+              <div className="max-w-[85%] bg-blue-900/40 border border-blue-400/40 rounded-2xl rounded-tr-none px-4 py-2.5 text-xs text-blue-200 italic">
+                🎤 {interimSpeech}...
+              </div>
+            </div>
+          )}
+
+          {/* Processing Indicator */}
           {isProcessing && (
-            <div className="flex items-center space-x-2 text-slate-400 text-xs py-2">
-              <Loader2 className="h-4 w-4 animate-spin text-[#FFD700]" />
-              <span className="font-mono text-[11px] text-[#FFD700]">Gemini processing aviation query...</span>
+            <div className="flex gap-3 justify-start animate-fadeIn">
+              <div className="w-8 h-8 rounded-xl bg-[#0A192F] border border-[#D4AF37]/50 flex items-center justify-center shrink-0">
+                <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin" />
+              </div>
+              <div className="bg-[#0E2A47]/60 border border-[#D4AF37]/20 rounded-2xl rounded-tl-none px-4 py-2.5 text-xs text-slate-300 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:0.2s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:0.4s]" />
+                <span className="text-[11px] text-slate-300 ml-1">Consulting Summit Policy & Protocol Archives...</span>
+              </div>
             </div>
           )}
 
           <div ref={chatBottomRef} />
         </div>
 
-        {/* Text Input Fallback Bar */}
-        <div className="px-4 py-2 bg-[#050B1A] border-b border-[#D4AF37]/20 flex items-center gap-2">
-          <input
-            id="gemini-live-text-input"
-            type="text"
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && textInput.trim()) {
-                sendVoiceQuery(textInput);
-                setTextInput('');
-              }
-            }}
-            placeholder="Type your question or speak into your microphone..."
-            className="flex-1 bg-[#0A192F] border border-slate-700 focus:border-[#D4AF37] rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 outline-none transition-colors"
-          />
-          <button
-            id="gemini-live-send-text-btn"
-            onClick={() => {
-              if (textInput.trim()) {
-                sendVoiceQuery(textInput);
-                setTextInput('');
-              }
-            }}
-            disabled={!textInput.trim() || isProcessing}
-            className="p-2 bg-[#D4AF37] hover:bg-[#FFD700] disabled:opacity-40 disabled:hover:bg-[#D4AF37] text-[#0A192F] font-bold rounded-xl transition-all"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Footer Action Controls & Toggles */}
-        <div className="p-3 sm:p-4 bg-[#050B1A] flex items-center justify-between flex-wrap gap-2">
-          
-          {/* Secondary Toggles */}
-          <div className="flex items-center space-x-2">
-            {/* Mic Mute Toggle */}
-            {isSessionActive && (
-              <button
-                id="toggle-mic-mute-btn"
-                onClick={toggleMicMute}
-                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                  isMicMuted
-                    ? 'bg-rose-950/80 border-rose-500 text-rose-300'
-                    : 'bg-[#132545] border-emerald-500/40 text-emerald-300 hover:bg-[#1b3664]'
-                }`}
-                title={isMicMuted ? 'Unmute Microphone' : 'Mute Microphone'}
-              >
-                {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                <span className="hidden sm:inline">{isMicMuted ? 'Unmute Mic' : 'Mute Mic'}</span>
-              </button>
-            )}
-
-            {/* Speaker Audio Toggle */}
+        {/* Quick Question Prompt Chips */}
+        <div className="px-4 py-2 bg-[#06101E] border-t border-slate-800/80 overflow-x-auto no-scrollbar flex items-center gap-2 shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37] whitespace-nowrap flex items-center gap-1">
+            <Zap className="w-3 h-3" /> Quick Inquiries:
+          </span>
+          {QUICK_PROMPTS.map((prompt, idx) => (
             <button
-              id="toggle-speaker-mute-btn"
-              onClick={() => {
-                if (!isSpeakerMuted && isAssistantSpeaking) {
-                  handleStopSpeaking();
-                }
-                setIsSpeakerMuted(!isSpeakerMuted);
-              }}
-              className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                isSpeakerMuted
-                  ? 'bg-amber-950/80 border-amber-500 text-amber-300'
-                  : 'bg-[#132545] border-[#D4AF37]/40 text-[#FFD700] hover:bg-[#1b3664]'
-              }`}
-              title={isSpeakerMuted ? 'Unmute Speaker Audio' : 'Mute Speaker Audio'}
+              key={idx}
+              onClick={() => sendQueryToGemini(prompt)}
+              disabled={isProcessing}
+              className="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-[#D4AF37]/20 border border-slate-700 hover:border-[#D4AF37]/60 text-slate-300 hover:text-white text-xs whitespace-nowrap transition cursor-pointer disabled:opacity-50"
             >
-              {isSpeakerMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              <span className="hidden sm:inline">{isSpeakerMuted ? 'Audio Off' : 'Audio On'}</span>
+              {prompt}
             </button>
-
-            {/* Voice Persona Selector */}
-            <select
-              value={activeVoice}
-              onChange={(e) => setActiveVoice(e.target.value as any)}
-              className="bg-[#132545] border border-slate-700 text-slate-300 text-xs rounded-xl px-2 py-2 outline-none"
-              title="Voice Model Persona"
-            >
-              <option value="Zephyr">Voice: Zephyr</option>
-              <option value="Kore">Voice: Kore</option>
-              <option value="Puck">Voice: Puck</option>
-              <option value="Fenrir">Voice: Fenrir</option>
-            </select>
-          </div>
-
-          {/* Primary Action Button */}
-          <div>
-            {!isSessionActive ? (
-              <button
-                id="start-live-voice-btn"
-                onClick={startLiveSession}
-                disabled={isConnecting}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#C59B27] hover:brightness-110 text-[#0A192F] font-bold rounded-xl text-xs sm:text-sm shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center space-x-2"
-              >
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Accessing Mic...</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="h-4 w-4" />
-                    <span>Start Live Microphone</span>
-                  </>
-                )}
-              </button>
-            ) : (
-              <button
-                id="end-live-voice-btn"
-                onClick={stopAllMedia}
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
-              >
-                <MicOff className="h-4 w-4" />
-                <span>End Voice Session</span>
-              </button>
-            )}
-          </div>
-
+          ))}
         </div>
 
+        {/* Bottom Audio Controls & Input Area */}
+        <div className="p-4 bg-[#0A192F] border-t border-[#D4AF37]/30 space-y-3 shrink-0">
+          {/* Main Action Strip */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Live Mic Button */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {!isSessionActive ? (
+                <button
+                  id="start-live-voice-btn"
+                  onClick={startMicSession}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#B89025] hover:brightness-110 text-[#0A192F] font-bold text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95 cursor-pointer"
+                >
+                  <Mic className="w-4 h-4" />
+                  <span>Start Live Voice</span>
+                </button>
+              ) : (
+                <button
+                  id="end-live-voice-btn"
+                  onClick={stopMicSession}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95 cursor-pointer"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                  <span>Stop Live Voice</span>
+                </button>
+              )}
+
+              {isAssistantSpeaking && (
+                <button
+                  onClick={stopAssistantAudio}
+                  className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  title="Mute Current Speech"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                  <span>Stop Audio</span>
+                </button>
+              )}
+
+              {/* Speaker Toggle */}
+              <button
+                onClick={() => {
+                  const next = !isSpeakerMuted;
+                  setIsSpeakerMuted(next);
+                  if (next) stopAssistantAudio();
+                }}
+                className={`p-2.5 rounded-xl border transition cursor-pointer ${
+                  isSpeakerMuted
+                    ? 'bg-red-950/60 border-red-500/50 text-red-300'
+                    : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                }`}
+                title={isSpeakerMuted ? 'Unmute Assistant Audio' : 'Mute Assistant Audio'}
+              >
+                {isSpeakerMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Live Status indicator */}
+            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Gemini 3.1 Flash Lite • Dual Live Protocol Engine</span>
+            </div>
+          </div>
+
+          {/* Text Input Fallback Bar */}
+          <form onSubmit={handleTextSubmit} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Or type a question for Gemini voice..."
+              disabled={isProcessing}
+              className="flex-1 bg-slate-900/90 border border-slate-700 focus:border-[#D4AF37] rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition"
+            />
+            <button
+              type="submit"
+              disabled={!inputText.trim() || isProcessing}
+              className="px-4 py-2.5 rounded-xl bg-[#D4AF37] hover:bg-[#E5C358] text-[#0A192F] font-bold text-xs uppercase tracking-wider transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shadow"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Send</span>
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

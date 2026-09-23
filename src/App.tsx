@@ -21,6 +21,7 @@ import About from './components/About';
 import SummitGlance from './components/SummitGlance';
 import SummitPoster from './components/SummitPoster';
 import OfficialDignitariesSection from './components/dignitaries/OfficialDignitariesSection';
+import MasterHierarchyView from './components/dignitaries/MasterHierarchyView';
 import Speakers from './components/Speakers';
 import GovernmentLeaders from './components/GovernmentLeaders';
 import IndustryParticipants from './components/IndustryParticipants';
@@ -55,6 +56,7 @@ import PodcastEngineHub from './components/publishing/PodcastEngineHub';
 import QRConnector from './components/publishing/QRConnector';
 import { PWAInstallButton } from './components/pwa/PWAInstallButton';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
+import { PWAUpdateNotification } from './components/pwa/PWAUpdateNotification';
 import GeminiLiveVoiceModal from './components/GeminiLiveVoiceModal';
 import RSVPPage from './components/rsvp/RSVPPage';
 import VolunteerPage from './components/volunteer/VolunteerPage';
@@ -403,6 +405,13 @@ export default function App() {
       {/* OFFICIAL DIGNITARY HIERARCHY (TIERS 1 - 4) */}
       <div id="dignitaries">
         <OfficialDignitariesSection 
+          onRegisterClick={() => handleNavigate('register')}
+        />
+      </div>
+
+      {/* COMPENDIUM OF DIGNITARIES, FAITH LEADERS & ASSIGNED SPEECHES (TIERS 1 - 7) */}
+      <div id="protocol-hierarchy">
+        <MasterHierarchyView 
           onRegisterClick={() => handleNavigate('register')}
         />
       </div>
@@ -762,6 +771,9 @@ export default function App() {
 
       {/* Offline Status Alert */}
       <OfflineIndicator />
+
+      {/* PWA Background Update Engine & Notification Banner */}
+      <PWAUpdateNotification />
 
       {/* Floating Share Quick Pill */}
       <div className="fixed bottom-6 right-6 md:right-84 z-30">

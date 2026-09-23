@@ -1,9 +1,11 @@
 import React from 'react';
 import { 
   Download, X, Smartphone, Monitor, Apple, CheckCircle2, 
-  Zap, WifiOff, ShieldCheck, Share, PlusSquare, ArrowRight 
+  Zap, WifiOff, ShieldCheck, Share, PlusSquare, ArrowRight,
+  RefreshCw, Sparkles, Check
 } from 'lucide-react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import { usePWAUpdate } from '../../hooks/usePWAUpdate';
 
 interface PWAInstallModalProps {
   isOpen: boolean;
@@ -12,6 +14,16 @@ interface PWAInstallModalProps {
 
 export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  const { 
+    isUpdateAvailable, 
+    isUpdating, 
+    isChecking, 
+    justChecked, 
+    checkForUpdates, 
+    applyUpdate, 
+    forceHardRefresh,
+    appVersion 
+  } = usePWAUpdate();
 
   if (!isOpen) return null;
 
@@ -82,14 +94,74 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
           </div>
         </div>
 
-        {/* Context-aware install instructions */}
+        {/* Context-aware install instructions & Update panel */}
         {isInstalled ? (
-          <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-center mb-4">
-            <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-            <h4 className="text-sm font-bold text-white mb-1">Application Already Installed!</h4>
-            <p className="text-xs text-slate-300">
-              You can launch Aviation Safety Summit 2026 anytime directly from your device home screen or applications menu.
-            </p>
+          <div className="space-y-4 mb-4">
+            <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+              <h4 className="text-sm font-bold text-white mb-1">Application Installed & Active!</h4>
+              <p className="text-xs text-slate-300">
+                Aviation Safety Summit 2026 is installed on your device. All updates automatically trail and sync to your local installation.
+              </p>
+            </div>
+
+            {/* Live Update & Sync Status */}
+            <div className="p-4 bg-slate-900/90 border border-[#D4AF37]/30 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">Sync & Version Status</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-mono text-[10px] font-bold">
+                  {appVersion}
+                </span>
+              </div>
+
+              {isUpdateAvailable ? (
+                <div className="p-3 bg-amber-950/50 border border-amber-500/50 rounded-lg space-y-2">
+                  <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                    New Summit Data Available
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Latest protocol order of precedence and church leader speeches are downloaded and ready to apply.
+                  </p>
+                  <button
+                    onClick={() => applyUpdate()}
+                    disabled={isUpdating}
+                    className="w-full py-2 bg-gradient-to-r from-[#D4AF37] to-[#B89025] hover:brightness-110 text-[#0A192F] font-bold text-xs uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
+                    <span>{isUpdating ? 'Updating...' : 'Apply Update Now'}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-xs text-slate-300 pt-1">
+                  <span>Hierarchy & Speeches:</span>
+                  <span className="text-emerald-400 font-semibold inline-flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> 76 Dignitaries Synced
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={() => checkForUpdates()}
+                  disabled={isChecking}
+                  className="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 transition border border-slate-700 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin text-[#D4AF37]' : ''}`} />
+                  <span>{isChecking ? 'Checking...' : justChecked ? 'Checked: Up to Date' : 'Check for Updates'}</span>
+                </button>
+                <button
+                  onClick={() => forceHardRefresh()}
+                  className="py-2 px-3 bg-red-950/30 hover:bg-red-900/40 text-red-300 text-xs font-medium rounded-lg transition border border-red-800/40 cursor-pointer"
+                  title="Purge local cache and reload fresh files"
+                >
+                  Reset Cache
+                </button>
+              </div>
+            </div>
           </div>
         ) : isInstallable ? (
           <div className="space-y-4">

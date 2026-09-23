@@ -1,6 +1,12 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState } from 'react';
-import { Download, Smartphone, Zap, CheckCircle2 } from 'lucide-react';
+import { Download, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import { usePWAUpdate } from '../../hooks/usePWAUpdate';
 import { PWAInstallModal } from './PWAInstallModal';
 
 interface PWAInstallButtonProps {
@@ -12,17 +18,45 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   className = '', 
   variant = 'navbar' 
 }) => {
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  const { isInstallable, isInstalled, install } = usePWAInstall();
+  const { isUpdateAvailable, isUpdating, applyUpdate } = usePWAUpdate();
   const [modalOpen, setModalOpen] = useState(false);
 
-  // If already installed in standalone mode, show a small badge or hide
+  // If already installed in standalone mode
   if (isInstalled) {
-    if (variant === 'floating' || variant === 'banner') return null;
+    if (variant === 'floating' || variant === 'banner') {
+      if (!isUpdateAvailable) return null;
+    }
+
+    if (isUpdateAvailable) {
+      return (
+        <>
+          <button
+            onClick={() => applyUpdate()}
+            disabled={isUpdating}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#B89025] text-[#0A192F] text-xs font-bold uppercase tracking-wider animate-pulse shadow-lg cursor-pointer ${className}`}
+            title="Aviation Safety Summit update available — tap to apply"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
+            <span>{isUpdating ? 'Updating...' : 'Update PWA'}</span>
+          </button>
+          <PWAInstallModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
+        </>
+      );
+    }
+
     return (
-      <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-medium ${className}`}>
-        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-        <span>App Installed</span>
-      </div>
+      <>
+        <button
+          onClick={() => setModalOpen(true)}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/30 text-emerald-300 text-xs font-medium cursor-pointer transition ${className}`}
+          title="App installed on device. Tap to view sync & update status."
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <span>App Synced</span>
+        </button>
+        <PWAInstallModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
+      </>
     );
   }
 

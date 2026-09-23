@@ -1,7 +1,7 @@
 {
   "name": "Aviation Safety Summit 2026",
   "short_name": "AviaSafety26",
-  "description": "Aviation Safety Summit 2026 — 17 November 2026 at Marriott Hotel, Ikeja, Lagos, Nigeria.",
+  "description": "Aviation Safety Summit 2026 — Official Protocol Precedence, Assigned Addresses, Live Programme & Compendium.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A192F",
@@ -11,6 +11,36 @@
   "id": "/",
   "orientation": "portrait-primary",
   "categories": ["business", "events", "travel"],
+  "shortcuts": [
+    {
+      "name": "Hierarchy & Speeches",
+      "short_name": "Hierarchy",
+      "description": "Official Protocol Order of Precedence & Assigned Addresses",
+      "url": "/#protocol-hierarchy",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Summit Programme",
+      "short_name": "Programme",
+      "description": "Interactive Summit Timetable & Technical Masterclasses",
+      "url": "/#programme",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Official Dignitaries",
+      "short_name": "Dignitaries",
+      "description": "Sovereign Leaders, Regulators & Governors",
+      "url": "/#dignitaries",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Register Delegate Pass",
+      "short_name": "Register",
+      "description": "Summit Badge Verification & Instant Registration",
+      "url": "/#register",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "/pwa-192x192.png",

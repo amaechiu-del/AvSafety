@@ -31,8 +31,16 @@ export default function PhotoVerificationStatus({
   size = 'md',
   className = ''
 }: PhotoVerificationProps) {
+  const [imageError, setImageError] = React.useState(false);
+
   // Determine if photo is valid and verified
-  const hasValidPhoto = Boolean(photoUrl && photoUrl.trim() !== '' && !photoUrl.includes('placeholder') && photoRights !== 'OFFICIAL_PHOTO_REQUIRED');
+  const hasValidPhoto = Boolean(
+    photoUrl && 
+    photoUrl.trim() !== '' && 
+    !photoUrl.includes('placeholder') && 
+    photoRights !== 'OFFICIAL_PHOTO_REQUIRED' &&
+    !imageError
+  );
 
   // Compute initials if monogram is not provided
   const computedMonogram = monogram || name
@@ -62,6 +70,7 @@ export default function PhotoVerificationStatus({
           alt={name}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
           referrerPolicy="no-referrer"
+          onError={() => setImageError(true)}
         />
         <div className="absolute bottom-1 right-1 bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 p-0.5 rounded-full shadow" title="Official Verified Photograph">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />

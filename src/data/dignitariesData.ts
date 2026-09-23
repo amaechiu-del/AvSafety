@@ -33,9 +33,9 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
     id: 'tier-1',
     tierNumber: 1,
     title: 'Tier 1 Protocol',
-    subtitle: 'SOVEREIGN EXECUTIVE HONOUR',
-    leadHeadline: 'Vice President of the Federal Republic of Nigeria',
-    description: 'The highest executive office presiding over the official Opening Ceremony and national safety declaration.',
+    subtitle: 'SOVEREIGN EXECUTIVE & LEGISLATIVE HONOUR',
+    leadHeadline: 'Presidency & National Assembly Leadership',
+    description: 'The highest executive and legislative leadership presiding over the official Opening Ceremony, statutory safety mandates, and national appropriations.',
     persons: [
       {
         id: 'shettima-vp',
@@ -47,9 +47,23 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         tierNumber: 1,
         monogram: 'KS',
         photoUrl: '', // Quarantine unverified placeholders
-        status: 'PROPOSED SPECIAL GUEST',
+        status: 'CONFIRMED SPECIAL GUEST',
         keynoteTitle: 'Sovereign Imperatives for Aviation Safety: Airspace Integrity, Economic Stability & National Security',
         keynoteFocus: 'Delivering the Presidential Address declaring open the DomisLink Aviation Safety Summit 2026, articulating the federal government\'s unwavering commitment to zero avoidable fatalities and sustainable infrastructure recapitalization.'
+      },
+      {
+        id: 'akpabio-senate-pres',
+        salutation: 'His Excellency',
+        name: 'SENATOR GODSWILL OBOT AKPABIO GCON',
+        position: 'President of the Senate of the Federal Republic of Nigeria',
+        organisation: 'Senate of the Federal Republic of Nigeria (10th National Assembly)',
+        roleTitle: 'Special Guest of Honour & Sovereign Legislative Keynote',
+        tierNumber: 1,
+        monogram: 'GA',
+        photoUrl: '',
+        status: 'CONFIRMED SPECIAL GUEST',
+        keynoteTitle: 'Legislative Imperatives for Aviation Safety: Statutory Independence, Modern Infrastructure Appropriations & Sovereign Oversight',
+        keynoteFocus: 'Delivering the Sovereign Legislative Keynote on parliamentary backing for civil aviation acts, statutory autonomy of safety regulators, and ring-fencing federal capital allocations for airspace radar and runway technologies.'
       }
     ]
   },

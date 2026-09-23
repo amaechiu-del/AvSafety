@@ -1,23 +1,15 @@
 import './preamble';
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
+import { pwaUpdateService } from './services/pwaUpdateService';
 import { AdminAuthProvider } from './components/AdminAuthWrapper';
 import App from './App.tsx';
 import './index.css';
 
-// Automatically register and update service worker in production environments
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  registerSW({
-    immediate: true,
-    onNeedRefresh() {
-      console.log('[PWA] New content available, reloading...');
-      window.location.reload();
-    },
-    onOfflineReady() {
-      console.log('[PWA] App is ready for offline usage');
-    },
-  });
+// Initialize PWA Update & Service Worker trail engine
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  // Service worker update engine auto-initializes via singleton
+  pwaUpdateService.checkForUpdates().catch(() => {});
 }
 
 createRoot(document.getElementById('root')!).render(
