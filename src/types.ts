@@ -55,6 +55,7 @@ export type SpeakerIndustry =
   | 'SIMULATION' 
   | 'INVESTORS' 
   | 'FAITH'
+  | 'INTERNATIONAL_BODY'
   | 'OTHER';
 
 export interface Speaker {

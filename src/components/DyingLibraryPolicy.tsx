@@ -8,7 +8,8 @@ import {
   BookOpen, ShieldCheck, Scale, AlertTriangle, FileText, 
   Landmark, Award, Globe, Users, ExternalLink, ChevronDown, 
   ChevronUp, CheckCircle2, BookmarkCheck, ArrowRight, ShieldAlert,
-  Building2, GraduationCap, Gavel, Sparkles, Send
+  Building2, GraduationCap, Gavel, Sparkles, Send, Mic, Volume2,
+  MapPin, Clock, Flag, Check
 } from 'lucide-react';
 import { AUTHOR_NAME, AUTHOR_FULL_TITLE, BOOK_PRIMARY } from '../constants/author';
 
@@ -17,9 +18,80 @@ interface DyingLibraryProps {
 }
 
 export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryProps) {
-  const [activeTab, setActiveTab] = useState<'whitepaper' | 'recommendations' | 'psc-model' | 'accidents' | 'contacts'>('whitepaper');
+  const [activeTab, setActiveTab] = useState<'whitepaper' | 'speeches' | 'recommendations' | 'psc-model' | 'accidents' | 'contacts'>('whitepaper');
   const [expandedRec, setExpandedRec] = useState<number | null>(1);
   const [selectedAccidentFilter, setSelectedAccidentFilter] = useState<'all' | 'commercial' | 'helicopter' | 'ground'>('all');
+
+  const allocatedSpeeches = [
+    {
+      id: "speech-icao-canada",
+      recipient: "International Civil Aviation Organisation (ICAO Headquarters) · Montreal, Canada",
+      rep: "ICAO Headquarters Special Envoy of the Secretary General",
+      location: "Montréal, Quebec H3C 5H7, Canada",
+      flag: "🌐 Canada / Global",
+      sessionTime: "09:15 AM - 09:40 AM (Plenary)",
+      speechTitle: "Global Adoption of Annex 19 SARP for Knowledge Preservation & The ICAO 80th Anniversary Memoir Challenge",
+      recommendationLink: "Recommendations 1 & 2",
+      coreTheme: "Establishing a multilateral Standard and Recommended Practice (SARP) under ICAO Annex 19 for National Aviation Memoir Archives, Universal Safety Oversight Audit Programme (USOAP) compliance, and sovereign knowledge preservation anniversary pledges.",
+      keyPoints: [
+        "Formal proposal to designate the Memoir Challenge as an official ICAO 80th Anniversary Initiative.",
+        "Adopting Annex 19 SARPs obligating contracting states to establish independently governed aviation knowledge archives.",
+        "Non-punitive legal protections for retiring pilots, controllers, and inspectors submitting career near-miss testimonies."
+      ],
+      badge: "Global Multilateral Keynote"
+    },
+    {
+      id: "speech-icao-wacaf",
+      recipient: "ICAO Western & Central African (WACAF) Regional Office · Dakar, Senegal",
+      rep: "ICAO WACAF Regional Director / Special Envoy",
+      location: "Dakar-Yoff, BP 2356, Dakar, Senegal",
+      flag: "🌍 West Africa / ECOWAS",
+      sessionTime: "09:40 AM - 10:05 AM (Plenary)",
+      speechTitle: "Regional Knowledge Retention, Safety Governance Oversight & West African Airspace Harmonisation",
+      recommendationLink: "Recommendations 1, 3 & 6",
+      coreTheme: "Operationalizing regional safety knowledge retention, cross-border incident transparency across 24 WACAF member states, and establishing offshore helicopter safety standards parity in the Niger Delta and Gulf of Guinea.",
+      keyPoints: [
+        "Harmonising Safety Management System (SMS) career archive protocols across ECOWAS and WACAF civil aviation authorities.",
+        "Eliminating safety disparities for offshore rotary-wing oil & gas operations (North Sea / Gulf of Mexico standards parity).",
+        "Cross-border accident prevention intelligence sharing to prevent recurring fatal failure modes."
+      ],
+      badge: "Regional Multilateral Keynote"
+    },
+    {
+      id: "speech-nass-senate",
+      recipient: "Senate & House Committees on Aviation · 10th National Assembly",
+      rep: "H.E. Senator Godswill Obot Akpabio, GCON (Senate President)",
+      location: "National Assembly Complex, Three Arms Zone, Abuja",
+      flag: "🇳🇬 Sovereign Legislature",
+      sessionTime: "08:35 AM - 08:55 AM (Opening Keynote)",
+      speechTitle: "Legislative Imperatives: The Independent Aviation Appointments Commission (The PSC Model)",
+      recommendationLink: "Recommendations 4 & 9",
+      coreTheme: "Enacting statutory legislation establishing the independent Aviation Appointments Commission modelled on Section 153 (Police Service Commission model), codifying ministerial technical prerequisites, and protecting institutional safety memory.",
+      keyPoints: [
+        "Constitutional firewall insulating NCAA, FAAN, NAMA, NSIB, and NCAT leadership from political turnover.",
+        "Codifying minimum technical qualification requirements for the Minister of Aviation.",
+        "Establishing a permanent civil service Director of Aviation to ensure regulatory continuity."
+      ],
+      badge: "Sovereign Legislative Directive"
+    },
+    {
+      id: "speech-fed-minister",
+      recipient: "Federal Ministry of Aviation & Aerospace Development",
+      rep: "Barr. Festus Keyamo SAN, CON, FCIArb (UK) (Honourable Minister)",
+      location: "Federal Secretariat, Constitution Avenue, Abuja",
+      flag: "🇳🇬 Federal Government",
+      sessionTime: "08:55 AM - 09:15 AM (Ministerial Keynote)",
+      speechTitle: "The 5-Point Safety Roadmap: Implementing White Paper Governance & Infrastructure Safeguards",
+      recommendationLink: "Recommendations 6, 7 & 8",
+      coreTheme: "Responding to White Paper directives: full statutory funding for AIB/NSIB 30-day reporting, creating a national registry protecting general aviation aerodromes (Magbo Aerodrome precedent), and offshore safety audits.",
+      keyPoints: [
+        "Statutory protection against land encroachment on active aerodromes and general aviation training grounds.",
+        "Sustaining non-punitive safety reporting channels and regulatory independence for NCAA and NSIB.",
+        "Strengthening national aviation training curricula through veteran oral history preservation."
+      ],
+      badge: "Ministerial Policy Address"
+    }
+  ];
 
   const policyRecommendations = [
     {
@@ -288,7 +360,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex flex-wrap justify-center gap-2 mb-12 p-1.5 bg-[#0A192F] border border-[#D4AF37]/30 rounded-2xl max-w-4xl mx-auto">
+        <div className="flex flex-wrap justify-center gap-2 mb-12 p-1.5 bg-[#0A192F] border border-[#D4AF37]/30 rounded-2xl max-w-5xl mx-auto">
           <button
             onClick={() => setActiveTab('whitepaper')}
             className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center space-x-2 ${
@@ -302,6 +374,18 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
           </button>
 
           <button
+            onClick={() => setActiveTab('speeches')}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center space-x-2 ${
+              activeTab === 'speeches' 
+                ? 'bg-[#D4AF37] text-[#0A192F] shadow-lg font-bold' 
+                : 'text-[#8A99AD] hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Mic className="h-4 w-4" />
+            <span>ICAO & Government Speeches</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('recommendations')}
             className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center space-x-2 ${
               activeTab === 'recommendations' 
@@ -310,7 +394,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
             }`}
           >
             <ShieldCheck className="h-4 w-4" />
-            <span>9 Policy Recommendations (ICAO)</span>
+            <span>9 Recommendations</span>
           </button>
 
           <button
@@ -322,7 +406,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
             }`}
           >
             <Scale className="h-4 w-4" />
-            <span>Police PSC Model Architecture</span>
+            <span>Police PSC Model</span>
           </button>
 
           <button
@@ -422,7 +506,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
                 </div>
                 <button
                   onClick={onNavigateToMemoir}
-                  className="px-6 py-3 bg-[#D4AF37] hover:bg-[#B89025] text-[#0A192F] font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center space-x-2 shrink-0"
+                  className="px-6 py-3 bg-[#D4AF37] hover:bg-[#B89025] text-[#0A192F] font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center space-x-2 shrink-0 cursor-pointer"
                 >
                   <span>Enter Memoir Challenge Portal</span>
                   <ArrowRight className="h-4 w-4" />
@@ -434,7 +518,78 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 2: 9 POLICY RECOMMENDATIONS (ICAO & SOVEREIGN) */}
+        {/* TAB 2: ALLOCATED SPEECHES (ICAO CANADA, ICAO WEST AFRICA & GOVERNMENT) */}
+        {/* ========================================================================= */}
+        {activeTab === 'speeches' && (
+          <div className="space-y-8 animate-fadeIn max-w-5xl mx-auto">
+            <div className="text-center max-w-3xl mx-auto space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#D4AF37] font-mono text-[10px] font-bold uppercase">
+                <Mic className="w-3.5 h-3.5" />
+                <span>OFFICIAL SUMMIT PLENARY ALLOCATIONS</span>
+              </div>
+              <h3 className="text-2xl font-serif font-bold text-white">
+                Allocated Speeches: ICAO Envoys & Sovereign Government
+              </h3>
+              <p className="text-xs text-[#8A99AD]">
+                In accordance with the Dying Library White Paper directives, dedicated plenary keynotes have been assigned to ICAO Headquarters (Montreal, Canada), ICAO West Africa (Dakar, Senegal), the National Assembly, and the Federal Ministry of Aviation.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {allocatedSpeeches.map((sp) => (
+                <div
+                  key={sp.id}
+                  className="bg-[#0A192F] border-2 border-[#D4AF37]/40 rounded-3xl p-6 space-y-4 shadow-xl hover:border-[#D4AF37] transition-all relative overflow-hidden"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <span className="px-2.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-mono font-bold uppercase">
+                        {sp.badge}
+                      </span>
+                      <div className="text-xs font-mono text-[#D4AF37] font-bold flex items-center gap-1.5 mt-1">
+                        <span>{sp.flag}</span>
+                        <span>•</span>
+                        <span>{sp.sessionTime}</span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#D4AF37] text-[10px] font-mono font-bold">
+                      {sp.recommendationLink}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-serif font-bold text-white leading-snug">
+                      "{sp.speechTitle}"
+                    </h4>
+                    <p className="text-xs font-semibold text-slate-300 mt-1">
+                      {sp.rep}
+                    </p>
+                    <p className="text-[11px] text-[#8A99AD] font-mono">
+                      {sp.recipient}
+                    </p>
+                  </div>
+
+                  <p className="text-xs text-slate-300 font-light leading-relaxed border-t border-slate-800 pt-3">
+                    {sp.coreTheme}
+                  </p>
+
+                  <div className="space-y-1.5 bg-black/30 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300">
+                    <p className="font-bold text-[#D4AF37] text-[10px] uppercase font-mono">Mandated Keynote Deliverables:</p>
+                    {sp.keyPoints.map((pt, pIdx) => (
+                      <div key={pIdx} className="flex items-start gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{pt}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: 9 POLICY RECOMMENDATIONS (ICAO & SOVEREIGN) */}
         {/* ========================================================================= */}
         {activeTab === 'recommendations' && (
           <div className="space-y-6 animate-fadeIn max-w-5xl mx-auto">
@@ -457,7 +612,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
                   >
                     <button
                       onClick={() => setExpandedRec(isExpanded ? null : rec.id)}
-                      className="w-full p-5 sm:p-6 text-left flex items-start justify-between gap-4"
+                      className="w-full p-5 sm:p-6 text-left flex items-start justify-between gap-4 cursor-pointer"
                     >
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
@@ -507,7 +662,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 3: THE POLICE SERVICE COMMISSION (PSC) GOVERNANCE MODEL */}
+        {/* TAB 4: THE POLICE SERVICE COMMISSION (PSC) GOVERNANCE MODEL */}
         {/* ========================================================================= */}
         {activeTab === 'psc-model' && (
           <div className="space-y-8 animate-fadeIn max-w-5xl mx-auto">
@@ -614,7 +769,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: ACCIDENT RECORD EVIDENCE (GROUND, ROTARY, AIRLINE) */}
+        {/* TAB 5: ACCIDENT RECORD EVIDENCE (GROUND, ROTARY, AIRLINE) */}
         {/* ========================================================================= */}
         {activeTab === 'accidents' && (
           <div className="space-y-8 animate-fadeIn max-w-5xl mx-auto">
@@ -630,7 +785,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
             <div className="flex justify-center gap-2">
               <button
                 onClick={() => setSelectedAccidentFilter('all')}
-                className={`px-3.5 py-1 rounded-full text-xs font-mono font-bold transition-all ${
+                className={`px-3.5 py-1 rounded-full text-xs font-mono font-bold transition-all cursor-pointer ${
                   selectedAccidentFilter === 'all' 
                     ? 'bg-[#D4AF37] text-[#0A192F]' 
                     : 'bg-white/5 text-[#8A99AD] hover:text-white'
@@ -640,7 +795,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
               </button>
               <button
                 onClick={() => setSelectedAccidentFilter('ground')}
-                className={`px-3.5 py-1 rounded-full text-xs font-mono font-bold transition-all ${
+                className={`px-3.5 py-1 rounded-full text-xs font-mono font-bold transition-all cursor-pointer ${
                   selectedAccidentFilter === 'ground' 
                     ? 'bg-[#D4AF37] text-[#0A192F]' 
                     : 'bg-white/5 text-[#8A99AD] hover:text-white'
@@ -650,7 +805,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
               </button>
               <button
                 onClick={() => setSelectedAccidentFilter('helicopter')}
-                className={`px-3.5 py-1 rounded-full text-xs font-mono font-bold transition-all ${
+                className={`px-3.5 py-1 rounded-full text-xs font-mono font-bold transition-all cursor-pointer ${
                   selectedAccidentFilter === 'helicopter' 
                     ? 'bg-[#D4AF37] text-[#0A192F]' 
                     : 'bg-white/5 text-[#8A99AD] hover:text-white'
@@ -699,7 +854,7 @@ export default function DyingLibraryPolicy({ onNavigateToMemoir }: DyingLibraryP
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 5: SUBMISSION CONTACTS */}
+        {/* TAB 6: SUBMISSION CONTACTS */}
         {/* ========================================================================= */}
         {activeTab === 'contacts' && (
           <div className="space-y-8 animate-fadeIn max-w-5xl mx-auto">

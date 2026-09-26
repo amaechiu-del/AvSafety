@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Crown, Mail, Phone, MapPin, ExternalLink, Calendar, 
-  Clock, CheckCircle, ShieldCheck, Database, Award, 
+  Clock, CheckCircle, ShieldCheck, Shield, Globe, Database, Award, 
   HelpCircle, MessageSquare, Menu, X, ArrowUp, Sparkles 
 } from 'lucide-react';
 
@@ -606,6 +606,20 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex items-start space-x-3.5">
+                    <Globe className="h-4 w-4 text-[#D4AF37] mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[#8A99AD] uppercase tracking-wider text-[9px] font-bold">Secretariat Portal:</p>
+                      <a 
+                        href="https://summitsecretariat.netlify.app" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-[#D4AF37] hover:underline font-mono font-bold block mt-0.5"
+                      >
+                        summitsecretariat.netlify.app ↗
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3.5">
                     <Mail className="h-4 w-4 text-[#D4AF37] mt-0.5 shrink-0" />
                     <div>
                       <p className="text-[#8A99AD] uppercase tracking-wider text-[9px] font-bold">Official Email:</p>
@@ -619,6 +633,18 @@ export default function App() {
                       <p className="text-white font-sans mt-0.5">+234 (0) 904 983 7474<br/>+234 (0) 7066117100</p>
                     </div>
                   </div>
+                </div>
+
+                <div className="pt-2">
+                  <a
+                    href="https://summitsecretariat.netlify.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 bg-[#D4AF37] hover:bg-[#B89025] text-[#0A192F] font-bold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center space-x-2 shadow-lg"
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span>Open Official Secretariat Web App ↗</span>
+                  </a>
                 </div>
               </div>
 
@@ -739,6 +765,7 @@ export default function App() {
               <div className="space-y-3">
                 <p className="text-[9px] font-mono text-[#D4AF37] uppercase tracking-widest font-bold">ACTION</p>
                 <ul className="space-y-2">
+                  <li><a href="https://summitsecretariat.netlify.app" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors font-bold text-[#D4AF37] flex items-center space-x-1.5"><Shield className="h-3.5 w-3.5" /><span>Summit Secretariat ↗</span></a></li>
                   <li><button onClick={() => { setShareModalTargetType('SUMMIT'); setIsShareModalOpen(true); }} className="hover:text-white transition-colors font-bold text-[#FFD700] flex items-center space-x-1.5"><Share2 className="h-3.5 w-3.5 text-[#D4AF37]" /><span>Share Summit Links</span></button></li>
                   <li><button onClick={() => handleNavigate('rsvp')} className="hover:text-white transition-colors font-bold text-[#FFD700]">RSVP Confirmation</button></li>
                   <li><button onClick={() => handleNavigate('volunteer')} className="hover:text-white transition-colors font-bold text-[#D4AF37]">Volunteer Intake</button></li>

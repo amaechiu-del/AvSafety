@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Crown, Sparkles, Bot, ShoppingCart, ShieldCheck, DollarSign, 
   Layers, Package, CheckCircle2, ArrowRight, Filter, Search, 
-  Globe, Building, Compass, Coffee, Users, BookOpen, PenTool, Upload, Eye, FileText, Lock, Plus
+  Globe, Building, Compass, Coffee, Users, BookOpen, PenTool, Upload, Eye, FileText, Lock, Plus, QrCode
 } from 'lucide-react';
 
 import { AdPosition, SponsorshipPackage, BookingItem, CommercialOrder, CustomQuote } from '../../types';
@@ -19,6 +19,7 @@ import ProofOfDisplayGallery from './ProofOfDisplayGallery';
 import AdminCommercialCenter from './AdminCommercialCenter';
 
 import CustomServicesDesk from './CustomServicesDesk';
+import QrCodeGeneratorModal from './QrCodeGeneratorModal';
 
 interface MarketplaceHubProps {
   onBackToMain?: () => void;
@@ -37,6 +38,7 @@ export default function MarketplaceHub({ onBackToMain }: MarketplaceHubProps) {
   // Cart / Booking State
   const [cartItems, setCartItems] = useState<BookingItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Paystack & Order Modals
   const [activeOrderForPayment, setActiveOrderForPayment] = useState<CommercialOrder | null>(null);
@@ -322,6 +324,13 @@ export default function MarketplaceHub({ onBackToMain }: MarketplaceHubProps) {
             </button>
 
             {/* Admin Commercial Trigger */}
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 transition"
+            >
+              <QrCode className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">QR Gen</span>
+            </button>
             <button
               onClick={() => setIsAdminCenterOpen(true)}
               className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center space-x-1.5 transition"
@@ -904,6 +913,11 @@ export default function MarketplaceHub({ onBackToMain }: MarketplaceHubProps) {
         onToggleAddon={() => {}}
         onProceedToPaystack={handleProceedToPaystack}
         onRequestFormalQuote={handleRequestFormalQuote}
+      />
+      
+      <QrCodeGeneratorModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
       />
 
       {/* Paystack Checkout Modal */}

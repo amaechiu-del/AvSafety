@@ -54,7 +54,7 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
     { id: 'safety-library', label: 'Safety Library' },
     { id: 'challenge', label: 'Memo Challenge' },
     { id: 'domislink-bookstore', label: 'Bookstore' },
-    { id: 'podcast', label: 'Podcast' },
+    { id: 'podcast', label: 'Live Radio & Podcast' },
     { id: 'marketplace', label: 'Sponsor' },
     { id: 'rsvp', label: 'RSVP' },
     { id: 'volunteer', label: 'Volunteer' },
@@ -119,13 +119,14 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
             {/* Quick Access Admin Dashboard & PWA Install Button */}
             <PWAInstallButton variant="navbar" className="ml-1" />
             <a
-              href="https://sec.domislink.com"
+              href="https://summitsecretariat.netlify.app"
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-2 px-2.5 py-1 bg-gradient-to-r from-[#D4AF37]/10 to-[#AA7C11]/20 hover:from-[#D4AF37]/20 hover:to-[#AA7C11]/30 border border-[#D4AF37]/40 text-[#D4AF37] rounded text-[11px] font-semibold tracking-wider transition-all duration-200 flex items-center gap-1.5"
+              className="ml-2 px-2.5 py-1 bg-gradient-to-r from-[#D4AF37]/15 to-[#AA7C11]/25 hover:from-[#D4AF37]/30 hover:to-[#AA7C11]/40 border border-[#D4AF37]/50 text-[#D4AF37] rounded text-[11px] font-bold tracking-wider transition-all duration-200 flex items-center gap-1.5 shadow-sm"
+              title="Official Summit Secretariat Portal (summitsecretariat.netlify.app)"
             >
-              <Shield className="h-3 w-3" />
-              DIGITAL SECRETARIAT
+              <Shield className="h-3 w-3 text-[#D4AF37]" />
+              <span>SUMMIT SECRETARIAT ↗</span>
             </a>
             <button
               onClick={onOpenAdmin}
@@ -138,6 +139,16 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
           {/* Medium screen condensed nav */}
           <div className="hidden lg:flex 2xl:hidden items-center space-x-2">
             <PWAInstallButton variant="navbar" />
+            <a
+              href="https://summitsecretariat.netlify.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-[#D4AF37] hover:text-white px-2 py-1 font-bold flex items-center space-x-1 border border-[#D4AF37]/40 rounded bg-[#D4AF37]/10"
+              title="Summit Secretariat Web Portal"
+            >
+              <Shield className="h-3 w-3" />
+              <span>Secretariat ↗</span>
+            </a>
             <button
               onClick={() => handleItemClick('poster')}
               className="text-xs text-[#E2E8F0] hover:text-[#D4AF37] px-2 py-1"
@@ -184,6 +195,15 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
 
           {/* Hamburger / Toggle Button */}
           <div className="flex items-center space-x-2 lg:hidden">
+            <a
+              href="https://summitsecretariat.netlify.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2 py-1 bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded text-[10px] tracking-wider uppercase flex items-center gap-1"
+            >
+              <Shield className="h-2.5 w-2.5" />
+              <span>Secretariat ↗</span>
+            </a>
             <button
               onClick={() => handleItemClick('register')}
               className="px-2.5 py-1 bg-[#D4AF37] text-[#0A192F] font-bold rounded text-[10px] tracking-wider uppercase"
@@ -222,13 +242,13 @@ export default function Navigation({ onNavigate, activeSection, onOpenAdmin }: N
             <div className="border-t border-[#D4AF37]/15 pt-3 px-4 flex flex-col gap-2">
               <PWAInstallButton variant="navbar" className="w-full justify-center py-2" />
               <a
-                href="https://sec.domislink.com"
+                href="https://summitsecretariat.netlify.app"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full text-xs text-[#D4AF37] font-bold flex items-center justify-center space-x-1.5 py-2 hover:bg-[#D4AF37]/10 rounded border border-[#D4AF37]/30"
+                className="w-full text-xs text-[#D4AF37] font-bold flex items-center justify-center space-x-1.5 py-2 hover:bg-[#D4AF37]/10 rounded border border-[#D4AF37]/40 bg-[#D4AF37]/5"
               >
                 <Shield className="h-3.5 w-3.5" />
-                <span>Digital Secretariat</span>
+                <span>Official Summit Secretariat Portal (summitsecretariat.netlify.app) ↗</span>
               </a>
               <button
                 onClick={() => { setIsOpen(false); onOpenAdmin(); }}

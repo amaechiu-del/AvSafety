@@ -204,6 +204,35 @@
   animation: textShimmerFlow 4s ease infinite;
 }
 
+@keyframes soundWaveOscillate {
+  0%, 100% {
+    transform: scaleY(0.25);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes audioAuraPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.2), inset 0 0 15px rgba(212, 175, 55, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(212, 175, 55, 0.6), inset 0 0 25px rgba(212, 175, 55, 0.3);
+  }
+}
+
+.animate-soundwave-bar {
+  animation: soundWaveOscillate 1.1s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+.animate-audio-aura {
+  animation: audioAuraPulse 2s ease-in-out infinite;
+}
+
 html {
   scroll-behavior: smooth;
 }

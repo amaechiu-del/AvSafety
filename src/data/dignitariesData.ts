@@ -16,6 +16,8 @@ export interface DignitaryPerson {
   status: 'CONFIRMED' | 'PROPOSED SPECIAL GUEST' | 'PROPOSED GUEST OF HONOUR' | 'PROPOSED INVITEE' | 'INVITATION TO BE SENT' | 'CONFIRMED SPECIAL GUEST' | 'CONFIRMED SPEAKER' | 'PROPOSED';
   keynoteTitle: string;
   keynoteFocus: string;
+  location?: string;
+  paperAddressedTo?: boolean;
 }
 
 export interface DignitaryTier {
@@ -33,9 +35,9 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
     id: 'tier-1',
     tierNumber: 1,
     title: 'Tier 1 Protocol',
-    subtitle: 'SOVEREIGN EXECUTIVE & LEGISLATIVE HONOUR',
-    leadHeadline: 'Presidency & National Assembly Leadership',
-    description: 'The highest executive and legislative leadership presiding over the official Opening Ceremony, statutory safety mandates, and national appropriations.',
+    subtitle: 'SOVEREIGN EXECUTIVE, LEGISLATIVE & MULTILATERAL HONOUR',
+    leadHeadline: 'Presidency, National Assembly Leadership & ICAO Global Envoys',
+    description: 'The highest executive, parliamentary, and international aviation leadership presiding over statutory safety mandates, Chicago Convention compliance, and national appropriations.',
     persons: [
       {
         id: 'shettima-vp',
@@ -62,8 +64,40 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         monogram: 'GA',
         photoUrl: '',
         status: 'CONFIRMED SPECIAL GUEST',
-        keynoteTitle: 'Legislative Imperatives for Aviation Safety: Statutory Independence, Modern Infrastructure Appropriations & Sovereign Oversight',
-        keynoteFocus: 'Delivering the Sovereign Legislative Keynote on parliamentary backing for civil aviation acts, statutory autonomy of safety regulators, and ring-fencing federal capital allocations for airspace radar and runway technologies.'
+        keynoteTitle: 'Legislative Imperatives for Aviation Safety: Statutory Independence, Modern Infrastructure Appropriations & The Aviation Appointments Commission',
+        keynoteFocus: 'Delivering the Sovereign Legislative Keynote on parliamentary enactment of the independent Aviation Appointments Commission (The PSC Model), codifying statutory qualification prerequisites for ministers, and ring-fencing federal capital allocations for radar coverage.'
+      },
+      {
+        id: 'icao-hq-canada-rep',
+        salutation: 'Honourable Representative',
+        name: 'ICAO HEADQUARTERS SPECIAL ENVOY (MONTREAL, CANADA)',
+        position: 'Special Envoy of the Secretary General, ICAO Headquarters',
+        organisation: 'International Civil Aviation Organisation (ICAO) · Montreal, Quebec, Canada',
+        roleTitle: 'Global Multilateral Keynote & White Paper Recipient',
+        tierNumber: 1,
+        monogram: 'IC',
+        location: 'Montréal, Quebec, Canada',
+        paperAddressedTo: true,
+        photoUrl: '',
+        status: 'CONFIRMED SPEAKER',
+        keynoteTitle: 'Global Adoption of Annex 19 SARP for Knowledge Preservation & The ICAO 80th Anniversary Memoir Challenge',
+        keynoteFocus: 'Delivering the official ICAO Global Address on Recommendation 1 & 2 of the Dying Library Policy White Paper: establishing multilateral Standards and Recommended Practices (SARPs) under Annex 19 for national aviation memoir archives, USOAP audit benchmarks, and the Secretary General\'s 80th Anniversary Global Memoir Initiative.'
+      },
+      {
+        id: 'icao-wacaf-dakar-rep',
+        salutation: 'Distinguished Director',
+        name: 'ICAO WEST & CENTRAL AFRICA (WACAF) REGIONAL DIRECTOR',
+        position: 'Regional Director for Western and Central Africa, ICAO WACAF',
+        organisation: 'ICAO Western & Central African Regional Office · Dakar, Senegal',
+        roleTitle: 'Regional Multilateral Address & West African Safety Envoy',
+        tierNumber: 1,
+        monogram: 'IW',
+        location: 'Dakar, Senegal',
+        paperAddressedTo: true,
+        photoUrl: '',
+        status: 'CONFIRMED SPEAKER',
+        keynoteTitle: 'Regional Knowledge Retention, Safety Governance Oversight & West African Airspace Harmonisation',
+        keynoteFocus: 'Addressing the 24 member states of West and Central Africa on operationalizing safety management system (SMS) knowledge retention, cross-border incident transparency, and enforcing offshore helicopter safety standards parity across the Gulf of Guinea and Niger Delta.'
       }
     ]
   },
@@ -73,7 +107,7 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
     title: 'Tier 2 Protocol',
     subtitle: 'MINISTERIAL & HOST STATE EXECUTIVE LEADERSHIP',
     leadHeadline: 'Federal Ministry of Aviation & Host State Governor',
-    description: 'Executive stewardship steering statutory aviation policy and host city aerodrome masterplans.',
+    description: 'Executive stewardship steering statutory aviation policy, White Paper implementation, and host city aerodrome masterplans.',
     persons: [
       {
         id: 'keyamo-minister',
@@ -87,7 +121,7 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         photoUrl: '',
         status: 'PROPOSED GUEST OF HONOUR',
         keynoteTitle: 'The 5-Point Aviation Safety Roadmap: Regulatory Independence, Consumer Protection & Fleet Modernisation',
-        keynoteFocus: 'Outlining federal safety oversight, maintenance support policies, and Bilateral Air Service Agreement (BASA) safety reciprocity.'
+        keynoteFocus: 'Outlining federal safety oversight, responding to the Dying Library White Paper recommendations, and advancing Cape Town Convention compliance and maintenance autonomy.'
       },
       {
         id: 'sanwo-olu-gov',
@@ -111,7 +145,7 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
     title: 'Tier 3 Protocol',
     subtitle: 'CIVIL AVIATION STATUTORY REGULATORS',
     leadHeadline: 'Directors General & Chief Executive Officers of Statutory Agencies',
-    description: 'The operational regulators and safety investigation authorities enforcing day-to-day airspace compliance.',
+    description: 'The operational regulators and safety investigation authorities enforcing day-to-day airspace compliance and White Paper technical standards.',
     persons: [
       {
         id: 'najomo-ncaa',
@@ -125,21 +159,21 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         photoUrl: 'https://ncaa.gov.ng/media/5wun51qj/capt-chris-najomo-dgca.jpg',
         status: 'CONFIRMED SPEAKER',
         keynoteTitle: 'Enforcing Compliance, Safety Audits & Global Standards in Civil Aviation',
-        keynoteFocus: 'Continuous surveillance, safety management system (SMS) mandates, and zero-tolerance regulatory audits.'
+        keynoteFocus: 'Continuous surveillance, safety management system (SMS) mandates, adopting Career Testimony before license renewal, and offshore helicopter standards parity.'
       },
       {
         id: 'badeh-nsib',
         salutation: 'Captain',
         name: 'CAPT. ALEX SABUNDU BADEH JNR.',
         position: 'Director General / CEO',
-        organisation: 'Nigerian Safety Investigation Bureau (NSIB)',
+        organisation: 'Nigerian Safety Investigation Bureau (NSIB / AIB)',
         roleTitle: 'Accident Investigation Keynote',
         tierNumber: 3,
         monogram: 'AB',
         photoUrl: '',
         status: 'INVITATION TO BE SENT',
         keynoteTitle: 'Transforming Incident Investigation into Preventive Aviation Safety Architecture',
-        keynoteFocus: 'Non-punitive safety reporting, independent multi-modal accident investigation, and life-saving preventive recommendations.'
+        keynoteFocus: 'Non-punitive safety reporting, independent multi-modal accident investigation, establishing the National Aviation Oral History Programme, and 30-day preliminary report issuance.'
       },
       {
         id: 'kuku-faan',
@@ -152,8 +186,8 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         monogram: 'OK',
         photoUrl: '',
         status: 'INVITATION TO BE SENT',
-        keynoteTitle: 'Airfield Safety, Runway Incursion Mitigation & Airport Infrastructure Resilience',
-        keynoteFocus: 'Modernizing airfield ground lighting, runway Foreign Object Debris (FOD) mitigation, and emergency evacuation drills.'
+        keynoteTitle: 'Airfield Safety, Runway Incursion Mitigation & Protecting General Aviation Aerodromes',
+        keynoteFocus: 'Modernizing airfield ground lighting, runway Foreign Object Debris (FOD) mitigation, and establishing statutory registries to protect general aviation aerodromes from encroachment.'
       },
       {
         id: 'farouk-nama',
@@ -167,7 +201,7 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         photoUrl: '',
         status: 'INVITATION TO BE SENT',
         keynoteTitle: 'Modernising CNS/ATM Systems: Safe Airspace Separation and Digital Navigation',
-        keynoteFocus: 'Total radar coverage, VHF communication redundancy, and performance-based navigation (PBN) routes.'
+        keynoteFocus: 'Total radar coverage, VHF communication redundancy, and performance-based navigation (PBN) routes across Nigerian FIR.'
       },
       {
         id: 'anosike-nimet',
@@ -195,7 +229,7 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         photoUrl: '',
         status: 'INVITATION TO BE SENT',
         keynoteTitle: 'Next-Generation Human Capital: Flight Simulation, Maintenance Engineering & Safety Ethics',
-        keynoteFocus: 'Standardizing ab-initio pilot flight training, simulator certification, and licensed engineer safety rigor.'
+        keynoteFocus: 'Standardizing ab-initio pilot flight training, teaching aviation history through memoirs, and simulator certification.'
       }
     ]
   },
@@ -261,7 +295,7 @@ export const DIGNITARY_TIERS_DATA: DignitaryTier[] = [
         photoUrl: '',
         status: 'PROPOSED INVITEE',
         keynoteTitle: 'Offshore Helideck Safety Standards and ATK Supply Chain Integrity',
-        keynoteFocus: 'Deepwater offshore aviation logistics, helideck certification, and zero-incident upstream energy transport.'
+        keynoteFocus: 'Deepwater offshore aviation logistics, helideck certification, and zero-incident upstream energy transport in the Niger Delta.'
       }
     ]
   }

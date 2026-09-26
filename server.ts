@@ -1798,7 +1798,22 @@ ESSENTIAL SUMMIT KNOWLEDGE & PROTOCOL:
 - Organiser: DomisLink International Services Ltd / The Digital Empire.
 - Convener & Principal Author: ${authorName}.
 - Landmark Book Launch: "${bookTitle}: But Who Is Flying Nigeria's Aviation?" by ${authorName}.
-- Statutory White Paper: "Dying Library Policy White Paper" addressing institutional memory loss, simulator training deficits, and legislative safety mandates submitted to the 10th National Assembly.
+- Statutory White Paper: "The Dying Library: A Policy White Paper on Aviation Knowledge Preservation, Memoir Institutionalisation, and Governance Reform" authored by F/O Amaechi Ubadike. Formally addressed to ICAO (Montreal), Flight Safety Foundation (Alexandria, VA), African Civil Aviation Commission (Dakar), AIB/NSIB, NCAA, Federal Ministry of Aviation, and the 10th National Assembly.
+- The 9 White Paper Policy Recommendations:
+  1. ICAO: Adopt an ICAO SARP under Annex 19 for National Aviation Knowledge Archive Programmes.
+  2. ICAO: Establish the Memoir Challenge as an official ICAO 80th Anniversary Initiative.
+  3. NCAA & NAAs: Require Career Testimony as a condition of final licence renewal before retirement.
+  4. National Assembly: Enact the independent Aviation Appointments Commission modelled on Section 153 Police Service Commission (PSC model) with mandatory ministerial technical qualifications and a Permanent Director of Aviation.
+  5. NCAA, NATCA & NAAPE: Establish an Annual National Aviation Memoir Award with financial prizes.
+  6. NCAA & NSIB: Mandate Offshore Helicopter Safety Standards Parity for Niger Delta operations with North Sea and Gulf of Mexico standards (24-month compliance timeline).
+  7. Federal Ministry & National Assembly: Fully fund and staff AIB/NSIB to international standards with 30-day preliminary report publication and an oral history programme.
+  8. FAAN & Federal Ministry: Protect and expand General Aviation infrastructure via statutory registry (addressing loss of Magbo Aerodrome).
+  9. National Assembly: Formal legislative enactment by the Senate and House Committees on Aviation.
+- Allocated Speeches to International & Sovereign Dignitaries:
+  * ICAO Headquarters Special Envoy (Montreal, Canada): "Global Adoption of Annex 19 SARP for Knowledge Preservation & The ICAO 80th Anniversary Memoir Challenge" (09:15 AM - 09:40 AM Plenary)
+  * ICAO West & Central Africa (WACAF) Regional Director (Dakar, Senegal): "Regional Knowledge Retention, Safety Governance Oversight & West African Airspace Harmonisation" (09:40 AM - 10:05 AM Plenary)
+  * Senate President Sen. Godswill Akpabio: "Legislative Imperatives: The Independent Aviation Appointments Commission (The PSC Model)"
+  * Hon. Minister Festus Keyamo SAN: "The 5-Point Safety Roadmap: Implementing White Paper Governance & Infrastructure Safeguards"
 - Simulation Training Mandate: "Sim Saves Fuel. Sim Saves Dollars. Sim Saves Lives."
 - Key Dignitaries & Protocol Order of Precedence:
   * Special Guest of Honour: His Excellency Sen. Kashim Shettima, GCON (Vice President of Nigeria)
@@ -1922,6 +1937,125 @@ app.post('/api/gemini/tts', async (req, res) => {
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message || 'TTS generation error' });
+  }
+});
+
+// ============================================================
+// AEROSAFE 98.5 FM LIVE RADIO & PODCAST 4-HOST STUDIO ENDPOINTS
+// ============================================================
+app.post('/api/radio/generate-segment', async (req, res) => {
+  try {
+    const { topic, callerName, callerMessage } = req.body;
+    const isCaller = Boolean(callerMessage);
+    
+    const prompt = `You are the Head Producer and Scriptwriter for "AeroSafe 98.5 FM / The SkyPulse Studio" at the DomisLink Aviation Safety Summit 2026 (Theme: "EVERYBODY IS INVOLVED IN AVIATION SAFETY").
+
+You must generate a realistic, high-energy, authoritative radio broadcast dialogue between FOUR (4) DISTINCT IN-STUDIO HOSTS:
+1. "host-anchor-aisha" (Aisha Bello-Lawal): Dynamic, welcoming Secretariat Anchor and Moderator.
+2. "host-captain-segun" (Capt. Segun Adeleke): Veteran 18,000-hour Airline Captain with deep cockpit wisdom.
+3. "host-engr-amara" (Engr. Dr. Amara Obi): Chief MRO Aerospace Engineer specializing in turbines, avionics, Jet A-1 fuel, and structural integrity.
+4. "host-author-amaechi" (F/O Amaechi Ubadike): Commercial Pilot, Air Traffic Controller, Inspector, and Author of "The Dying Library" White Paper (advocating ICAO Annex 19 SARP and Police Service Commission model governance).
+
+Topic / Context: ${topic || 'General Aviation Safety & Knowledge Preservation'}
+${isCaller ? `A live caller named "${callerName || 'Capt. Emeka'}" just phoned into the studio asking: "${callerMessage}". The hosts should greet the caller, answer directly, and debate the solutions.` : 'The hosts should debate this topic with deep technical nuance, real-world examples, regulatory references (NCAA, ICAO, NSIB), and actionable takeaways.'}
+
+Generate between 4 to 6 dialogue turns. Each turn MUST be spoken English suitable for radio broadcast (NO asterisks, NO markdown bullet points, NO emoji).
+
+Return a strict JSON object with the following schema:
+{
+  "title": "Short Catchy Broadcast Episode Title",
+  "turns": [
+    {
+      "id": "t-1",
+      "speakerId": "host-anchor-aisha",
+      "speakerName": "Aisha Bello-Lawal",
+      "roleTitle": "Secretariat Anchor",
+      "text": "Exact words spoken by Aisha...",
+      "timestamp": "00:05",
+      "sentiment": "enthusiastic"
+    },
+    {
+      "id": "t-2",
+      "speakerId": "host-captain-segun",
+      "speakerName": "Capt. Segun Adeleke",
+      "roleTitle": "Chief Flight Deck Veteran",
+      "text": "Exact words spoken by Capt. Segun...",
+      "timestamp": "00:25",
+      "sentiment": "authoritative"
+    },
+    {
+      "id": "t-3",
+      "speakerId": "host-engr-amara",
+      "speakerName": "Engr. Dr. Amara Obi",
+      "roleTitle": "Lead MRO Specialist",
+      "text": "Exact words spoken by Dr. Amara...",
+      "timestamp": "00:48",
+      "sentiment": "technical"
+    },
+    {
+      "id": "t-4",
+      "speakerId": "host-author-amaechi",
+      "speakerName": "F/O Amaechi Ubadike",
+      "roleTitle": "Summit Convener & Author",
+      "text": "Exact words spoken by F/O Amaechi...",
+      "timestamp": "01:10",
+      "sentiment": "thoughtful"
+    }
+  ]
+}`;
+
+    const responseText = await callGeminiWithFallback(prompt, {
+      responseMimeType: "application/json",
+      temperature: 0.3
+    });
+
+    if (responseText) {
+      try {
+        const parsed = JSON.parse(responseText);
+        return res.json(parsed);
+      } catch (parseErr) {
+        console.warn('Radio segment JSON parse error, returning fallback');
+      }
+    }
+
+    res.status(500).json({ error: 'Failed to generate radio segment from AI' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Radio segment generation error' });
+  }
+});
+
+// Secretariat Job Application Submission
+app.post('/api/secretariat/job-apply', async (req, res) => {
+  try {
+    const { jobId, jobTitle, applicantName, email, phone, experience, statement, submittedAt } = req.body;
+    if (!jobTitle || !applicantName || !email) {
+      return res.status(400).json({ error: 'Missing required application fields' });
+    }
+
+    const currentDb = readDb();
+    if (!currentDb.secretariatApplications) {
+      currentDb.secretariatApplications = [];
+    }
+
+    const newApplication = {
+      id: `app-${Date.now()}`,
+      jobId: jobId || 'general',
+      jobTitle,
+      applicantName,
+      email,
+      phone: phone || '',
+      experience: experience || '',
+      statement: statement || '',
+      status: 'UNDER_REVIEW',
+      submittedAt: submittedAt || new Date().toISOString()
+    };
+
+    currentDb.secretariatApplications.push(newApplication);
+    writeDb(currentDb);
+
+    res.json({ success: true, application: newApplication });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to submit application' });
   }
 });
 

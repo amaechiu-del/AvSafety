@@ -27,7 +27,13 @@ import {
   Headphones,
   Sliders,
   Zap,
-  Info
+  Lock,
+  RefreshCw,
+  ExternalLink,
+  ShieldAlert,
+  Smartphone,
+  Laptop,
+  Activity
 } from 'lucide-react';
 
 interface GeminiLiveVoiceModalProps {
@@ -59,20 +65,137 @@ const QUICK_PROMPTS = [
   'How do I register for a Delegate Pass?'
 ];
 
+/**
+ * Visual Sound Wave Indicator Component
+ * Renders dynamic animated sound wave frequency bars with audio-level reactivity
+ */
+function SoundWaveVisualizer({
+  isSpeaking,
+  isGenerating,
+  audioLevel = 0,
+  voiceName = 'Zephyr',
+  onStop
+}: {
+  isSpeaking: boolean;
+  isGenerating: boolean;
+  audioLevel?: number;
+  voiceName?: string;
+  onStop?: () => void;
+}) {
+  const bars = [
+    { height: 35, delay: '0.05s' },
+    { height: 65, delay: '0.15s' },
+    { height: 95, delay: '0.25s' },
+    { height: 50, delay: '0.10s' },
+    { height: 85, delay: '0.20s' },
+    { height: 100, delay: '0.30s' },
+    { height: 60, delay: '0.12s' },
+    { height: 90, delay: '0.22s' },
+    { height: 45, delay: '0.08s' },
+    { height: 80, delay: '0.18s' },
+    { height: 95, delay: '0.28s' },
+    { height: 55, delay: '0.14s' },
+    { height: 85, delay: '0.24s' },
+    { height: 40, delay: '0.06s' }
+  ];
+
+  if (!isSpeaking && !isGenerating) return null;
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0A192F]/90 via-[#0E2A47]/95 to-[#0A192F]/90 border border-[#D4AF37]/50 px-4 py-2.5 shadow-[0_0_30px_rgba(212,175,55,0.3)] backdrop-blur-md animate-fadeIn flex flex-wrap items-center justify-between gap-3">
+      {/* Background ambient audio glow */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#D4AF37]/10 via-emerald-500/10 to-[#D4AF37]/10 animate-pulse pointer-events-none" />
+
+      {/* Left Icon & Information */}
+      <div className="flex items-center gap-3 relative z-10">
+        <div className="relative flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8C701B] flex items-center justify-center shadow-md">
+            {isSpeaking ? (
+              <Volume2 className="w-4 h-4 text-[#0A192F] animate-pulse" />
+            ) : (
+              <Loader2 className="w-4 h-4 text-[#0A192F] animate-spin" />
+            )}
+          </div>
+          <span className="absolute -inset-1 rounded-xl bg-[#D4AF37]/40 animate-ping pointer-events-none" />
+        </div>
+
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-wider text-[#D4AF37] flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              {isGenerating ? 'AI Generating Spoken Audio...' : `AI Speaking (${voiceName} Voice)`}
+            </span>
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-300">
+            {isGenerating
+              ? 'Synthesizing neural 24kHz PCM voice response...'
+              : 'Streaming live broadcast audio to your speakers/headphones'}
+          </p>
+        </div>
+      </div>
+
+      {/* Center Dynamic Sound Wave Oscilloscope Bars */}
+      <div className="flex items-end gap-1 h-7 px-3 py-0.5 bg-black/40 border border-slate-700/60 rounded-xl relative z-10">
+        {bars.map((bar, i) => {
+          const dynamicHeight = isSpeaking
+            ? Math.max(25, Math.min(100, bar.height * (0.6 + (audioLevel / 100) * 0.8)))
+            : bar.height * 0.5;
+
+          return (
+            <span
+              key={i}
+              className={`w-1 rounded-full transition-all duration-150 ${
+                isGenerating
+                  ? 'bg-gradient-to-t from-amber-500 via-amber-300 to-white animate-soundwave-bar'
+                  : 'bg-gradient-to-t from-[#D4AF37] via-[#FFF2B2] to-emerald-300 shadow-[0_0_8px_rgba(212,175,55,0.7)] animate-soundwave-bar'
+              }`}
+              style={{
+                height: `${dynamicHeight}%`,
+                animationDuration: isSpeaking ? '0.8s' : '1.4s',
+                animationDelay: bar.delay
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Right Stop Audio Button if currently speaking */}
+      {isSpeaking && onStop && (
+        <button
+          onClick={onStop}
+          className="relative z-10 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-[#D4AF37]/50 text-[#D4AF37] hover:text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow"
+          title="Stop Audio Playback"
+        >
+          <Square className="w-3 h-3 fill-current" />
+          <span>Stop Audio</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoiceModalProps) {
   // Session States
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
-  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
+
+  // Permission & Error States
+  const [permissionState, setPermissionState] = useState<'granted' | 'prompt' | 'denied' | 'unknown'>('unknown');
+  const [showPermissionHelp, setShowPermissionHelp] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Voice & Customisation
   const [activeVoice, setActiveVoice] = useState<'Zephyr' | 'Kore' | 'Puck' | 'Fenrir'>('Zephyr');
   const [showSettings, setShowSettings] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Text query input
@@ -98,7 +221,6 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
   const audioChunksRef = useRef<Blob[]>([]);
   const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const speechRecognitionRef = useRef<any>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll conversation
@@ -111,6 +233,29 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
       scrollToBottom();
     }
   }, [transcript, interimSpeech, isOpen, scrollToBottom]);
+
+  // Check microphone permissions on mount
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions
+        .query({ name: 'microphone' as PermissionName })
+        .then((permissionStatus) => {
+          setPermissionState(permissionStatus.state as any);
+          permissionStatus.onchange = () => {
+            setPermissionState(permissionStatus.state as any);
+            if (permissionStatus.state === 'granted') {
+              setShowPermissionHelp(false);
+              setErrorMessage(null);
+            }
+          };
+        })
+        .catch(() => {
+          setPermissionState('unknown');
+        });
+    }
+  }, [isOpen]);
 
   // Initialize or get AudioContext
   const getAudioContext = useCallback(() => {
@@ -139,12 +284,17 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
       window.speechSynthesis.cancel();
     }
     setIsAssistantSpeaking(false);
+    setSpeakingMessageId(null);
   }, []);
 
   // Play audio buffer (raw PCM or WAV) or fallback to SpeechSynthesis
-  const playAssistantSpeech = useCallback(async (text: string, audioBase64?: string, mimeType?: string) => {
+  const playAssistantSpeech = useCallback(async (text: string, messageId?: string, audioBase64?: string, mimeType?: string) => {
     if (isSpeakerMuted) return;
     stopAssistantAudio();
+
+    if (messageId) {
+      setSpeakingMessageId(messageId);
+    }
 
     // 1. If Gemini returned raw audio, decode and play through Web Audio API
     if (audioBase64) {
@@ -188,6 +338,7 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
 
             source.onended = () => {
               setIsAssistantSpeaking(false);
+              setSpeakingMessageId(null);
               currentAudioSourceRef.current = null;
             };
 
@@ -196,7 +347,7 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
           }
         }
       } catch (err) {
-        console.warn('[Gemini Voice] Web Audio decode failed, falling back to speech synthesis:', err);
+        console.warn('[Gemini Voice] Web Audio decode note, using speech synthesis fallback:', err);
       }
     }
 
@@ -207,7 +358,6 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
 
-      // Try selecting standard professional English voice
       const voices = window.speechSynthesis.getVoices();
       const preferred = voices.find(v => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel')) && v.lang.startsWith('en'))
         || voices.find(v => v.lang.startsWith('en'));
@@ -216,8 +366,14 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
       }
 
       utterance.onstart = () => setIsAssistantSpeaking(true);
-      utterance.onend = () => setIsAssistantSpeaking(false);
-      utterance.onerror = () => setIsAssistantSpeaking(false);
+      utterance.onend = () => {
+        setIsAssistantSpeaking(false);
+        setSpeakingMessageId(null);
+      };
+      utterance.onerror = () => {
+        setIsAssistantSpeaking(false);
+        setSpeakingMessageId(null);
+      };
 
       window.speechSynthesis.speak(utterance);
     }
@@ -286,43 +442,63 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
         }
       ]);
 
-      // Play audio response
-      playAssistantSpeech(replyText, audioData, audioMime);
+      // Play audio response with sound wave animation
+      playAssistantSpeech(replyText, assistantMessageId, audioData, audioMime);
     } catch (err: any) {
       console.error('[Gemini Voice] Query failed:', err);
       setErrorMessage(err.message || 'Unable to connect to voice engine. Please check network connection.');
       const fallbackText = 'I am currently processing offline. The Aviation Safety Summit 2026 takes place on Tuesday, 17 November 2026 at Lagos Marriott Hotel, convened by Captain AMAECHI UBADIKE.';
+      const fallbackId = `fallback-${Date.now()}`;
       setTranscript(prev => [
         ...prev,
         {
-          id: `fallback-${Date.now()}`,
+          id: fallbackId,
           sender: 'gemini',
           text: fallbackText,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
-      playAssistantSpeech(fallbackText);
+      playAssistantSpeech(fallbackText, fallbackId);
     } finally {
       setIsProcessing(false);
     }
   }, [activeVoice, isProcessing, playAssistantSpeech, transcript]);
 
-  // Start microphone streaming & audio metering
+  // Start microphone streaming & audio metering with robust multi-stage permission handling
   const startMicSession = useCallback(async () => {
+    setErrorMessage(null);
+    setShowPermissionHelp(false);
+
+    // 1. Check if mediaDevices is supported in this browser context
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setErrorMessage('Microphone access is not supported by your browser environment or requires an HTTPS secure origin.');
+      setShowPermissionHelp(true);
+      return;
+    }
+
     try {
-      setErrorMessage(null);
       const audioCtx = getAudioContext();
       if (!audioCtx) throw new Error('Web Audio is not supported in this browser.');
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+      let stream: MediaStream;
+
+      // Try preferred audio constraints first, with graceful fallback to simple constraints
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+      } catch (advancedConstraintErr) {
+        console.warn('[Gemini Voice] Advanced mic constraints failed, retrying with basic audio constraints:', advancedConstraintErr);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
 
       mediaStreamRef.current = stream;
+      setPermissionState('granted');
+      setShowPermissionHelp(false);
 
       // Setup Web Audio Analyser for live frequency metering
       const source = audioCtx.createMediaStreamSource(stream);
@@ -429,9 +605,23 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
       setIsListening(true);
     } catch (err: any) {
       console.error('[Gemini Live Voice] Mic start error:', err);
-      setErrorMessage(err.message || 'Microphone access denied. Please allow microphone permissions in your browser.');
+      setPermissionState('denied');
       setIsSessionActive(false);
       setIsListening(false);
+
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setErrorMessage('Microphone access was blocked or denied by your browser settings.');
+        setShowPermissionHelp(true);
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setErrorMessage('No physical microphone device was detected on your computer or phone.');
+        setShowPermissionHelp(true);
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setErrorMessage('Your microphone is currently in use by another application.');
+        setShowPermissionHelp(true);
+      } else {
+        setErrorMessage(err.message || 'Microphone permission not granted. Please allow microphone access in your browser.');
+        setShowPermissionHelp(true);
+      }
     }
   }, [getAudioContext, sendQueryToGemini]);
 
@@ -440,10 +630,6 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
-    }
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
     }
     if (speechRecognitionRef.current) {
       try {
@@ -621,7 +807,9 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
                   isAssistantSpeaking
-                    ? 'bg-[#D4AF37]/30 border-2 border-[#D4AF37] shadow-[0_0_20px_rgba(212,175,55,0.6)]'
+                    ? 'bg-[#D4AF37]/30 border-2 border-[#D4AF37] shadow-[0_0_20px_rgba(212,175,55,0.6)] animate-audio-aura'
+                    : isProcessing
+                    ? 'bg-amber-500/20 border-2 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
                     : isListening
                     ? 'bg-emerald-500/20 border-2 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
                     : 'bg-slate-800 border border-slate-700'
@@ -629,6 +817,8 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
               >
                 {isAssistantSpeaking ? (
                   <Volume2 className="w-5 h-5 text-[#D4AF37] animate-pulse" />
+                ) : isProcessing ? (
+                  <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
                 ) : isListening ? (
                   <Mic className="w-5 h-5 text-emerald-400 animate-pulse" />
                 ) : (
@@ -643,18 +833,18 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
                   className={`w-2 h-2 rounded-full ${
                     isAssistantSpeaking
                       ? 'bg-[#D4AF37] animate-ping'
-                      : isListening
-                      ? 'bg-emerald-400 animate-pulse'
                       : isProcessing
                       ? 'bg-amber-400 animate-ping'
+                      : isListening
+                      ? 'bg-emerald-400 animate-pulse'
                       : 'bg-slate-500'
                   }`}
                 />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
                   {isAssistantSpeaking
-                    ? 'Gemini Is Speaking...'
+                    ? `Gemini Speaking (${activeVoice} Voice)`
                     : isProcessing
-                    ? 'Analyzing Airspace Knowledge...'
+                    ? 'Generating Voice Audio & Airspace Intelligence...'
                     : isListening
                     ? 'Live Microphone Active — Speak Now'
                     : 'Voice Engine Ready'}
@@ -662,7 +852,9 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
               </div>
               <p className="text-[11px] text-slate-400">
                 {isAssistantSpeaking
-                  ? `Broadcasting via ${activeVoice} voice synthesis`
+                  ? `Broadcasting via ${activeVoice} voice synthesis at 24kHz HD`
+                  : isProcessing
+                  ? 'Compiling protocol knowledge and synthesizing spoken audio stream'
                   : isListening
                   ? 'Real-time duplex voice recognition listening for your question'
                   : 'Press "Start Live Voice" or type below to interact'}
@@ -672,39 +864,156 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
 
           {/* Dynamic Audio Bars */}
           <div className="flex items-end gap-1 h-6">
-            {[40, 75, 55, 90, 60, 85, 45, 95].map((height, i) => {
-              const active = isSessionActive || isAssistantSpeaking;
-              const scale = active ? Math.max(20, (audioLevel * height) / 100) : 15;
+            {[40, 75, 55, 90, 60, 85, 45, 95, 60, 80, 50, 70].map((height, i) => {
+              const active = isSessionActive || isAssistantSpeaking || isProcessing;
+              const scale = isAssistantSpeaking
+                ? Math.max(25, (audioLevel * height) / 100)
+                : isProcessing
+                ? Math.max(20, (height * 0.7))
+                : isListening
+                ? Math.max(20, (audioLevel * height) / 100)
+                : 15;
+
               return (
                 <div
                   key={i}
                   className={`w-1 rounded-full transition-all duration-100 ${
                     isAssistantSpeaking
-                      ? 'bg-[#D4AF37]'
+                      ? 'bg-gradient-to-t from-[#D4AF37] to-white animate-soundwave-bar'
+                      : isProcessing
+                      ? 'bg-gradient-to-t from-amber-400 to-amber-200 animate-soundwave-bar'
                       : isListening
                       ? 'bg-emerald-400'
                       : 'bg-slate-700'
                   }`}
-                  style={{ height: `${scale}%` }}
+                  style={{
+                    height: `${scale}%`,
+                    animationDelay: `${(i % 5) * 0.15}s`
+                  }}
                 />
               );
             })}
           </div>
         </div>
 
+        {/* Global Sound Wave Speaking Indicator Banner when AI is active */}
+        {(isAssistantSpeaking || isProcessing) && (
+          <div className="px-5 py-2.5 bg-[#081526] border-b border-[#D4AF37]/30 shrink-0">
+            <SoundWaveVisualizer
+              isSpeaking={isAssistantSpeaking}
+              isGenerating={isProcessing}
+              audioLevel={audioLevel}
+              voiceName={activeVoice}
+              onStop={stopAssistantAudio}
+            />
+          </div>
+        )}
+
+        {/* Microphone Permission Helper Modal / Banner */}
+        {showPermissionHelp && (
+          <div className="bg-[#1A0D15]/95 border-b-2 border-amber-500/60 p-4 sm:p-5 text-slate-200 shrink-0 animate-fadeIn shadow-2xl backdrop-blur-md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500 text-[#0A192F] text-[10px] font-black uppercase tracking-wider">
+                      Microphone Permission Guide
+                    </span>
+                    <span className="text-xs font-semibold text-amber-300">
+                      Enable 1-Click Voice Mode
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white">
+                    How to grant microphone access in your browser:
+                  </h4>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowPermissionHelp(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
+                aria-label="Dismiss guide"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3.5 text-xs text-slate-300">
+              <div className="p-3 bg-black/40 border border-slate-700/60 rounded-xl space-y-1.5">
+                <div className="font-bold text-white flex items-center gap-1.5">
+                  <Laptop className="w-3.5 h-3.5 text-[#D4AF37]" /> On Chrome / Edge / Desktop:
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-300">
+                  1. Click the <strong>Lock / Settings icon</strong> (🔒 or 🎛️) at the left of your browser address bar.
+                  <br />
+                  2. Toggle <strong>Microphone</strong> to <strong>"Allow"</strong>.
+                  <br />
+                  3. Click the <em>"Try Granting Access"</em> button below.
+                </p>
+              </div>
+
+              <div className="p-3 bg-black/40 border border-slate-700/60 rounded-xl space-y-1.5">
+                <div className="font-bold text-white flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-[#D4AF37]" /> On iPhone (Safari) / Android:
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-300">
+                  1. Tap <strong>"aA"</strong> or <strong>Site Settings</strong> in your phone browser bar.
+                  <br />
+                  2. Select <strong>Website Settings ➔ Microphone ➔ Allow</strong>.
+                  <br />
+                  3. You can also type queries below and hear full Gemini AI voice answers!
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3.5 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] text-slate-400 italic">
+                Tip: You can ask questions via the text input below and Gemini will still speak the response aloud!
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPermissionHelp(false)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 cursor-pointer transition"
+                >
+                  Use Text & Voice Playback
+                </button>
+                <button
+                  onClick={startMicSession}
+                  className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#B89025] hover:brightness-110 text-[#0A192F] text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Try Granting Access</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Error Notification Alert */}
-        {errorMessage && (
+        {errorMessage && !showPermissionHelp && (
           <div className="bg-red-950/80 border-b border-red-500/50 px-5 py-2.5 flex items-center justify-between text-xs text-red-200 shrink-0">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
               <span>{errorMessage}</span>
             </div>
-            <button
-              onClick={() => setErrorMessage(null)}
-              className="text-red-400 hover:text-white p-1"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPermissionHelp(true)}
+                className="underline text-amber-300 hover:text-amber-200 font-semibold cursor-pointer"
+              >
+                Help Fix This
+              </button>
+              <button
+                onClick={() => setErrorMessage(null)}
+                className="text-red-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -713,24 +1022,48 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
           {transcript.map((item) => {
             const isUser = item.sender === 'user';
             const isCopied = copiedId === item.id;
+            const isCurrentMessageSpeaking = isAssistantSpeaking && speakingMessageId === item.id;
+
             return (
               <div
                 key={item.id}
                 className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} animate-fadeIn`}
               >
                 {!isUser && (
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8C701B] p-0.5 shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8C701B] p-0.5 shrink-0 mt-0.5 relative">
                     <div className="w-full h-full bg-[#0A192F] rounded-[10px] flex items-center justify-center">
                       <Sparkles className="w-4 h-4 text-[#D4AF37]" />
                     </div>
+                    {isCurrentMessageSpeaking && (
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-[#D4AF37]" />
+                      </span>
+                    )}
                   </div>
                 )}
 
                 <div className={`max-w-[85%] sm:max-w-[78%] space-y-1.5`}>
+                  {/* Inline Speaking Sound Wave Badge */}
+                  {isCurrentMessageSpeaking && (
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/60 text-[#D4AF37] text-[10px] font-bold uppercase tracking-wider w-max shadow-sm animate-fadeIn">
+                      <Volume2 className="w-3.5 h-3.5 animate-pulse text-[#D4AF37]" />
+                      <span>Speaking now ({activeVoice})</span>
+                      <div className="flex items-end gap-0.5 h-3 pl-1 border-l border-[#D4AF37]/40">
+                        <span className="w-0.5 h-full bg-[#D4AF37] rounded-full animate-soundwave-bar" style={{ animationDelay: '0ms' }} />
+                        <span className="w-0.5 h-full bg-[#D4AF37] rounded-full animate-soundwave-bar" style={{ animationDelay: '150ms' }} />
+                        <span className="w-0.5 h-full bg-[#D4AF37] rounded-full animate-soundwave-bar" style={{ animationDelay: '300ms' }} />
+                        <span className="w-0.5 h-full bg-[#D4AF37] rounded-full animate-soundwave-bar" style={{ animationDelay: '80ms' }} />
+                      </div>
+                    </div>
+                  )}
+
                   <div
-                    className={`rounded-2xl px-4 py-3 text-xs sm:text-sm leading-relaxed shadow-md ${
+                    className={`rounded-2xl px-4 py-3 text-xs sm:text-sm leading-relaxed shadow-md transition-all ${
                       isUser
                         ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-tr-none'
+                        : isCurrentMessageSpeaking
+                        ? 'bg-[#0E2A47] border-2 border-[#D4AF37] text-slate-100 rounded-tl-none shadow-[0_0_20px_rgba(212,175,55,0.25)]'
                         : 'bg-[#0E2A47]/80 border border-[#D4AF37]/30 text-slate-100 rounded-tl-none backdrop-blur-sm'
                     }`}
                   >
@@ -763,7 +1096,7 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
 
                     {!isUser && (
                       <button
-                        onClick={() => playAssistantSpeech(item.text, item.audioBase64, item.mimeType)}
+                        onClick={() => playAssistantSpeech(item.text, item.id, item.audioBase64, item.mimeType)}
                         className="hover:text-[#D4AF37] transition flex items-center gap-1 cursor-pointer ml-1"
                         title="Replay Voice Audio"
                       >
@@ -792,17 +1125,38 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
             </div>
           )}
 
-          {/* Processing Indicator */}
+          {/* Processing Indicator with Audio Generation Shimmer Wave */}
           {isProcessing && (
             <div className="flex gap-3 justify-start animate-fadeIn">
               <div className="w-8 h-8 rounded-xl bg-[#0A192F] border border-[#D4AF37]/50 flex items-center justify-center shrink-0">
                 <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin" />
               </div>
-              <div className="bg-[#0E2A47]/60 border border-[#D4AF37]/20 rounded-2xl rounded-tl-none px-4 py-2.5 text-xs text-slate-300 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce" />
-                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:0.2s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:0.4s]" />
-                <span className="text-[11px] text-slate-300 ml-1">Consulting Summit Policy & Protocol Archives...</span>
+              <div className="bg-[#0E2A47]/80 border border-[#D4AF37]/40 rounded-2xl rounded-tl-none p-3.5 text-xs text-slate-200 space-y-2 max-w-[85%] shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[#D4AF37]">Synthesizing Gemini Voice Answer</span>
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:0.2s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                </div>
+
+                {/* Animated sound wave bars while waiting for audio payload */}
+                <div className="flex items-center gap-1.5 py-1">
+                  {[30, 60, 90, 45, 75, 100, 50, 85, 40, 70].map((h, i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-gradient-to-t from-amber-400 to-amber-200 rounded-full animate-soundwave-bar"
+                      style={{
+                        height: `${h * 0.25}px`,
+                        animationDelay: `${i * 0.12}s`
+                      }}
+                    />
+                  ))}
+                  <span className="text-[11px] text-slate-300 ml-2 font-mono">
+                    Generating audio...
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -856,7 +1210,7 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
               {isAssistantSpeaking && (
                 <button
                   onClick={stopAssistantAudio}
-                  className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow"
                   title="Mute Current Speech"
                 >
                   <Square className="w-3.5 h-3.5" />
@@ -880,12 +1234,37 @@ export default function GeminiLiveVoiceModal({ isOpen, onClose }: GeminiLiveVoic
               >
                 {isSpeakerMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
+
+              {permissionState === 'denied' && (
+                <button
+                  onClick={() => setShowPermissionHelp(true)}
+                  className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  title="View Microphone Permission Help"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                  <span className="hidden md:inline">Permission Help</span>
+                </button>
+              )}
             </div>
 
-            {/* Live Status indicator */}
-            <div className="flex items-center gap-2 text-[11px] text-slate-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>Gemini 3.1 Flash Lite • Dual Live Protocol Engine</span>
+            {/* Live Status indicator with mini soundwave */}
+            <div className="flex items-center gap-2 text-[11px] text-slate-300">
+              {isAssistantSpeaking ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#D4AF37] font-semibold">
+                  <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                  <span>{activeVoice} Voice Active</span>
+                </div>
+              ) : isProcessing ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 font-semibold">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Synthesizing Audio...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span>Gemini 3.1 Flash Lite • Dual Live Protocol Engine</span>
+                </div>
+              )}
             </div>
           </div>
 
